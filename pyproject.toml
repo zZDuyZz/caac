@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caac"
+version = "0.1.0"
+description = "Cost-Aware Adaptive Computation for Efficient LLM Reasoning"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "[Student Name]" }]
+keywords = ["llm", "reasoning", "test-time-scaling", "adaptive-computation", "efficient-inference"]
+
+# Core dependencies are CPU-only so the whole decision layer runs without a GPU.
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# GPU / serving extras -- installed only when running phases P1+.
+gpu = [
+    "torch>=2.1",
+    "transformers>=4.40",
+    "vllm>=0.4",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+caac = "caac.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
