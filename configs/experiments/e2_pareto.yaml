@@ -1,0 +1,5 @@
+# E2 -- Pareto sweep vs all baselines.
+experiment: e2_pareto
+lambda_grid: {low: 0.001, high: 10.0, n: 12}
+baselines: [fixed_budget, self_consistency, budget_forcing, deer, deepconf, compute_optimal_tts]
+metrics: [cost_at_iso_accuracy, accuracy_at_iso_cost, acc_cost_auc]

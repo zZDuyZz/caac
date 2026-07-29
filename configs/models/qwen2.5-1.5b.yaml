@@ -1,0 +1,14 @@
+# Model config for Qwen2.5-1.5B-Instruct (phase P1+; needs GPU).
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  backend: vllm            # use 'mock' on CPU
+  dtype: bfloat16
+verifier:
+  name: prm                # use 'mock' on CPU
+  model: Qwen/Qwen2.5-Math-PRM-7B
+controller:
+  segment_tokens: 64
+  max_steps: 32
+  max_branches: 2
+adapter:
+  calibrator: temperature

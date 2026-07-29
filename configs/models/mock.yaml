@@ -1,0 +1,13 @@
+# CPU-only mock config -- runs the full loop without any model weights.
+model:
+  name: mock-model
+  backend: mock
+  difficulty: 0.5
+verifier:
+  name: mock
+controller:
+  segment_tokens: 64
+  max_steps: 16
+  max_branches: 2
+adapter:
+  calibrator: temperature

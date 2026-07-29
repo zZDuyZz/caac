@@ -1,0 +1,9 @@
+# E1 -- calibration study (RQ1, go/no-go gate).
+experiment: e1_calibration
+signals: [mean_token_confidence, sequence_entropy, semantic_entropy, prm_score]
+scales: [0.5B, 1.5B, 3B, 7B]
+calibrators: [identity, temperature, isotonic]
+metrics: [ece, brier, aurc, selective_risk]
+gate:
+  metric: ece
+  threshold: 0.10          # at least one signal must reach this at >=1.5B

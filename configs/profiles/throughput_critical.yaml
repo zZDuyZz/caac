@@ -1,0 +1,2 @@
+# Tokens and KV pressure dominate serving throughput.
+weights: {tokens: 1.0, forward_passes: 0.5, kv_bytes: 0.000001, latency_s: 0.0}

@@ -1,0 +1,5 @@
+# E0 -- oracle upper bound (go/no-go gate).
+experiment: e0_oracle
+lambda_grid: {low: 0.001, high: 10.0, n: 12}
+gate:
+  min_oracle_gap: 0.20     # oracle must beat best baseline by >=20% cost @ iso-acc

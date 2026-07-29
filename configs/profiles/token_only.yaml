@@ -1,0 +1,2 @@
+# Pure token accounting (the usual, incomplete convention).
+weights: {tokens: 1.0, forward_passes: 0.0, kv_bytes: 0.0, latency_s: 0.0}
