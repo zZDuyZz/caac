@@ -75,7 +75,7 @@ def area_under_risk_coverage(probs, labels) -> float:
     'wrong scale' from 'wrong ordering'.
     """
     coverage, risk = selective_risk_curve(probs, labels)
-    return float(np.trapezoid(risk, coverage))
+    return float(np.trapz(risk, coverage))
 
 
 def calibration_report(probs, labels, n_bins: int = 15) -> dict:

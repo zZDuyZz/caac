@@ -60,7 +60,7 @@ class VLLMBackend:
     top_logprobs: int = 20
     temperature: float = 0.0
     gpu_memory_utilization: float = 0.90
-    max_model_len: int | None = None
+    max_model_len: int | None = 4096
     stop: list[str] | None = None
     seed: int = 0
 

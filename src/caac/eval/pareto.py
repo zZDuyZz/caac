@@ -89,7 +89,7 @@ def acc_cost_auc(points: list, cost_min=None, cost_max=None, n_grid: int = 100) 
         return float(accs.max())
     grid = np.linspace(lo, hi, n_grid)
     interp = np.array([accs[costs <= c].max() if np.any(costs <= c) else accs[0] for c in grid])
-    return float(np.trapezoid(interp, grid) / (hi - lo))
+    return float(np.trapz(interp, grid) / (hi - lo))
 
 
 def compare_frontiers(method: list, baseline: list, accuracy_targets=None) -> dict:

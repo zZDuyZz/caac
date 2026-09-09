@@ -39,10 +39,14 @@ def _make_backend(name: str, **kwargs):
     if name == "hf":
         from caac.backends.hf import HFBackend
 
+        if "model" in kwargs and "model_name" not in kwargs:
+            kwargs["model_name"] = kwargs.pop("model")
         return HFBackend(**kwargs)
     if name == "vllm":
         from caac.backends.vllm import VLLMBackend
 
+        if "model" in kwargs and "model_name" not in kwargs:
+            kwargs["model_name"] = kwargs.pop("model")
         return VLLMBackend(**kwargs)
     raise KeyError(f"unknown backend '{name}'")
 
@@ -101,6 +105,8 @@ class CAAC:
         a segment costs ~64, and gains are O(0.1), so a sensible default is
         ~5e-4. Sweeping lam traces the Pareto frontier; see core.budget.
         """
+        if backend != "mock":
+            backend_kwargs.setdefault("model", model)
         be = _make_backend(backend, **backend_kwargs)
         vf = _make_verifier(verifier, backend=be)
         weights = DEPLOYMENT_PROFILES.get(profile, CostWeights())
