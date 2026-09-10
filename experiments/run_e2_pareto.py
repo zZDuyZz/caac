@@ -106,9 +106,8 @@ def main():
     backend = get_backend(
         args.backend, **({} if args.backend == "mock" else {"model_name": args.model})
     )
-    verifier = MockVerifier() if args.backend == "mock" else None
+    verifier = MockVerifier()  # TODO(P1->P4): swap for real PRM once tuned
     problems = load_benchmark('gsm8k', n=args.n_problems)
-    for prob in problems:
 
     # CAAC frontier
     caac_pts = []
