@@ -104,12 +104,10 @@ def main():
     else:
         from caac.backends import get_backend
         from caac.backends.mock import MockVerifier
-        from caac.data.benchmarks import synthetic_benchmark
+        from caac.data.benchmarks import load_benchmark
 
         backend = get_backend(args.backend, **({} if args.backend == "mock" else {"model_name": args.model}))
-        problems = synthetic_benchmark(n=args.n_problems)
-        for prob in problems:
-            prob["answer"] = "42"  # mock answer pool
+        problems = load_benchmark('gsm8k', n=args.n_problems)
         tree = collect_tree(
             backend, problems, verifier=MockVerifier(),
             config=CollectionConfig(max_depth=2, n_rollouts=2),
