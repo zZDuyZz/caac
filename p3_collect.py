@@ -52,6 +52,9 @@ def main():
     from caac.data.compute_tree import oracle_frontier
     from caac.data.collect import CollectionConfig, collect_tree
     from caac.types import CostWeights
+    from caac.utils.logging import setup_logging
+
+    setup_logging("INFO")
 
     print(f"Loading backend: {args.model} ...")
     backend = VLLMBackend(model_name=args.model)
