@@ -1,0 +1,10 @@
+name, driver_version
+NVIDIA A100-SXM4-40GB, 615.71.09
+2.5.1+cu124 4.52.4 0.7.3
+datasets==3.6.0
+math-verify==0.9.0
+torch==2.5.1
+torchaudio==2.5.1
+torchvision==0.20.1
+transformers==4.52.4
+vllm==0.7.3

@@ -1,0 +1,31 @@
+
+================ (1) ACCURACY vs ANCHORS (sanity) ================
+  [sizes] MATH-500 1.5b=500 7b=500 | GSM8K 1.5b=1319 7b=1319
+  MATH-500 1.5B greedy          0.490   anchor 0.441  Δ+0.049  [OK]
+  MATH-500 1.5B maj@16          0.604   anchor 0.558  Δ+0.046  [OK]
+  MATH-500 7B greedy            0.664   anchor 0.755  Δ-0.091  [CHECK prompt/grader]
+  GSM8K 1.5B greedy             0.728   anchor 0.701  Δ+0.027  [OK]
+  GSM8K 1.5B maj@16             0.834   anchor 0.809  Δ+0.025  [OK]
+  GSM8K 7B greedy               0.901
+
+  MATH-500 1.5B truncated: greedy 10.6%, samples 9.7%   [ok]
+
+================ (2) CHOW BOUND (headroom cho hành động sửa) ================
+  pi_pop = tỉ lệ câu trả lời ỨNG VIÊN đúng. serve/abstain-only bị chặn ở
+  min{1, pi_pop/(1-alpha)}. Escalate sang 7B nâng pi_pop -> nâng trần.
+
+  [MATH-500] pi_pop 1.5B-greedy=0.490 | 7B-greedy=0.664
+      alpha=0.10:  serve/abstain cap=0.544   sau escalate cap=0.738   (+0.193)
+      alpha=0.15:  serve/abstain cap=0.576   sau escalate cap=0.781   (+0.205)
+      alpha=0.20:  serve/abstain cap=0.612   sau escalate cap=0.830   (+0.218)
+  [GSM8K] pi_pop 1.5B-greedy=0.728 | 7B-greedy=0.901
+      alpha=0.10:  serve/abstain cap=0.809   sau escalate cap=1.000   (+0.191)
+      alpha=0.15:  serve/abstain cap=0.856   sau escalate cap=1.000   (+0.144)
+      alpha=0.20:  serve/abstain cap=0.910   sau escalate cap=1.000   (+0.090)
+
+  Đọc: trần serve/abstain càng THẤP so với escalate -> câu chuyện paper càng
+  mạnh (hành động sửa câu trả lời là điều kiện cần, không phải tối ưu thêm).
+
+  LƯU Ý: đây là readout để quyết định có chạy tiếp A2 không. Gate E0/E1
+  chính thức tính sau, khi controller đã huấn luyện trên split A3.
+

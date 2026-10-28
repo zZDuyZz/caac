@@ -1,0 +1,10 @@
+[math7b] n=500 acc=0.664 finish={'stop': 448, 'length': 52}
+   truncated=10.4%  acc|not-truncated=0.739  no-answer(None/empty)=0.0%
+   decode tokens median=515 p90=1024 max=1024
+   wrong & finished & no extracted answer = 0  (nghi lỗi trích/ chấm)
+   samples truncated=10.9%
+[math15b] n=500 acc=0.490 finish={'stop': 447, 'length': 53}
+   truncated=10.6%  acc|not-truncated=0.546  no-answer(None/empty)=0.0%
+   decode tokens median=477 p90=1024 max=1024
+   wrong & finished & no extracted answer = 0  (nghi lỗi trích/ chấm)
+   samples truncated=9.7%
