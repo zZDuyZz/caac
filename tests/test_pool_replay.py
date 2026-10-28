@@ -146,6 +146,28 @@ def test_caac_controller_runs_and_certifies():
     assert sum(r.certified for r in ordered) >= sum(r.certified for r in results) - 0  # sane
 
 
+def test_vote_uses_graded_correctness_not_raw_gold_string():
+    """MATH golds are LaTeX; normalized answers differ byte-for-byte from them.
+    Voting must key on the graded `correct` flag, else correct answers vanish."""
+    from caac.pool.schema import GOLD
+
+    def comp(ans, ok):
+        return Completion(answer=ans, correct=ok, decode_tokens=100,
+                          finish_reason="stop", confidence=0.5, seed=1)
+
+    # raw gold is "\\frac{1}{2}", but correct samples were normalized to "1/2"/"0.5"
+    samples = [comp("1/2", True)] * 3 + [comp("0.5", True)] * 2 + [comp("3", False)] * 2
+    rec = PoolRecord(query_id="q", dataset="math500", model="m", gold="\\frac{1}{2}",
+                     prompt_tokens=50, greedy=comp("1/2", True), samples=samples)
+    # old behaviour (string equality with raw gold): gold never appears -> 0.0
+    assert maj_at_k_exact(rec.sample_answers(), rec.gold, 5) == 0.0
+    # new behaviour: all 5 correct forms merge into GOLD and beat the 2 wrong ones
+    assert maj_at_k_exact(rec.canonical_sample_answers(), GOLD, 5) > 0.99
+    # and the replay policy agrees
+    out = P.self_consistency(rec, 7, list(range(7)))
+    assert out.correct is True
+
+
 if __name__ == "__main__":
     import sys, traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

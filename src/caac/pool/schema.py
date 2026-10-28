@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Iterator
 
 SCHEMA_VERSION = "1.0"
+GOLD = "__GOLD__"  # canonical label for any answer graded correct
+
 
 
 @dataclass
@@ -66,6 +68,18 @@ class PoolRecord:
     def sample_answers(self) -> list[str | None]:
         return [s.answer for s in self.samples]
 
+    def canonical_sample_answers(self) -> list[str | None]:
+        """Sample answers with every CORRECT one mapped to the single label GOLD.
+
+        Voting must not compare normalized answers to the raw gold string: MATH
+        golds are LaTeX (e.g. \\frac{1}{2}) and normalization rarely reproduces
+        them byte-for-byte, so string equality would score correct answers as
+        wrong. ``Completion.correct`` is already graded by the project's
+        equivalence matcher, so we key the vote on it. Wrong answers keep their
+        own labels (equivalent wrong forms stay split: a conservative choice).
+        """
+        return [GOLD if c.correct else c.answer for c in self.samples]
+
     def sample_correct(self) -> list[bool]:
         return [s.correct for s in self.samples]
 
@@ -103,8 +117,11 @@ def record_from_dict(d: dict) -> PoolRecord:
 def write_records(path: str | Path, records: list[PoolRecord]) -> None:
     """Atomic write: to .tmp then os.replace, so a partial file never wins."""
     path = Path(path)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with _open(tmp, "w") as f:
+    tmp = path.with_name(path.name + ".tmp")
+    # choose gzip by the FINAL name (".gz"), not the ".tmp" scratch name
+    opener = (lambda: gzip.open(tmp, "wt", encoding="utf-8")) if str(path).endswith(".gz") \
+        else (lambda: open(tmp, "w", encoding="utf-8"))
+    with opener() as f:
         for rec in records:
             f.write(record_to_json(rec) + "\n")
     import os

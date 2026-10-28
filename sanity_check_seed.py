@@ -25,7 +25,7 @@ does not override on some versions. Re-run this script after each change
 until you see genuine diversity.
 """
 
-from caac.backends.vllm import VLLMBackend
+from caac.backends.vllm_backend import VLLMBackend
 
 PROMPT = "What is 17 + 25? Think step by step."
 

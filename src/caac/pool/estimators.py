@@ -63,7 +63,7 @@ def _plurality_credit(counts: tuple[int, ...], gold_idx: int, tie: str,
     return 1.0 / len(winners)  # "fair"
 
 
-def maj_at_k_exact(
+def _maj_at_k_enum(
     answers: list,
     gold,
     k: int,
@@ -131,6 +131,68 @@ def maj_at_k_exact(
 
     rec(0, k, [], 1)
     return acc / total_subsets
+
+
+def maj_at_k_exact(answers: list, gold, k: int, tie: str = "fair") -> float:
+    """EXACT maj@k over a finite pool, polynomial time (no enumeration blow-up).
+
+    Same quantity as the enumerating reference ``_maj_at_k_enum`` (kept for
+    cross-checking in tests) but scales to MATH-style pools with many distinct
+    answers (e.g. 22 distinct answers, k=16), where enumeration explodes.
+
+    Method: condition on c = number of gold answers in the random size-k
+    subset (C(g,c) ways). Gold wins iff every other answer appears <= c times
+    (strictly < c for a sole win). Count the ways to fill the other k-c draws
+    with a truncated-polynomial DP over (draws used, number of other answers
+    tied at exactly c). Unparsable answers (None) consume draws but never vote.
+
+    tie: "fair" (credit 1/(1+#tied)), "correct" (gold wins ties), "incorrect".
+    """
+    n = len(answers)
+    if n == 0:
+        return 0.0
+    k = min(k, n)
+    counts = Counter(a for a in answers if a is not None)
+    n_none = n - sum(counts.values())
+    g = counts.get(gold, 0)
+    if gold is None or g == 0:
+        return 0.0  # gold never appears -> maj@k cannot be correct
+    others = [c for a, c in counts.items() if a != gold]
+    total = comb(n, k)
+    acc = 0.0
+    for cg in range(1, min(g, k) + 1):
+        r = k - cg
+        # dp[d] : {q: ways}; d draws used on other answers, q answers tied at cg
+        dp = [dict() for _ in range(r + 1)]
+        dp[0][0] = 1
+        for ni in others:
+            new = [dict() for _ in range(r + 1)]
+            for d in range(r + 1):
+                for q, w in dp[d].items():
+                    for j in range(0, min(cg, ni, r - d) + 1):
+                        q2 = q + (1 if j == cg else 0)
+                        new[d + j][q2] = new[d + j].get(q2, 0) + w * comb(ni, j)
+            dp = new
+        final: dict[int, int] = {}
+        for d in range(r + 1):
+            j = r - d  # remaining draws go to the None bucket (never votes)
+            if j <= n_none:
+                wn = comb(n_none, j)
+                for q, w in dp[d].items():
+                    final[q] = final.get(q, 0) + w * wn
+        s = 0.0
+        for q, w in final.items():
+            if q == 0:
+                credit = 1.0
+            elif tie == "correct":
+                credit = 1.0
+            elif tie == "incorrect":
+                credit = 0.0
+            else:
+                credit = 1.0 / (1 + q)
+            s += w * credit
+        acc += comb(g, cg) * s
+    return acc / total
 
 
 def chow_coverage_bound(pi_pop: float, alpha: float) -> float:

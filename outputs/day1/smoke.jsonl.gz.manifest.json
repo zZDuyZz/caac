@@ -1,0 +1,10 @@
+{
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "dataset": "gsm8k",
+  "split": "test",
+  "n_samples": 4,
+  "temperature": 0.7,
+  "max_tokens": 512,
+  "top_logprobs": 5,
+  "vllm_use_v1": "0"
+}

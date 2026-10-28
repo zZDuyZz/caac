@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from caac.pool.ledger import Call
-from caac.pool.schema import Completion, PoolRecord
+from caac.pool.schema import Completion, PoolRecord, GOLD
 
 __all__ = [
     "PolicyOutcome",
@@ -82,9 +82,10 @@ def greedy_only(small: PoolRecord) -> PolicyOutcome:
 
 def self_consistency(small: PoolRecord, k: int, order: list[int]) -> PolicyOutcome:
     idxs = order[:k]
-    answers = [small.samples[i].answer for i in idxs]
+    canon = small.canonical_sample_answers()  # correct -> GOLD (see schema)
+    answers = [canon[i] for i in idxs]
     voted = _vote(answers)
-    correct = voted is not None and voted == small.gold
+    correct = voted == GOLD
     return PolicyOutcome(True, voted, correct, [_samples_call(small, idxs, 0)], "sample_more")
 
 
