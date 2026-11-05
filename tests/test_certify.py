@@ -59,3 +59,43 @@ def test_grid_is_ordered_most_conservative_first():
     grid = [round(1.0 - i / 20, 4) for i in range(21)]
     assert grid[0] == 1.0 and grid[-1] == 0.0
     assert grid == sorted(grid, reverse=True)
+
+
+# --------------------------------------------------------------------------- #
+# certification floor: how small a calibration set can still prove anything
+# --------------------------------------------------------------------------- #
+
+def test_min_served_matches_the_flawless_run_bound():
+    """n_min is the smallest n with (1-alpha)^n <= delta, i.e. the fewest
+    questions a ZERO-error run needs before its p-value clears delta."""
+    from caac.pool.ltt import min_served_certifiable, pvalue_selective_risk
+    for alpha, delta in [(0.1, 0.1), (0.05, 0.1), (0.2, 0.05), (0.1, 0.005)]:
+        n = min_served_certifiable(alpha, delta)
+        assert pvalue_selective_risk(n, 0, alpha) <= delta
+        assert pvalue_selective_risk(n - 1, 0, alpha) > delta
+
+
+def test_min_served_is_22_at_the_preregistered_levels():
+    from caac.pool.ltt import min_served_certifiable
+    assert min_served_certifiable(0.10, 0.10) == 22
+
+
+def test_bonferroni_raises_the_floor():
+    """Splitting delta over the grid makes the floor markedly higher -- the
+    reason Bonferroni certifies nothing on our smallest calibration sets."""
+    from caac.pool.ltt import min_served_certifiable
+    assert min_served_certifiable(0.1, 0.1 / 21) > min_served_certifiable(0.1, 0.1)
+
+
+def test_certification_floor_is_a_coverage_fraction():
+    from caac.pool.ltt import certification_floor
+    assert certification_floor(220, 0.1, 0.1) == pytest.approx(0.1)
+    assert certification_floor(10, 0.1, 0.1) == 1.0      # clamped
+    assert certification_floor(0, 0.1, 0.1) == 1.0
+
+
+def test_min_served_rejects_degenerate_levels():
+    from caac.pool.ltt import min_served_certifiable
+    for bad in [(0.0, 0.1), (1.0, 0.1), (0.1, 0.0), (0.1, 1.0)]:
+        with pytest.raises(ValueError):
+            min_served_certifiable(*bad)

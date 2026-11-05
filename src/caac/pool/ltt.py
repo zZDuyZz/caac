@@ -19,11 +19,13 @@ This module is pure stats -- a "policy at a given lambda" is summarized as
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import comb
+from math import ceil, comb, log
 
 __all__ = [
     "binom_cdf",
     "pvalue_selective_risk",
+    "min_served_certifiable",
+    "certification_floor",
     "certify_bonferroni",
     "certify_fixed_sequence",
     "LambdaResult",
@@ -36,6 +38,33 @@ def binom_cdf(e: int, n: int, p: float) -> float:
         return 1.0
     p = min(max(p, 0.0), 1.0)
     return sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(0, e + 1))
+
+
+def min_served_certifiable(alpha: float, delta: float) -> int:
+    """Fewest served questions that CAN ever be certified, even with 0 errors.
+
+    A flawless run still only reaches p = (1-alpha)^n, so no configuration whose
+    served count is below ``ceil(log delta / log(1-alpha))`` is certifiable at
+    any risk level -- the data cannot get there. At alpha=delta=0.1 that is 22
+    questions; under Bonferroni, with delta/|G| in place of delta, 21 grid
+    points push it to 58.
+
+    This is why an aggressive, very-low-coverage operating point is not
+    conservative but simply uncertifiable, and why calibration-set size shows up
+    in the results as a floor on coverage rather than as noise.
+    """
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0,1)")
+    if not 0.0 < delta < 1.0:
+        raise ValueError("delta must be in (0,1)")
+    return int(ceil(log(delta) / log(1.0 - alpha)))
+
+
+def certification_floor(n_calib: int, alpha: float, delta: float) -> float:
+    """Minimum coverage any certifiable configuration must have on ``n_calib``."""
+    if n_calib <= 0:
+        return 1.0
+    return min(1.0, min_served_certifiable(alpha, delta) / n_calib)
 
 
 def pvalue_selective_risk(n_served: int, n_wrong: int, alpha: float) -> float:

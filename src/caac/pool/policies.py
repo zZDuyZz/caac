@@ -19,7 +19,11 @@ Implemented:
   cascade                -- serve small greedy if confident, else escalate to
                             big greedy and serve that.
   caac                   -- the 4-action controller: {answer now, sample more,
-                            escalate, abstain} chosen by a pluggable scorer.
+                            escalate, abstain} chosen by a pluggable scorer
+                            maximising value-of-computation (the ablation).
+  caac_certified         -- CAAC proper: the CHEAPEST action whose calibrated
+                            P(correct) clears tau, else abstain. One knob, on
+                            the same scale as the risk LTT certifies.
 """
 
 from __future__ import annotations
@@ -38,6 +42,7 @@ __all__ = [
     "serve_abstain",
     "cascade",
     "caac",
+    "caac_certified",
     "pricecheck",
     "agreement_with_greedy",
     "CHECKS",
@@ -306,6 +311,65 @@ def caac(
         out = PolicyOutcome(False, None, False, [_greedy_call(small)], "abstain")
     out.action = action
     out.meta["voc"] = voc
+    return out
+
+
+def caac_certified(
+    small: PoolRecord,
+    big: PoolRecord,
+    scorer: Scorer,
+    tau: float,
+    order: list[int],
+    k: int = 8,
+    cost_profile: str = "flops",
+    actions: tuple[str, ...] = ("answer_now", "sample_more", "escalate"),
+) -> PolicyOutcome:
+    """CAAC proper: **cheapest action predicted safe enough, else abstain.**
+
+        eligible = { a : Phat(correct | a) >= tau }
+        serve the CHEAPEST eligible action;  if none is eligible, abstain.
+
+    One knob, ``tau``, and it is a probability on the same scale as the risk the
+    guarantee is about -- so Learn-then-Test can certify it directly (§8.2) and
+    the certified value is interpretable rather than an arbitrary score cut.
+
+    Why "cheapest eligible" and not argmax-utility: the question CAAC answers is
+    not "which action is best" but "how little compute suffices here". Spending
+    more than needed on a question the small model already handles is exactly
+    the waste the paper is about, and a cost-weighted VOC trades risk against
+    cost on one axis, which would smear the risk guarantee. The VOC variant is
+    kept in ``caac`` as the ablation.
+
+    The contrast with ``pricecheck`` is one line of code: there the eligible set
+    is only ``{answer_now}``, so coverage is capped by the Chow bound at
+    ``pi/(1-alpha)``; here ``sample_more``/``escalate`` can make a question
+    eligible that ``answer_now`` never could, which is what lifts the cap.
+
+    ``actions`` restricts the action set -- the ablation table (answer-only,
+    +sample_more, +escalate, all) is produced by varying just this argument.
+    """
+    from caac.pool.ledger import cost_profiles
+
+    phat = scorer(small, big)
+    costs = {a: cost_profiles(_calls_for_action(small, big, a, k, order))[cost_profile]
+             for a in actions}
+    eligible = [a for a in actions if phat.get(a, 0.0) >= tau]
+    action = min(eligible, key=lambda a: (costs[a], a)) if eligible else "abstain"
+
+    if action == "answer_now":
+        out = greedy_only(small)
+    elif action == "sample_more":
+        out = self_consistency(small, k, order)
+        out.calls = [_greedy_call(small, 0), _samples_call(small, order[:k], 1)]
+    elif action == "escalate":
+        out = cascade_force_escalate(small, big)
+    else:
+        # the greedy turn is already paid for when we decide to abstain
+        out = PolicyOutcome(False, None, False, [_greedy_call(small)], "abstain")
+    out.action = action
+    out.meta["phat"] = phat
+    out.meta["eligible"] = eligible
+    out.meta["tau"] = tau
     return out
 
 

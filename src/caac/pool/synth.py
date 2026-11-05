@@ -53,8 +53,14 @@ def make_pair(
         conf = min(1.0, max(0.0, rng.gauss(base, 0.15)))
         dec = rng.randint(120, 700)
         fr = "length" if dec > 680 else "stop"
+        # conf_prefix32 is the PRE-REGISTERED difficulty proxy (CAAC_MASTER
+        # section 8.4): correlated with difficulty, NOT a copy of `conf`, so an
+        # estimator fitted on synthetic pools exercises the real feature path.
+        cp32 = min(1.0, max(0.0, rng.gauss(0.92 - 0.45 * difficulty, 0.08)))
         return Completion(answer=ans, correct=correct, decode_tokens=dec,
                           finish_reason=fr, confidence=conf,
+                          mean_logprob=-max(0.01, rng.gauss(0.9 - 0.5 * conf, 0.15)),
+                          conf_prefix32=cp32,
                           seed=rng.randint(0, 2**31))
 
     small = PoolRecord(
