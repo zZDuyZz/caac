@@ -5,6 +5,12 @@ model, with prefill/decode token counts, finish_reason, per-completion seed and
 a confidence feature. Writes one jsonl.gz per (model, dataset, split), in
 RESUMABLE batches so a killed GPU rental loses nothing.
 
+Grading (CAAC_MASTER §6.3): the PRIMARY grader is Math-Verify; ``answers_match``
+is kept as the secondary verdict in ``correct_legacy``. Both are computed here so
+the pool's numbers are authoritative right away. The raw generated TEXT is also
+written to a sidecar ``<pool>.text.jsonl.gz`` so any grader / better extractor
+can re-grade on CPU later without re-running the GPU (see regrade_pool.py).
+
 Seeding (PLAN_V2 section 3 -- this is the fix for the whole seed saga):
   vLLM 0.7.3 splits n>1 into n requests with seeds s, s+1, ..., s+n-1. So each
   question's seed base is spaced by >= n (here * 1024) and derived from a stable
@@ -20,8 +26,10 @@ Run ONLY after sanity_check_seed.py confirms samples differ within one run.
 Usage:
   python build_pool.py --model Qwen/Qwen2.5-1.5B-Instruct --dataset math500 \
       --n-samples 32 --max-tokens 1024 --out pools/math500_qwen1.5b.jsonl.gz
-  python build_pool.py --model Qwen/Qwen2.5-7B-Instruct --dataset math500 \
-      --n-samples 8  --max-tokens 1024 --out pools/math500_qwen7b.jsonl.gz
+  # new pool, faster config (DO NOT change config for an existing pool):
+  python build_pool.py ... --max-num-seqs 512 --batch-size 300
+  # re-run only specific questions (e.g. the ones that were truncated):
+  python build_pool.py ... --qids-file truncated.txt --max-tokens 2048 --max-model-len 3072
 """
 
 from __future__ import annotations
@@ -45,10 +53,34 @@ def mean_token_prob(logprobs: list[float]) -> float:
     return sum(math.exp(lp) for lp in logprobs) / len(logprobs)
 
 
+def completion_dict(answer_raw, answer_norm, gold, decode_tokens, finish_reason,
+                    seed, lps, grader, answers_match):
+    """Assemble ONE completion record (pure; no vLLM types) and grade it.
+
+    answer_raw  : extracted-but-not-normalized answer (best for Math-Verify)
+    answer_norm : normalized answer (what we store + feed answers_match)
+    Returns the dict stored in the pool.
+    """
+    from caac.eval.grade import grade
+    legacy = bool(answer_norm is not None and answers_match(answer_norm, gold))
+    primary = grade(gold, answer_raw if answer_raw is not None else answer_norm,
+                    legacy_correct=legacy, mode=grader)
+    return {
+        "answer": answer_norm,
+        "correct": bool(primary),
+        "correct_legacy": legacy,
+        "decode_tokens": decode_tokens,
+        "finish_reason": finish_reason or "stop",
+        "seed": seed,
+        "confidence": mean_token_prob(lps),
+        "mean_logprob": (sum(lps) / len(lps)) if lps else None,
+    }
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", required=True)
-    p.add_argument("--dataset", required=True, help="gsm8k | math500 | arc_challenge | ...")
+    p.add_argument("--dataset", required=True, help="gsm8k | math500 | math_train | arc_challenge | ...")
     p.add_argument("--split", default="test")
     p.add_argument("--n-samples", type=int, default=32)
     p.add_argument("--n-questions", type=int, default=None, help="cap for pilot")
@@ -59,6 +91,14 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--gpu-mem", type=float, default=0.90)
     p.add_argument("--max-model-len", type=int, default=2048)
+    p.add_argument("--max-num-seqs", type=int, default=None,
+                   help="vLLM max_num_seqs; None = vLLM default (256). ONLY for a NEW pool.")
+    p.add_argument("--qids-file", default=None,
+                   help="txt file, one qid per line; only build those questions")
+    p.add_argument("--grader", default="mathverify", choices=["mathverify", "legacy"],
+                   help="primary grader for 'correct' (answers_match always kept in correct_legacy)")
+    p.add_argument("--no-text", action="store_true",
+                   help="do NOT write the <pool>.text.jsonl.gz sidecar (not recommended)")
     args = p.parse_args()
 
     from vllm import LLM, SamplingParams
@@ -67,11 +107,22 @@ def main():
     # project graders/loaders (patched versions must be in the repo)
     from caac.data.benchmarks import load_benchmark
     from caac.eval.answer_match import extract_answer, normalize_answer, answers_match
+    from caac.eval.grade import mathverify_available
+    from caac.pool.schema import text_sidecar_path, append_texts
+
+    if args.grader == "mathverify" and not mathverify_available():
+        print("WARNING: --grader mathverify but math-verify not importable; "
+              "'correct' will fall back to answers_match per item.", flush=True)
 
     outp = Path(args.out)
     outp.parent.mkdir(parents=True, exist_ok=True)
+    sidecar = None if args.no_text else text_sidecar_path(outp)
 
     problems = load_benchmark(args.dataset, split=args.split, n=args.n_questions)
+    if args.qids_file:
+        keep = {l.strip() for l in open(args.qids_file) if l.strip()}
+        problems = [pr for pr in problems if pr["id"] in keep]
+        print(f"qids-file: giữ {len(problems)}/{len(keep)} câu", flush=True)
     tok = AutoTokenizer.from_pretrained(args.model)
 
     def build_prompt(q: str) -> str:
@@ -80,9 +131,12 @@ def main():
                                 "final answer within \\boxed{}."}]
         return tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
-    llm = LLM(model=args.model, gpu_memory_utilization=args.gpu_mem,
-              max_model_len=args.max_model_len, enable_prefix_caching=True,
-              seed=0)  # engine seed harmless; per-request seeds below drive diversity
+    llm_kw = dict(model=args.model, gpu_memory_utilization=args.gpu_mem,
+                  max_model_len=args.max_model_len, enable_prefix_caching=True,
+                  seed=0)  # engine seed harmless; per-request seeds below drive diversity
+    if args.max_num_seqs:
+        llm_kw["max_num_seqs"] = args.max_num_seqs
+    llm = LLM(**llm_kw)
 
     # --- resume: which qids already have a complete record on disk ---
     done = set()
@@ -103,6 +157,9 @@ def main():
         "n_samples": args.n_samples, "temperature": args.temperature,
         "max_tokens": args.max_tokens, "top_logprobs": args.top_logprobs,
         "vllm_use_v1": os.environ.get("VLLM_USE_V1", "0"),
+        "max_num_seqs": args.max_num_seqs, "max_model_len": args.max_model_len,
+        "grader": args.grader, "has_text_sidecar": not args.no_text,
+        "batch_size": args.batch_size,
     }
     Path(str(outp) + ".manifest.json").write_text(json.dumps(manifest, indent=2))
 
@@ -118,15 +175,10 @@ def main():
         prompts = [build_prompt(pr["question"]) for pr in batch]
         prefill = [len(tok(pr_text).input_ids) for pr_text in prompts]
 
-        # greedy (temperature=0): one request each, seed ignored on greedy path
         greedy_sp = SamplingParams(temperature=0.0, max_tokens=args.max_tokens,
                                    logprobs=args.top_logprobs)
         greedy_out = llm.generate(prompts, greedy_sp)
 
-        # samples: n per prompt in one request; vLLM gives per-child seeds s..s+n-1
-        # ONE batched call with a per-prompt SamplingParams list (vLLM accepts a
-        # list matching prompts), so the GPU sees batch_size*n sequences at once
-        # instead of n -- one call per question would leave it badly underused.
         sps = [SamplingParams(n=args.n_samples, temperature=args.temperature,
                               max_tokens=args.max_tokens, logprobs=args.top_logprobs,
                               seed=stable_seed(args.model, args.dataset, pr["id"]))
@@ -134,36 +186,38 @@ def main():
         sample_outs = llm.generate(prompts, sps)
 
         records = []
+        texts = []
         for pr, pf, g, so in zip(batch, prefill, greedy_out, sample_outs):
-            def completion(o, seed=None):
+            def one(o, seed=None):
                 txt = o.text
                 raw = extract_answer(txt)
                 ans = normalize_answer(raw) if raw is not None else None
                 lps = [lp_dict[tid].logprob
                        for tid, lp_dict in zip(o.token_ids, o.logprobs or [])
                        if o.logprobs and tid in lp_dict] if o.logprobs else []
-                return {
-                    "answer": ans,
-                    "correct": bool(ans is not None and answers_match(ans, pr["answer"])),
-                    "decode_tokens": len(o.token_ids),
-                    "finish_reason": o.finish_reason or "stop",
-                    "seed": seed,
-                    "confidence": mean_token_prob(lps),
-                    "mean_logprob": (sum(lps) / len(lps)) if lps else None,
-                }
+                d = completion_dict(raw, ans, pr["answer"], len(o.token_ids),
+                                    o.finish_reason, seed, lps, args.grader, answers_match)
+                return d, txt
+            g_d, g_txt = one(g.outputs[0])
+            s_pairs = [one(c, seed=stable_seed(args.model, args.dataset, pr["id"]) + i)
+                       for i, c in enumerate(so.outputs)]
             rec = {
                 "query_id": pr["id"], "dataset": args.dataset, "model": args.model,
                 "gold": pr["answer"], "prompt_tokens": pf,
-                "greedy": completion(g.outputs[0]),
-                "samples": [completion(c, seed=stable_seed(args.model, args.dataset, pr["id"]) + i)
-                            for i, c in enumerate(so.outputs)],
+                "greedy": g_d,
+                "samples": [d for d, _ in s_pairs],
                 "temperature": args.temperature,
                 "confidence_semantics": "vllm_v0_post_temperature",
                 "schema_version": "1.0",
             }
             records.append(json.dumps(rec, ensure_ascii=False))
+            if sidecar is not None:
+                texts.append({"query_id": pr["id"], "greedy_text": g_txt,
+                              "sample_texts": [t for _, t in s_pairs]})
 
         append(records)
+        if sidecar is not None:
+            append_texts(sidecar, texts)
         print(f"wrote {start + len(batch)}/{len(todo)}", flush=True)
 
     print("done", flush=True)
