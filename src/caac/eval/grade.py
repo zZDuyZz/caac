@@ -19,6 +19,13 @@ Design notes / caveats (see CAAC_MASTER §3.3, §6.3):
 
 from __future__ import annotations
 
+import os
+
+# Math-Verify's per-call timeout uses signal.alarm on Linux, but on Windows it
+# SPAWNS A PROCESS PER CALL (slow + floods errors under Python 3.14). On Windows we
+# therefore disable the timeout (None). Linux (the GPU box) keeps the default 5s.
+_NO_TIMEOUT = os.name == "nt"
+
 
 def _mv_fns():
     """Return (parse, verify) from math_verify, or None if unavailable."""
@@ -42,6 +49,10 @@ def math_verify_correct(gold: str, pred: str | None) -> bool | None:
         return None
     parse, verify = fns
     try:
+        if _NO_TIMEOUT:
+            g = parse("\\boxed{" + str(gold) + "}", parsing_timeout=None)
+            p = parse("\\boxed{" + str(pred) + "}", parsing_timeout=None)
+            return bool(verify(g, p, timeout_seconds=None))
         g = parse("\\boxed{" + str(gold) + "}")
         p = parse("\\boxed{" + str(pred) + "}")
         return bool(verify(g, p))
