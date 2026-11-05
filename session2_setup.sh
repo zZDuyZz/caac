@@ -26,15 +26,9 @@ python -c "import vllm,transformers,torch;print('vllm',vllm.__version__,'tf',tra
 echo "=== 3. Test CPU (phải pass hết) ==="
 python -m pytest -q -p no:warnings
 
-echo "=== 4. Tải model + dataset vào cache ==="
+echo "=== 4. Tải model vào cache ==="
 huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct >/dev/null
 huggingface-cli download Qwen/Qwen2.5-7B-Instruct  >/dev/null
-PYTHONPATH=src python - <<'PY'
-from caac.data.benchmarks import load_benchmark as L
-for name, split in [("math500","test"),("gsm8k","test"),("gsm8k","train"),
-                    ("math_train","train"),("math_test_ex500","test")]:
-    print(f"  {name:16} {split:5} {len(L(name, split=split))}")
-PY
 
 echo "=== 5. qids A3 (chọn ngẫu nhiên phân tầng, seed 0; tất định) ==="
 mkdir -p qids
@@ -42,6 +36,25 @@ mkdir -p qids
 [ -f qids/a3_math_test_ex500.txt ] || python make_qids.py --dataset math_test_ex500 --split test --n 1000 --out qids/a3_math_test_ex500.txt
 [ -f qids/a3_gsm8k_train.txt ]     || python make_qids.py --dataset gsm8k --split train --n 1500 --out qids/a3_gsm8k_train.txt
 wc -l qids/*.txt
+PYTHONPATH=src python - <<'PY'
+# kiểm số câu VÀ mọi qid của A3 có trong dataset; sai -> dừng (set -e) trước khi tốn giờ GPU
+from caac.data.benchmarks import load_benchmark as L
+EXPECT = {("math500","test"): 500, ("gsm8k","test"): 1319, ("gsm8k","train"): 7473,
+          ("math_train","train"): 7499, ("math_test_ex500","test"): 4501}
+ids = {}
+for (name, split), n in EXPECT.items():
+    items = L(name, split=split); ids[(name, split)] = {it["id"] for it in items}
+    print(f"  {name:16} {split:5} {len(items)} (cần {n})")
+    assert len(items) == n, f"{name}/{split}: {len(items)} != {n}"
+for (name, split), f, n in [(("gsm8k","train"),"qids/a3_gsm8k_train.txt",1500),
+                            (("math_train","train"),"qids/a3_math_train.txt",1000),
+                            (("math_test_ex500","test"),"qids/a3_math_test_ex500.txt",1000)]:
+    q = [l.strip() for l in open(f) if l.strip()]
+    assert len(q) == n and len(set(q)) == n, f"{f}: {len(q)} dòng"
+    miss = [x for x in q if x not in ids[(name, split)]]
+    assert not miss, f"{f}: {len(miss)} qid không có trong dataset (vd {miss[:3]})"
+    print(f"  {f}: {n} qid hợp lệ")
+PY
 pip freeze | grep -iE "^(vllm|torch|transformers|datasets|math-verify|huggingface)" > /workspace/env_s2.txt
 nvidia-smi --query-gpu=name,driver_version --format=csv >> /workspace/env_s2.txt
 echo "=== SETUP XONG -> bash session2_run.sh ==="
