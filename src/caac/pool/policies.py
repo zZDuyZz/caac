@@ -11,8 +11,11 @@ harness can average over many permutations with common random numbers.
 Implemented:
   greedy_only            -- small greedy, always serve (lower anchor)
   self_consistency       -- maj vote over first k sampled (small), always serve
-  serve_abstain          -- PriceCheck-style: serve greedy iff a check passes,
-                            else abstain. NO answer-correcting action.
+  serve_abstain          -- serve greedy iff the generator-confidence check
+                            passes, else abstain. NO answer-correcting action.
+  pricecheck             -- the faithful PriceCheck baseline: one or more
+                            label-free CHECKS vote on the greedy answer; the
+                            served answer is ALWAYS the greedy one.
   cascade                -- serve small greedy if confident, else escalate to
                             big greedy and serve that.
   caac                   -- the 4-action controller: {answer now, sample more,
@@ -35,6 +38,9 @@ __all__ = [
     "serve_abstain",
     "cascade",
     "caac",
+    "pricecheck",
+    "agreement_with_greedy",
+    "CHECKS",
     "ACTIONS",
 ]
 
@@ -101,6 +107,97 @@ def serve_abstain(small: PoolRecord, confidence_threshold: float) -> PolicyOutco
     if conf >= confidence_threshold:
         return PolicyOutcome(True, g.answer, g.correct, calls, "answer_now")
     return PolicyOutcome(False, None, False, calls, "abstain")
+
+
+# --------------------------------------------------------------------------
+# PriceCheck (2609.37493, Lee et al.) -- the closest competitor, as a policy.
+#
+# Every "action" in PriceCheck is a CHECK that returns an agree/disagree verdict
+# on an answer that already exists; the output is always "serve the original" or
+# "abstain". It can never produce a different answer. That single restriction is
+# what the Chow frontier (pool/frontier.py) is about, so the baseline has to be
+# faithful to it: below, the served answer is `small.greedy.answer` in every
+# branch, no matter what the checks saw.
+#
+# Checks implemented (both FREE from the pool -- no extra GPU):
+#   confidence    -- the generator's own mean token probability on the greedy run
+#   resolve_vote  -- re-solve the question k times and measure what fraction of
+#                    the re-solves AGREE with the greedy answer (not with gold)
+# The backward probe of their paper needs fresh generations (A5) and is omitted;
+# CAAC_MASTER §11 records that omission.
+# --------------------------------------------------------------------------
+
+CHECKS = ("confidence", "resolve_vote", "both")
+
+
+def agreement_with_greedy(rec: PoolRecord, idxs: list[int]) -> float:
+    """Fraction of the chosen samples whose answer matches the greedy answer.
+
+    Matching convention is the schema's (see canonical_sample_answers): two
+    completions graded correct are the same answer; a correct and an incorrect
+    one differ; two incorrect ones match only if their normalized strings match
+    (equivalent wrong answers stay split -- conservative, and it can only make
+    the check look WEAKER, never stronger).
+
+    This is label-free in deployment: the grader is used here only as a stand-in
+    for "are these two strings the same answer", never to reveal the gold label
+    to the policy. A deployed PriceCheck compares strings directly.
+    """
+    if not idxs:
+        return 0.0
+    g = rec.greedy
+    n = 0
+    for i in idxs:
+        c = rec.samples[i]
+        if g.correct and c.correct:
+            n += 1
+        elif (not g.correct) and (not c.correct) and c.answer is not None \
+                and c.answer == g.answer:
+            n += 1
+    return n / len(idxs)
+
+
+def pricecheck(small: PoolRecord, lam: float, check: str = "resolve_vote",
+               k: int = 8, order: list[int] | None = None,
+               conf_threshold: float | None = None) -> PolicyOutcome:
+    """Serve-or-abstain on the GREEDY answer, decided by label-free check(s).
+
+    lam   threshold the check score must clear to serve.
+    check "confidence"   -- generator confidence only (no extra samples, no cost
+                            beyond the greedy run)
+          "resolve_vote" -- k re-solves must agree with greedy at rate >= lam
+          "both"         -- run the cheap confidence check first; only pay for
+                            the re-solves when it is inconclusive (this is the
+                            cost-saving "schedule" idea of the paper). Serve iff
+                            confidence >= conf_threshold OR the re-solve vote
+                            clears lam.
+    """
+    if check not in CHECKS:
+        raise ValueError(f"check must be one of {CHECKS}")
+    g = small.greedy
+    conf = g.confidence if g.confidence is not None else 0.0
+    calls = [_greedy_call(small)]
+
+    if check == "confidence":
+        serve = conf >= lam
+    else:
+        run_votes = True
+        if check == "both":
+            ct = conf_threshold if conf_threshold is not None else 1.0
+            if conf >= ct:          # cheap check already decides: serve, pay nothing more
+                return PolicyOutcome(True, g.answer, g.correct, calls, "answer_now",
+                                     {"check": check, "decided_by": "confidence"})
+            run_votes = True
+        idxs = (order or list(range(small.n_samples)))[:k]
+        if run_votes:
+            calls.append(_samples_call(small, idxs, 1))
+        serve = agreement_with_greedy(small, idxs) >= lam
+
+    if serve:
+        # NOTE: the greedy answer, never a voted or escalated one. This is the point.
+        return PolicyOutcome(True, g.answer, g.correct, calls, "answer_now",
+                             {"check": check})
+    return PolicyOutcome(False, None, False, calls, "abstain", {"check": check})
 
 
 def cascade(small: PoolRecord, big: PoolRecord, confidence_threshold: float) -> PolicyOutcome:
