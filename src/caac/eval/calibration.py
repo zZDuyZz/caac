@@ -8,6 +8,7 @@ trustworthy to compute with. Pure numpy, runs anywhere.
 from __future__ import annotations
 
 import numpy as np
+_trapz = getattr(np, "trapezoid", None) or np.trapz
 
 __all__ = [
     "expected_calibration_error",
@@ -75,7 +76,7 @@ def area_under_risk_coverage(probs, labels) -> float:
     'wrong scale' from 'wrong ordering'.
     """
     coverage, risk = selective_risk_curve(probs, labels)
-    return float(np.trapz(risk, coverage))
+    return float(_trapz(risk, coverage))
 
 
 def calibration_report(probs, labels, n_bins: int = 15) -> dict:

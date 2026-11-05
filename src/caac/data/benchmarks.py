@@ -8,9 +8,8 @@ MATH-500 is a subset of the MATH test set, so the MATH train/calib loaders
 exclude any problem whose text matches a MATH-500 problem (matched on collapsed
 whitespace, robust across dataset mirrors).
 
-NOT YET VERIFIED against a live run on the GPU box: the exact HF dataset name and
-column names for full MATH and ARC. Run ``inspect_math.py`` first; the loaders
-auto-detect common column layouts and accept an explicit ``source``/``config``.
+MATH/ARC source names and columns were VERIFIED with inspect_math.py on 5 Nov 2026
+(see the comment above ``_NLILE``).
 """
 
 from __future__ import annotations
@@ -122,48 +121,83 @@ def _math500_problem_set():
     return {_norm_problem(it["question"]) for it in load_math500()}
 
 
-# HF dataset names to try for the FULL MATH set (verify with inspect_math.py).
-_MATH_SOURCES = [
-    ("nlile/hendrycks-MATH-benchmark", None),
-    ("EleutherAI/hendrycks_math", "all"),
-    ("qwedsacf/competition_math", None),
-]
+# VERIFIED with inspect_math.py (5 Nov 2026):
+#  * nlile/hendrycks-MATH-benchmark: split "train" = 12,000 rows = the PRM800K split
+#    (original MATH train 7,500 + original MATH test minus MATH-500 = 4,500); split
+#    "test" = 500 rows = MATH-500 itself. Columns: problem, solution, answer, subject,
+#    level, unique_id ("train/algebra/1.json" or "test/algebra/1.json" = ORIGIN).
+#  * EleutherAI/hendrycks_math has NO "all" config (7 per-subject configs) -> dropped.
+#  * qwedsacf/competition_math: only "train" (12,500 = full MATH, no answer column) ->
+#    generic fallback (answer extracted from the solution's \\boxed).
+_NLILE = "nlile/hendrycks-MATH-benchmark"
+_MATH_FALLBACKS = [("qwedsacf/competition_math", None)]
+
+
+def _uid_to_id(uid: str) -> str:
+    """'train/algebra/1.json' -> 'math_train_algebra_1' (stable across mirrors/order)."""
+    return "math_" + re.sub(r"\.json$", "", uid).replace("/", "_")
+
+
+def _load_math_nlile(split, exclude_math500):
+    """Use unique_id origin: split='train' -> 7,500; split='test' -> 4,500 (test minus
+    MATH-500). NB: the mirror's own 'test' split is MATH-500, so we never read it."""
+    from datasets import load_dataset
+
+    ds = load_dataset(_NLILE, split="train")
+    prefix = "train/" if split == "train" else "test/"
+    exclude = _math500_problem_set() if exclude_math500 else set()
+    items = []
+    for row in ds:
+        uid = row.get("unique_id") or ""
+        if not uid.startswith(prefix):
+            continue
+        q, a = _row_problem(row), _row_answer(row)
+        if q is None or a is None:
+            continue
+        if _norm_problem(q) in exclude:
+            continue
+        items.append({"id": _uid_to_id(uid), "question": q, "answer": a})
+    return items
 
 
 def load_math(n: int | None = None, split: str = "train", exclude_math500: bool = True,
               source: str | None = None, config: str | None = None):
     """Load the FULL MATH set (train, or 'test minus MATH-500').
 
-    split="train"            -> MATH train (7,500)
-    split="test"             -> MATH test (5,000); with exclude_math500=True this
-                                is the 4,500 'test minus MATH-500' calib pool.
-    Pass source/config explicitly once inspect_math.py confirms what's cached.
-    ids are 'math_{split}_{running}' so they never collide with 'math500_*'.
+    split="train" -> MATH train (7,500)
+    split="test"  -> MATH test (5,000); with exclude_math500=True this is the
+                     4,500 'test minus MATH-500' calibration pool.
+    Default source = nlile mirror (verified). ids are 'math_{train|test}_{subject}_{k}'
+    (from the dataset's unique_id) so they never collide with 'math500_*'.
     """
+    if split not in ("train", "test"):
+        raise ValueError(f"split must be 'train' or 'test', got {split!r}")
+    if source is None or source == _NLILE:
+        try:
+            items = _load_math_nlile(split, exclude_math500)
+            if items:
+                return items[:n] if n is not None else items
+        except Exception:
+            if source == _NLILE:
+                raise
+    # generic fallback (other mirrors; ids by running index)
     from datasets import load_dataset
 
-    sources = [(source, config)] if source else _MATH_SOURCES
-    ds = None
-    last_err = None
+    sources = [(source, config)] if source else _MATH_FALLBACKS
+    ds, last_err = None, None
     for src, cfg in sources:
         try:
             ds = load_dataset(src, cfg, split=split) if cfg else load_dataset(src, split=split)
             break
-        except Exception as e:  # try the next mirror
+        except Exception as e:
             last_err = e
-            continue
     if ds is None:
-        raise RuntimeError(f"could not load a MATH source {sources}; last error: {last_err}. "
-                           f"Run inspect_math.py and pass --source/--config.")
-
+        raise RuntimeError(f"could not load a MATH source; last error: {last_err}")
     exclude = _math500_problem_set() if exclude_math500 else set()
     items, running = [], 0
     for row in ds:
-        q = _row_problem(row)
-        a = _row_answer(row)
-        if q is None or a is None:
-            continue
-        if _norm_problem(q) in exclude:
+        q, a = _row_problem(row), _row_answer(row)
+        if q is None or a is None or _norm_problem(q) in exclude:
             continue
         items.append({"id": f"math_{split}_{running}", "question": q, "answer": a})
         running += 1
