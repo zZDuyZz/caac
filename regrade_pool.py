@@ -35,12 +35,17 @@ from caac.eval.grade import math_verify_correct, mathverify_available
 
 
 def _pred_for(completion, text, use_text):
-    """String to hand Math-Verify: raw from text if available, else stored answer."""
+    """String to hand Math-Verify, best source first:
+    raw answer re-extracted from the text sidecar > stored ``answer_raw`` (pools
+    built 2026-11+) > stored normalized ``answer`` (LOSSY: commas, bases and
+    exact fractions already destroyed -- see CAAC_MASTER §3.3)."""
     if use_text and text is not None:
         raw = extract_answer(text)
         if raw is not None:
             return raw
-    return completion.answer  # already-normalized (lossy) fallback
+    if getattr(completion, "answer_raw", None) is not None:
+        return completion.answer_raw
+    return completion.answer
 
 
 def main():
@@ -66,8 +71,17 @@ def main():
           f"text sidecar: {'YES ('+str(sc.name)+')' if use_text else 'NONE -> LOSSY regrade'}")
 
     n_g = len(recs)
+    # backfill the legacy verdict BEFORE counting (old pools have None there;
+    # counting first printed a bogus "legacy=0.000")
+    for r in recs.values():
+        for c in [r.greedy, *r.samples]:
+            if c.correct_legacy is None:
+                c.correct_legacy = bool(c.answer is not None and answers_match(c.answer, r.gold))
     base_correct = sum(1 for r in recs.values() if r.greedy.correct)
     base_legacy = sum(1 for r in recs.values() if r.greedy.correct_legacy)
+    has_raw = any(getattr(r.greedy, "answer_raw", None) for r in recs.values())
+    if not use_text and not has_raw:
+        print("  WARNING: no text sidecar and no answer_raw -> LOSSY; do NOT report these numbers")
     flips_to_true, flips_to_false = [], []
     disagree = 0  # new(MV) vs legacy on greedy
 
@@ -81,9 +95,6 @@ def main():
             mv = math_verify_correct(r.gold, pred)
             if mv is None:
                 return  # keep as-is
-            if c.correct_legacy is None:  # backfill legacy if missing
-                ans = c.answer
-                c.correct_legacy = bool(ans is not None and answers_match(ans, r.gold))
             c.correct = mv
 
         before = r.greedy.correct

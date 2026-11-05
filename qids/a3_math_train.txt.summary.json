@@ -1,0 +1,39 @@
+{
+  "dataset": "math_train",
+  "split": "train",
+  "seed": 0,
+  "n_population": 7499,
+  "n_picked": 1000,
+  "subject_pop": {
+    "Algebra": 1744,
+    "Counting & Probability": 771,
+    "Geometry": 869,
+    "Intermediate Algebra": 1295,
+    "Number Theory": 869,
+    "Prealgebra": 1205,
+    "Precalculus": 746
+  },
+  "subject_picked": {
+    "Algebra": 232,
+    "Counting & Probability": 103,
+    "Geometry": 115,
+    "Intermediate Algebra": 172,
+    "Number Theory": 116,
+    "Prealgebra": 162,
+    "Precalculus": 100
+  },
+  "level_pop": {
+    "1": 564,
+    "2": 1348,
+    "3": 1594,
+    "4": 1690,
+    "5": 2303
+  },
+  "level_picked": {
+    "1": 76,
+    "2": 179,
+    "3": 212,
+    "4": 225,
+    "5": 308
+  }
+}

@@ -42,6 +42,11 @@ class Completion:
     confidence: float | None = None  # mean token prob; RAW for greedy (temp=0),
                                      # post-temperature for samples (flag below)
     mean_logprob: float | None = None
+    answer_raw: str | None = None    # extracted but NOT normalized (keeps commas, bases,
+                                     # \\frac); added 2026-11 -- None in older pools
+    conf_prefix32: float | None = None  # mean token prob over the FIRST 32 generated
+                                        # tokens = the PRE-REGISTERED difficulty proxy
+                                        # (CAAC_MASTER §8.4); None in older pools
 
 
 @dataclass
@@ -151,14 +156,29 @@ def load_pool(path: str | Path) -> dict[str, PoolRecord]:
 # --------------------------------------------------------------------------
 
 
-def text_sidecar_path(pool_path: str | Path) -> Path:
-    """`foo.jsonl.gz` -> `foo.text.jsonl.gz` (keeps the same compression)."""
+def _sidecar_path(pool_path: str | Path, tag: str) -> Path:
     p = Path(pool_path)
     name = p.name
     for suf in (".jsonl.gz", ".jsonl", ".gz"):
         if name.endswith(suf):
-            return p.with_name(name[: -len(suf)] + ".text" + suf)
-    return p.with_name(name + ".text")
+            return p.with_name(name[: -len(suf)] + "." + tag + suf)
+    return p.with_name(name + "." + tag)
+
+
+def text_sidecar_path(pool_path: str | Path) -> Path:
+    """`foo.jsonl.gz` -> `foo.text.jsonl.gz` (keeps the same compression)."""
+    return _sidecar_path(pool_path, "text")
+
+
+def token_sidecar_path(pool_path: str | Path) -> Path:
+    """`foo.jsonl.gz` -> `foo.tok.jsonl.gz`: per-token signals, one line per query:
+      {"query_id": ..., "greedy": {"lp": [...], "tc": [...], "ent": [...]},
+       "samples": [{"lp": [...], "tc": [...]}, ...]}
+    lp  = logprob of the CHOSEN token; tc = DeepConf token confidence
+    (-mean of the top-k logprobs); ent = entropy of the renormalised top-k
+    distribution (greedy only). Samples are post-temperature (vLLM V0).
+    Not in git (large); keep next to the pool."""
+    return _sidecar_path(pool_path, "tok")
 
 
 def append_texts(path: str | Path, items: list[dict]) -> None:

@@ -91,7 +91,7 @@ def load_gsm8k(n: int | None = None, split: str = "test"):
     """Load GSM8K. Answer is the final number after '####' in the solution."""
     from datasets import load_dataset
 
-    ds = load_dataset("gsm8k", "main", split=split)
+    ds = load_dataset("openai/gsm8k", "main", split=split)
     items = []
     for i, row in enumerate(ds):
         if n is not None and i >= n:
@@ -156,7 +156,10 @@ def _load_math_nlile(split, exclude_math500):
             continue
         if _norm_problem(q) in exclude:
             continue
-        items.append({"id": _uid_to_id(uid), "question": q, "answer": a})
+        items.append({"id": _uid_to_id(uid), "question": q, "answer": a,
+                      # extra keys for stratified subsampling (make_qids.py);
+                      # build_pool only reads id/question/answer
+                      "subject": row.get("subject"), "level": row.get("level")})
     return items
 
 
@@ -173,14 +176,14 @@ def load_math(n: int | None = None, split: str = "train", exclude_math500: bool 
     if split not in ("train", "test"):
         raise ValueError(f"split must be 'train' or 'test', got {split!r}")
     if source is None or source == _NLILE:
-        try:
-            items = _load_math_nlile(split, exclude_math500)
-            if items:
-                return items[:n] if n is not None else items
-        except Exception:
-            if source == _NLILE:
-                raise
-    # generic fallback (other mirrors; ids by running index)
+        # NO silent fallback: a different mirror has different ids/order, so the
+        # qids files and pools would silently stop matching. Fail loudly instead;
+        # pass source=... explicitly to use another mirror on purpose.
+        items = _load_math_nlile(split, exclude_math500)
+        if not items:
+            raise RuntimeError(f"{_NLILE} returned 0 items for split={split!r}")
+        return items[:n] if n is not None else items
+    # explicit other mirror (ids by running index -- NOT compatible with nlile qids)
     from datasets import load_dataset
 
     sources = [(source, config)] if source else _MATH_FALLBACKS

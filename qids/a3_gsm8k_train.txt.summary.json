@@ -1,0 +1,19 @@
+{
+  "dataset": "gsm8k",
+  "split": "train",
+  "seed": 0,
+  "n_population": 7473,
+  "n_picked": 1500,
+  "subject_pop": {
+    "None": 7473
+  },
+  "subject_picked": {
+    "None": 1500
+  },
+  "level_pop": {
+    "None": 7473
+  },
+  "level_picked": {
+    "None": 1500
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "dataset": "math_test_ex500",
+  "split": "test",
+  "seed": 0,
+  "n_population": 4501,
+  "n_picked": 1000,
+  "subject_pop": {
+    "Algebra": 1063,
+    "Counting & Probability": 436,
+    "Geometry": 440,
+    "Intermediate Algebra": 806,
+    "Number Theory": 478,
+    "Prealgebra": 789,
+    "Precalculus": 489
+  },
+  "subject_picked": {
+    "Algebra": 235,
+    "Counting & Probability": 97,
+    "Geometry": 98,
+    "Intermediate Algebra": 179,
+    "Number Theory": 107,
+    "Prealgebra": 176,
+    "Precalculus": 108
+  },
+  "level_pop": {
+    "1": 394,
+    "2": 804,
+    "3": 1025,
+    "4": 1086,
+    "5": 1192
+  },
+  "level_picked": {
+    "1": 88,
+    "2": 178,
+    "3": 228,
+    "4": 241,
+    "5": 265
+  }
+}

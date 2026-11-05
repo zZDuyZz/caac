@@ -25,6 +25,10 @@ import os
 # SPAWNS A PROCESS PER CALL (slow + floods errors under Python 3.14). On Windows we
 # therefore disable the timeout (None). Linux (the GPU box) keeps the default 5s.
 _NO_TIMEOUT = os.name == "nt"
+if _NO_TIMEOUT:
+    import logging
+    # the "Timeout is disabled ..." notice is expected here; keep logs readable
+    logging.getLogger("math_verify").setLevel(logging.ERROR)
 
 
 def _mv_fns():
