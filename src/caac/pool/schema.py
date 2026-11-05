@@ -34,9 +34,10 @@ class Completion:
     """One greedy or sampled completion."""
 
     answer: str | None          # extracted + normalized answer, None if unparsable
-    correct: bool               # graded against gold (by the STRONGEST grader)
+    correct: bool               # graded against gold by the PRIMARY grader (Math-Verify)
     decode_tokens: int          # generated tokens (NOT counting prefill)
     finish_reason: str          # "stop" | "length" | other; "length" => truncated
+    correct_legacy: bool | None = None  # secondary grader (answers_match); None if not run
     seed: int | None = None     # the per-completion seed actually used
     confidence: float | None = None  # mean token prob; RAW for greedy (temp=0),
                                      # post-temperature for samples (flag below)
@@ -140,3 +141,49 @@ def read_records(path: str | Path) -> Iterator[PoolRecord]:
 def load_pool(path: str | Path) -> dict[str, PoolRecord]:
     """Load a pool file keyed by query_id (one model, one dataset split)."""
     return {rec.query_id: rec for rec in read_records(path)}
+
+
+# --------------------------------------------------------------------------
+# text sidecar -- the raw generated text, stored NEXT TO the pool (not in it,
+# not in git) so any grader (Math-Verify, a better extractor) can re-grade on
+# CPU without re-running the GPU. One line per query_id:
+#   {"query_id": ..., "greedy_text": ..., "sample_texts": [...]}
+# --------------------------------------------------------------------------
+
+
+def text_sidecar_path(pool_path: str | Path) -> Path:
+    """`foo.jsonl.gz` -> `foo.text.jsonl.gz` (keeps the same compression)."""
+    p = Path(pool_path)
+    name = p.name
+    for suf in (".jsonl.gz", ".jsonl", ".gz"):
+        if name.endswith(suf):
+            return p.with_name(name[: -len(suf)] + ".text" + suf)
+    return p.with_name(name + ".text")
+
+
+def append_texts(path: str | Path, items: list[dict]) -> None:
+    """Append text records (resumable, like the pool's own append)."""
+    path = Path(path)
+    if str(path).endswith(".gz"):
+        f = gzip.open(path, "at", encoding="utf-8")
+    else:
+        f = open(path, "a", encoding="utf-8")
+    with f:
+        for it in items:
+            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+
+def load_texts(path: str | Path) -> dict[str, dict]:
+    """Load a text sidecar keyed by query_id. Returns {} if the file is absent."""
+    path = Path(path)
+    if not path.exists():
+        return {}
+    out: dict[str, dict] = {}
+    with _open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            d = json.loads(line)
+            out[d["query_id"]] = d
+    return out
