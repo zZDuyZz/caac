@@ -8,7 +8,8 @@ MATH-500 is a subset of the MATH test set, so the MATH train/calib loaders
 exclude any problem whose text matches a MATH-500 problem (matched on collapsed
 whitespace, robust across dataset mirrors).
 
-MATH/ARC source names and columns were VERIFIED with inspect_math.py on 5 Nov 2026
+MATH/ARC source names and columns were VERIFIED on 5 Nov 2026 (one-off inspection
+script, kept in git history at tag pre-cleanup-2026-11-06)
 (see the comment above ``_NLILE``).
 """
 
@@ -123,7 +124,7 @@ def _math500_problem_set():
     return {_norm_problem(it["question"]) for it in load_math500()}
 
 
-# VERIFIED with inspect_math.py (5 Nov 2026):
+# VERIFIED by inspecting the dataset (5 Nov 2026):
 #  * nlile/hendrycks-MATH-benchmark: split "train" = 12,000 rows = the PRM800K split
 #    (original MATH train 7,500 + original MATH test minus MATH-500 = 4,500); split
 #    "test" = 500 rows = MATH-500 itself. Columns: problem, solution, answer, subject,
@@ -305,10 +306,12 @@ def load_gsm_symbolic(n: int | None = None, split: str = "test",
     config -- a built-in difficulty axis worth reporting separately rather than
     pooling. The answer carries GSM8K's ``#### x`` marker.
     """
-    from datasets import load_dataset
-
+    # validate before importing datasets, so a bad config fails the same way
+    # with or without the optional dependency installed
     if config not in ("main", "p1", "p2"):
         raise ValueError(f"gsm_symbolic config must be main/p1/p2, got {config!r}")
+    from datasets import load_dataset
+
     ds = load_dataset("apple/GSM-Symbolic", config, split=split)
     items = []
     for i, row in enumerate(ds):

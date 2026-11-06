@@ -8,3 +8,5 @@ dist/
 *.json.gz
 outputs/
 .venv/
+# preliminary figures/results; add the final ones with git add -f
+figs/

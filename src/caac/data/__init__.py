@@ -1,7 +1,5 @@
-"""Datasets and the compute tree."""
+"""Benchmark loaders and the single chat prompt used for every pool."""
+
 from caac.data.benchmarks import load_benchmark, synthetic_benchmark
-from caac.data.compute_tree import ComputeTree, TreeNode, oracle_frontier, oracle_value
-__all__ = [
-    "ComputeTree", "TreeNode", "oracle_value", "oracle_frontier",
-    "load_benchmark", "synthetic_benchmark",
-]
+
+__all__ = ["load_benchmark", "synthetic_benchmark"]

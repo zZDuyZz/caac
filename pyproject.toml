@@ -4,36 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caac"
-version = "0.1.0"
-description = "Cost-Aware Adaptive Computation for Efficient LLM Reasoning"
+version = "0.2.0"
+description = "Certified, compute-adaptive control of LLM reasoning (sample pool + offline replay)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10"   # CPU replay/analysis; GPU pool building needs >=3.11 (vLLM 0.32)
 license = { text = "MIT" }
 authors = [{ name = "[Student Name]" }]
-keywords = ["llm", "reasoning", "test-time-scaling", "adaptive-computation", "efficient-inference"]
+keywords = ["llm", "reasoning", "test-time-compute", "selective-prediction", "learn-then-test"]
 
-# Core dependencies are CPU-only so the whole decision layer runs without a GPU.
+# Core = CPU-only offline replay, estimators, certification. numpy is all it needs.
 dependencies = [
     "numpy>=1.24",
-    "scipy>=1.10",
-    "scikit-learn>=1.3",
-    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
-# GPU / serving extras -- installed only when running phases P1+.
+# Pool building on GPU (build_pool.py, extract_hidden.py). session2_setup.sh pins vllm.
 gpu = [
-    "torch>=2.1",
-    "transformers>=4.40",
-    "vllm>=0.4",
+    "torch",
+    "transformers",
+    "vllm==0.32.0",
 ]
+# Benchmark loaders, the primary grader, parameter counting from the hub cache.
+data = [
+    "datasets",
+    "math-verify==0.9.0",
+    "huggingface_hub",
+]
+plot = ["matplotlib"]   # chow_frontier.py (use --no-plot without it)
 dev = [
     "pytest>=7.0",
-    "pytest-cov>=4.0",
 ]
-
-[project.scripts]
-caac = "caac.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
