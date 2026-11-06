@@ -21,6 +21,8 @@ better -- more questions answered, less compute, same risk guarantee.
             --json figs/certify_gsm8k_pc_matched.json=PriceCheck \
             --json figs/certify_gsm8k_caac.json=CAAC \
         --out figs/certified_frontier
+
+Writes ONE figure per panel (``<out>_<slug>.png`` and ``.pdf``).
 """
 
 from __future__ import annotations
@@ -68,67 +70,184 @@ def panel_caps(small_path, big_path, alpha, k):
             "cap_correct": cap_correct(rr.pi_greedy, alpha, rr.r)}
 
 
-def plot(panels, out_png):
+def _slug(title: str) -> str:
+    keep = [c.lower() if c.isalnum() else "_" for c in title]
+    out = "".join(keep)
+    while "__" in out:
+        out = out.replace("__", "_")
+    return out.strip("_")[:40]
+
+
+def _overlap(bb, taken) -> float:
+    """Weighted overlap area. Obstacles carry a weight so a *soft* one (the
+    shaded band: undesirable to cover, not forbidden) always loses to a hard
+    one (another label, a marker) rather than pushing a label on top of text."""
+    total = 0.0
+    for o, w in taken:
+        total += w * (max(0.0, min(bb.x1, o.x1) - max(bb.x0, o.x0))
+                      * max(0.0, min(bb.y1, o.y1) - max(bb.y0, o.y0)))
+    return total
+
+
+def _place(ax, fig, x, y, text, colour, taken, pad=3.0):
+    """Put a label near (x, y) in the first candidate slot that collides with
+    nothing already drawn.
+
+    Hand-tuned offsets break the moment the numbers change, and every one of
+    these figures is going to be redrawn on the Session 2 pools. So the slots
+    are tried in order of preference and accepted only when the rendered box
+    overlaps neither a previous label nor the axes edge -- the layout repairs
+    itself for whatever the next run produces.
+    """
+    slots = [(18, 12), (18, -42), (-18, 12), (-18, -42), (18, 58), (-18, 58),
+             (18, -88), (-18, -88), (0, 66), (0, -96)]
+    renderer = fig.canvas.get_renderer()
+    axbb = ax.get_window_extent(renderer)
+
+    def draw(dx, dy):
+        return ax.annotate(
+            text, xy=(x, y), xytext=(dx, dy), textcoords="offset points",
+            fontsize=8.5, color=colour, zorder=6,
+            ha="left" if dx > 0 else ("right" if dx < 0 else "center"),
+            va="bottom" if dy > 0 else "top",
+            arrowprops=dict(arrowstyle="-", color=colour, lw=0.7,
+                            shrinkA=2, shrinkB=6),
+            bbox=dict(fc="white", ec=colour, lw=0.7, alpha=0.95,
+                      boxstyle="round,pad=0.32"))
+
+    best = None               # (penalty, dx, dy, bbox) -- the least-bad slot
+    for dx, dy in slots:
+        ann = draw(dx, dy)
+        fig.canvas.draw()
+        bb = ann.get_window_extent(renderer).expanded(1.0 + pad / 100, 1.0 + pad / 100)
+        ann.remove()          # every trial is removed; only the winner is redrawn
+        outside = (bb.x0 < axbb.x0 or bb.x1 > axbb.x1
+                   or bb.y0 < axbb.y0 or bb.y1 > axbb.y1)
+        penalty = _overlap(bb, taken) + (1e9 if outside else 0.0)
+        if penalty == 0.0:
+            best = (0.0, dx, dy, bb)
+            break
+        if best is None or penalty < best[0]:
+            best = (penalty, dx, dy, bb)
+    _, dx, dy, bb = best
+    taken.append((bb, 1.0))
+    return draw(dx, dy)
+
+
+def plot_panel(p, out_png):
+    """One dataset, one figure. Cost on a LINEAR axis in units of 1e12 FLOPs:
+    a log axis spaced these few points so unevenly that its minor ticks ran
+    into each other, and the quantity spans well under one decade anyway."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(1, len(panels), figsize=(5.6 * len(panels), 4.6),
-                             squeeze=False)
-    for ax, p in zip(axes[0], panels):
-        caps = p["caps"]
-        ax.axhline(caps["cap_serve"], color="#d62728", ls="--", lw=1.6,
-                   label=f"Chow cap, serve/abstain only ({caps['cap_serve']:.2f})")
-        ax.axhline(caps["cap_correct"], color="#1f77b4", ls="--", lw=1.6,
-                   label=f"Chow cap, + correcting actions ({caps['cap_correct']:.2f})")
-        ax.axhspan(0, caps["cap_serve"], color="#d62728", alpha=0.04)
-        costs = [pt["cost"] for pt in p["points"]]
-        ax.set_xscale("log")
-        ax.set_xlim(min(costs) / 2.4, max(costs) * 5.5)
-        mid = (min(costs) * max(costs)) ** 0.5
-        seen: dict[str, int] = {}
-        for pt in sorted(p["points"], key=lambda x: -x["coverage"]):
-            col, mk = METHOD_STYLE.get(pt["label"], FALLBACK)
-            solid = pt["method"] != "bonferroni"
-            ax.plot([pt["cost"]], [pt["coverage"]], mk, color=col,
-                    mfc=col if solid else "none", ms=11, mew=1.8, zorder=5)
-            # ours hangs below its marker, the baselines stack to the right, so
-            # the boxes cannot collide however close two points land
-            rank = seen.get(pt["label"], 0)
-            seen[pt["label"]] = rank + 1
-            ours = pt["label"] == "CAAC"
-            tag = (f"{pt['label']} ({'fixed-seq' if solid else 'Bonferroni'})\n"
-                   f"coverage {pt['coverage']:.3f}, risk {pt['risk']:.3f}")
-            if pt["violated"]:
-                tag += "\n[risk violated on test]"
-            ax.annotate(tag, xy=(pt["cost"], pt["coverage"]),
-                        xytext=(0, -38 - 26 * rank) if ours else (12, 2 - 30 * rank),
-                        textcoords="offset points", fontsize=8, color=col,
-                        ha="center" if ours else "left",
-                        bbox=dict(fc="white", ec=col, lw=0.5, alpha=0.9, pad=1.4))
-            # the one claim a serve/abstain policy provably cannot match
-            if pt["label"] == "CAAC" and pt["coverage"] > caps["cap_serve"] + 1e-9:
-                ax.annotate("above the serve/abstain ceiling",
-                            xy=(pt["cost"], pt["coverage"]),
-                            xytext=(pt["cost"], min(1.0, pt["coverage"] + 0.13)),
-                            fontsize=8, color=col, ha="center",
-                            arrowprops=dict(arrowstyle="->", color=col, lw=1.2))
-        ax.set_xlabel("mean cost per question (FLOPs, held out)")
-        ax.set_ylabel("certified coverage on held-out questions")
-        ax.set_title(f"{p['title']}\n"
-                     f"pi={caps['pi']:.3f}, r={caps['r']:.2f}, "
-                     f"n_calib={p['points'][0]['n_calib']}, "
-                     f"n_test={p['points'][0]['n_test']}", fontsize=10)
-        ax.set_ylim(0, 1.04)
-        ax.grid(alpha=0.22)
-        ax.legend(fontsize=7.5, loc="lower left", framealpha=0.95)
-    fig.suptitle("Same risk guarantee, same test questions, same protocol: "
-                 "only the action set differs", fontsize=11)
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    caps, pts = p["caps"], p["points"]
+    costs = [pt["cost"] / 1e12 for pt in pts]
+    lo, hi = min(costs), max(costs)
+    span = max(hi - lo, 0.2 * hi)
+    x0, x1 = max(0.0, lo - 0.45 * span), hi + 0.45 * span
+
+    fig, ax = plt.subplots(figsize=(7.4, 5.4))
+    ax.set_xlim(x0, x1)
+    ax.set_ylim(0, 1.06)
+
+    # the band only a correcting action can reach -- the figure's whole point
+    ax.axhspan(caps["cap_serve"], caps["cap_correct"], color="#1f77b4", alpha=0.07,
+               zorder=0)
+    ax.axhline(caps["cap_serve"], color="#d62728", ls="--", lw=1.7, zorder=1)
+    ax.axhline(caps["cap_correct"], color="#1f77b4", ls="--", lw=1.7, zorder=1)
+
+    fig.canvas.draw()
+    taken = []
+    renderer = fig.canvas.get_renderer()
+
+    # markers FIRST, so every piece of text afterwards has to route around them
+    for pt in pts:
+        col, mk = METHOD_STYLE.get(pt["label"], FALLBACK)
+        solid = pt["method"] != "bonferroni"
+        h, = ax.plot([pt["cost"] / 1e12], [pt["coverage"]], mk, color=col,
+                     mfc=col if solid else "white", ms=13, mew=2.0, zorder=5)
+        fig.canvas.draw()
+        taken.append((h.get_window_extent(renderer).expanded(1.7, 1.7), 1.0))
+
+    def line_text(yd, txt, colour, ha="left"):
+        """A caption that must sit ON its own horizontal line: only the x
+        position and the side of the line are free, so try those."""
+        choices = [(xf, va) for va in ("bottom", "top")
+                   for xf in (0.015, 0.34, 0.62, 0.985)]
+        best = None
+        for xf, va in choices:
+            t = ax.text(xf, yd, txt, transform=ax.get_yaxis_transform(),
+                        fontsize=8.5, color=colour, va=va, zorder=6,
+                        ha="right" if xf > 0.9 else ha,
+                        bbox=dict(fc="white", ec="none", alpha=0.88, pad=1.6))
+            fig.canvas.draw()
+            bb = t.get_window_extent(renderer)
+            t.remove()
+            out = bb.x0 < axbb.x0 or bb.x1 > axbb.x1 or bb.y0 < axbb.y0 or bb.y1 > axbb.y1
+            pen = _overlap(bb, taken) + (1e9 if out else 0.0)
+            if pen == 0.0:
+                best = (0.0, xf, va, bb)
+                break
+            if best is None or pen < best[0]:
+                best = (pen, xf, va, bb)
+        _, xf, va, bb = best
+        taken.append((bb, 1.0))
+        return ax.text(xf, yd, txt, transform=ax.get_yaxis_transform(), fontsize=8.5,
+                       color=colour, va=va, ha="right" if xf > 0.9 else ha, zorder=6,
+                       bbox=dict(fc="white", ec="none", alpha=0.88, pad=1.6))
+
+    axbb = ax.get_window_extent(renderer)
+    line_text(caps["cap_serve"],
+              f"Chow ceiling, serve/abstain only = {caps['cap_serve']:.3f}", "#d62728")
+    line_text(caps["cap_correct"],
+              f"Chow ceiling, + answer-correcting actions = {caps['cap_correct']:.3f}",
+              "#1f77b4")
+    if caps["cap_correct"] - caps["cap_serve"] > 0.06:
+        line_text((caps["cap_serve"] + caps["cap_correct"]) / 2,
+                  "reachable only with answer-correcting actions", "#1f77b4")
+
+    # Keep point labels OUT of the shaded band. A caption floating inside the
+    # "only reachable with correcting actions" region reads as if that point
+    # were in it, which for a baseline would be exactly the wrong claim.
+    bx0, by0 = ax.transData.transform((x0, caps["cap_serve"]))
+    bx1, by1 = ax.transData.transform((x1, caps["cap_correct"]))
+    if by1 > by0:
+        from matplotlib.transforms import Bbox
+        taken.append((Bbox.from_extents(bx0, by0, bx1, by1), 0.08))
+
+    for pt in sorted(pts, key=lambda x: -x["coverage"]):
+        col, _ = METHOD_STYLE.get(pt["label"], FALLBACK)
+        solid = pt["method"] != "bonferroni"
+        tag = (f"{pt['label']}  ({'fixed-sequence' if solid else 'Bonferroni'})\n"
+               f"coverage {pt['coverage']:.3f}   risk {pt['risk']:.3f}\n"
+               f"cost {pt['cost'] / 1e12:.2f}e12 FLOPs")
+        if pt["violated"]:
+            tag += "\nrisk VIOLATED on test"
+        _place(ax, fig, pt["cost"] / 1e12, pt["coverage"], tag, col, taken)
+
+    ax.set_xlabel("mean cost per question  (10$^{12}$ FLOPs, held out)"
+                  "   \u2192 cheaper is better")
+    ax.set_ylabel("certified coverage on held-out questions")
+    ax.set_title(f"{p['title']}\n"
+                 f"\u03c0={caps['pi']:.3f}   r={caps['r']:.2f}   "
+                 f"n_calib={pts[0]['n_calib']}   n_test={pts[0]['n_test']}\n"
+                 "same test questions, same LTT protocol \u2014 only the action set differs",
+                 fontsize=9.5)
+    ax.grid(alpha=0.2, zorder=0)
+    fig.tight_layout()
     Path(out_png).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_png, dpi=200)
     fig.savefig(str(out_png).replace(".png", ".pdf"))
+    plt.close(fig)
     return out_png
+
+
+def plot(panels, out_stem):
+    """One figure PER dataset -- two panels in one canvas left the cost axes on
+    different scales side by side, which invites exactly the wrong comparison."""
+    return [plot_panel(p, f"{out_stem}_{_slug(p['title'])}.png") for p in panels]
 
 
 def main():
@@ -185,7 +304,8 @@ def main():
     Path(str(a.out) + ".json").write_text(json.dumps(panels, indent=2))
     print(f"\n  -> {a.out}.json")
     if not a.no_plot:
-        print(f"  -> {plot(panels, str(a.out) + '.png')} (+ .pdf)")
+        for f in plot(panels, str(a.out)):
+            print(f"  -> {f} (+ .pdf)")
 
 
 if __name__ == "__main__":

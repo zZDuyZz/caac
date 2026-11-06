@@ -17,6 +17,8 @@ from __future__ import annotations
 import re
 
 __all__ = ["load_benchmark", "synthetic_benchmark", "load_gsm8k", "load_math500",
+           "load_gsm_plus", "load_gsm_symbolic", "load_aime",
+           "GSM_PLUS_SKIP_PERTURBATIONS",
            "load_math", "load_arc_challenge"]
 
 
@@ -231,6 +233,130 @@ def load_arc_challenge(n: int | None = None, split: str = "test"):
     return items
 
 
+
+# --------------------------------------------------------------------------
+# CLEAN SETS (B3): benchmarks published AFTER / independently of Qwen2.5's
+# training data, used to test whether CAAC's gains survive contamination
+# control (CAAC_MASTER section 16).
+#
+# Schemas were read from the dataset cards on 2026-11-05 and are asserted at
+# load time rather than guessed: a silently renamed column would produce an
+# all-wrong run that looks like a real result.
+# --------------------------------------------------------------------------
+
+#: rows whose "answer" is deliberately unanswerable -- they must be dropped,
+#: not graded, or every model scores ~0 on them and the set looks impossible.
+GSM_PLUS_SKIP_PERTURBATIONS = {"critical thinking"}
+
+
+def _require_columns(row: dict, needed, dataset: str, repo: str):
+    missing = [c for c in needed if c not in row]
+    if missing:
+        raise KeyError(
+            f"{dataset}: {repo} is missing column(s) {missing}; got {sorted(row)}. "
+            f"The dataset schema changed -- fix the loader, do not guess."
+        )
+
+
+def load_gsm_plus(n: int | None = None, split: str = "test",
+                  keep_critical_thinking: bool = False):
+    """GSM-Plus (Li et al., ACL 2024): GSM8K perturbed eight ways.
+
+    repo ``qintongli/GSM-Plus``; splits ``test`` (full) and ``testmini``;
+    columns ``question``, ``answer``, ``solution``, ``perturbation_type``.
+
+    The "critical thinking" perturbation removes information needed to solve
+    the problem, so the gold answer is a refusal rather than a number. Those
+    rows are dropped by default (lighteval does the same); keeping them would
+    silently punish every policy and, worse, reward abstention for the wrong
+    reason -- which would corrupt a paper about selective prediction.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset("qintongli/GSM-Plus", split=split)
+    items, skipped = [], 0
+    for i, row in enumerate(ds):
+        if i == 0:
+            _require_columns(row, ("question", "answer", "perturbation_type"),
+                             "gsm_plus", "qintongli/GSM-Plus")
+        ptype = str(row.get("perturbation_type", "")).strip().lower()
+        if not keep_critical_thinking and ptype in GSM_PLUS_SKIP_PERTURBATIONS:
+            skipped += 1
+            continue
+        if n is not None and len(items) >= n:
+            break
+        gold = str(row["answer"]).strip().replace(",", "")
+        items.append({"id": f"gsmplus_{split}_{i}", "question": row["question"],
+                      "answer": gold, "perturbation_type": row.get("perturbation_type")})
+    if not items:
+        raise RuntimeError("gsm_plus: loaded 0 items -- check split name")
+    return items
+
+
+def load_gsm_symbolic(n: int | None = None, split: str = "test",
+                      config: str = "main"):
+    """GSM-Symbolic (Mirzadeh et al., ICLR 2025): templated GSM8K variants.
+
+    repo ``apple/GSM-Symbolic``; configs ``main``, ``p1``, ``p2``; split
+    ``test``; columns ``id``, ``instance``, ``question``, ``answer``,
+    ``original_id``, ``original_question``, ``original_answer``.
+
+    ``p1``/``p2`` add one and two extra clauses, so difficulty rises with the
+    config -- a built-in difficulty axis worth reporting separately rather than
+    pooling. The answer carries GSM8K's ``#### x`` marker.
+    """
+    from datasets import load_dataset
+
+    if config not in ("main", "p1", "p2"):
+        raise ValueError(f"gsm_symbolic config must be main/p1/p2, got {config!r}")
+    ds = load_dataset("apple/GSM-Symbolic", config, split=split)
+    items = []
+    for i, row in enumerate(ds):
+        if i == 0:
+            _require_columns(row, ("question", "answer"), "gsm_symbolic",
+                             "apple/GSM-Symbolic")
+        if n is not None and len(items) >= n:
+            break
+        gold = str(row["answer"]).split("####")[-1].strip().replace(",", "")
+        items.append({"id": f"gsmsym_{config}_{row.get('id', i)}_{row.get('instance', 0)}",
+                      "question": row["question"], "answer": gold,
+                      "original_id": row.get("original_id")})
+    if not items:
+        raise RuntimeError(f"gsm_symbolic[{config}]: loaded 0 items")
+    return items
+
+
+def load_aime(n: int | None = None, split: str = "train", year: str = "2024"):
+    """AIME 2024 (``HuggingFaceH4/aime_2024``): 30 problems, split ``train``.
+
+    Columns: ``id``, ``problem``, ``solution``, ``answer``, ``url``, ``year``.
+
+    WARNING, and it belongs in the paper rather than in a footnote: 30
+    questions cannot support a risk guarantee. Learn-then-Test needs at least
+    ceil(log delta / log(1-alpha)) = 22 SERVED questions before even a
+    zero-error run clears delta (``ltt.min_served_certifiable``), so at
+    alpha=delta=0.1 a 30-question set could only ever certify a policy with
+    coverage above 0.73 -- and nothing at all under Bonferroni. AIME is
+    therefore an accuracy/cost stress test here, never a certification set.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset("HuggingFaceH4/aime_2024", split=split)
+    items = []
+    for i, row in enumerate(ds):
+        if i == 0:
+            _require_columns(row, ("problem", "answer"), "aime",
+                             "HuggingFaceH4/aime_2024")
+        if n is not None and len(items) >= n:
+            break
+        items.append({"id": f"aime{year}_{row.get('id', i)}",
+                      "question": row["problem"],
+                      "answer": str(row["answer"]).strip()})
+    if not items:
+        raise RuntimeError("aime: loaded 0 items")
+    return items
+
+
 def load_benchmark(name: str, split: str = "test", n: int | None = None, **kwargs):
     """Dispatch to a named benchmark."""
     if name == "synthetic":
@@ -245,7 +371,15 @@ def load_benchmark(name: str, split: str = "test", n: int | None = None, **kwarg
         return load_math(n=n, split="test", exclude_math500=True, **kwargs)
     if name in ("arc_challenge", "arc"):
         return load_arc_challenge(n=n, split=split)
+    if name == "gsm_plus":
+        return load_gsm_plus(n=n, split=split, **kwargs)
+    if name in ("gsm_symbolic", "gsm_symbolic_main"):
+        return load_gsm_symbolic(n=n, split=split, config="main")
+    if name in ("gsm_symbolic_p1", "gsm_symbolic_p2"):
+        return load_gsm_symbolic(n=n, split=split, config=name.rsplit("_", 1)[1])
+    if name in ("aime", "aime_2024"):
+        return load_aime(n=n, split="train" if split == "test" else split)
     raise NotImplementedError(
         f"loader for '{name}' not wired yet. Available: synthetic, gsm8k, math500, "
-        "math_train, math_test_ex500, arc_challenge."
+        "math_train, math_test_ex500, arc_challenge, gsm_plus, gsm_symbolic[_p1|_p2], aime."
     )

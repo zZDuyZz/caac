@@ -51,8 +51,8 @@ from pathlib import Path
 from caac.pool.ltt import (LambdaResult, certification_floor, certify_bonferroni,
                            certify_fixed_sequence, min_served_certifiable,
                            select_max_coverage)
-from caac.pool.estimator import PerActionEstimator
-from caac.pool.policies import caac_certified, pricecheck
+from caac.pool.estimator import PerActionEstimator, SecondStageEstimator
+from caac.pool.policies import caac_certified, caac_staged, pricecheck
 from caac.pool.replay import make_orders, run_policy
 from caac.pool.schema import load_pool
 
@@ -77,6 +77,17 @@ def make_policy(small, big, check, k, conf_threshold):
         def fn(qid, order):
             return pricecheck(small[qid], lam=lam, check=check, k=k, order=order,
                               conf_threshold=conf_threshold)
+        return fn
+    return factory
+
+
+def make_staged_policy(small, big, est, est2, k, actions, cost_profile):
+    """tau -> policy_fn for the three-stage controller."""
+    def factory(tau):
+        def fn(qid, order):
+            return caac_staged(small[qid], (big or {}).get(qid), est, est2, tau=tau,
+                               order=order, k=k, cost_profile=cost_profile,
+                               actions=actions)
         return fn
     return factory
 
@@ -117,7 +128,8 @@ def main():
     ap.add_argument("--calib-big", default=None)
     ap.add_argument("--test-small", default=None)
     ap.add_argument("--test-big", default=None)
-    ap.add_argument("--policy", default="pricecheck", choices=["pricecheck", "caac"])
+    ap.add_argument("--policy", default="pricecheck",
+                    choices=["pricecheck", "caac", "caac_staged"])
     ap.add_argument("--estimator", default=None,
                     help="caac: a JSON estimator from train_estimator.py; "
                          "without it, one is fitted on the TRAIN part")
@@ -155,7 +167,8 @@ def main():
     if a.test_small:
         tst_s = load_pool(a.test_small)
         mode = "disjoint pools"
-    elif a.split == "three" or (a.split == "auto" and a.policy == "caac"
+    elif a.split == "three" or (a.split == "auto"
+                                and a.policy in ("caac", "caac_staged")
                                 and not a.estimator):
         # three disjoint parts: fit | certify | report. The estimator must never
         # see a question that the guarantee or the reported number depends on.
@@ -172,8 +185,8 @@ def main():
     tst_b = load_pool(a.test_big) if a.test_big else cal_b
 
     actions = tuple(x.strip() for x in a.actions.split(",") if x.strip())
-    est = None
-    if a.policy == "caac":
+    est = est2 = None
+    if a.policy in ("caac", "caac_staged"):
         if a.estimator:
             est = PerActionEstimator.from_json(Path(a.estimator).read_text())
             fit_note = f"loaded {a.estimator}"
@@ -185,8 +198,19 @@ def main():
                 trn_b = trn_b or cal_b
             est = PerActionEstimator(k=a.k).fit(sorted(trn_s), trn_s, trn_b)
             fit_note = f"fitted on {len(trn_s)} held-apart questions"
+        if a.policy == "caac_staged":
+            # stage 2 is fitted on the SAME held-apart questions, never on the
+            # calibration or test half
+            src = trn_s if trn_s else cal_s
+            est2 = SecondStageEstimator(k=a.k).fit(
+                sorted(src), src,
+                make_orders(min(r.n_samples for r in src.values()), 4, seed=11),
+                stage1=lambda r: est(r))
+            fit_note += f"; stage2 on {len(src)} (base {est2.base_rate:.3f})"
 
     def factory_for(small, big):
+        if a.policy == "caac_staged":
+            return make_staged_policy(small, big, est, est2, a.k, actions, a.cost_profile)
         if a.policy == "caac":
             return make_caac_policy(small, big, est, a.k, actions, a.cost_profile)
         return make_policy(small, big, a.check, a.k, a.conf_threshold)
@@ -194,7 +218,8 @@ def main():
     # grid ordered MOST CONSERVATIVE FIRST (high threshold -> abstains more).
     # The order is fixed here, before seeing any calibration number -- that is
     # what fixed-sequence testing requires.
-    gmax = a.grid_max if a.grid_max is not None else (0.95 if a.policy == "caac" else 1.0)
+    gmax = a.grid_max if a.grid_max is not None else (
+        1.0 if a.policy == "pricecheck" else 0.95)
     grid = [round(gmax * (1.0 - i / (a.grid - 1)), 4) for i in range(a.grid)]
     n_samp = min(r.n_samples for r in cal_s.values())
     orders = make_orders(n_samp, a.perms, seed=0)
@@ -209,9 +234,9 @@ def main():
     fseq = certify_fixed_sequence([r for r, _ in fs_pairs], a.alpha, a.delta)
     pick_f = select_max_coverage(fseq)
 
-    knob = "tau" if a.policy == "caac" else "lambda"
-    detail = (f"actions={'+'.join(actions)}, estimator {fit_note}"
-              if a.policy == "caac" else f"check={a.check}")
+    knob = "lambda" if a.policy == "pricecheck" else "tau"
+    detail = (f"check={a.check}" if a.policy == "pricecheck"
+              else f"actions={'+'.join(actions)}, estimator {fit_note}")
     print(f"\n=== LTT CERTIFICATION [{a.policy}] ({mode}; {detail}, k={a.k}, "
           f"alpha={a.alpha}, delta={a.delta}, |G|={len(grid)}) ===")
     n_min = min_served_certifiable(a.alpha, a.delta)

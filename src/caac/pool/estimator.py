@@ -53,6 +53,7 @@ __all__ = [
     "SERVING_ACTIONS", "FEATURE_GROUPS",
     "features", "feature_names", "action_targets", "realised_targets",
     "LogisticHead", "Isotonic", "PerActionEstimator",
+    "POST_FEATURES", "post_sample_features", "SecondStageEstimator",
 ]
 
 # ``abstain`` is not estimated: it serves nothing, so its correctness is not
@@ -393,4 +394,128 @@ class PerActionEstimator:
         e.base_rate = dict(d.get("base_rate", {}))
         e.heads = {a: LogisticHead.from_dict(v) for a, v in d["heads"].items()}
         e.cals = {a: Isotonic.from_dict(v) for a, v in d["cals"].items()}
+        return e
+
+
+# --------------------------------------------------------------------------- #
+# Stage 3 (CAAC_MASTER §8.1): decide again AFTER paying for samples.
+#
+# The §3.7 ablation showed CAAC's ``answer_now`` gate is weaker than
+# PriceCheck's 8-sample check, while its correcting actions lift the ceiling
+# the check is stuck under. The two advantages are complementary, and this is
+# where they combine: once ``sample_more`` has been paid for, the samples are
+# evidence as well as a candidate answer. Re-deciding on that evidence costs
+# nothing extra -- it is the same tokens, read twice.
+# --------------------------------------------------------------------------- #
+
+POST_FEATURES = ("top_share", "margin", "agree_greedy", "mean_sample_conf",
+                 "parse_rate", "stage1_answer_now", "bias_post")
+
+
+def post_sample_features(small: PoolRecord, idxs: list[int],
+                         stage1: dict[str, float] | None = None) -> list[float]:
+    """Evidence available after drawing ``idxs`` -- all of it already paid for.
+
+    Deliberately excludes anything that needs the gold label. ``agree_greedy``
+    uses the schema's answer-identity convention (policies.agreement_with_greedy),
+    which a deployed system computes by comparing answer strings.
+    """
+    from collections import Counter
+
+    from caac.pool.policies import agreement_with_greedy
+
+    canon = small.canonical_sample_answers()
+    vals = [canon[i] for i in idxs if i < len(canon)]
+    valid = [v for v in vals if v is not None]
+    k = max(1, len(vals))
+    counts = Counter(valid).most_common(2)
+    n1 = counts[0][1] if counts else 0
+    n2 = counts[1][1] if len(counts) > 1 else 0
+    confs = [small.samples[i].confidence for i in idxs
+             if i < small.n_samples and small.samples[i].confidence is not None]
+    return [
+        n1 / len(valid) if valid else 0.0,
+        (n1 - n2) / k,
+        agreement_with_greedy(small, [i for i in idxs if i < small.n_samples]),
+        sum(confs) / len(confs) if confs else 0.0,
+        len(valid) / k,
+        float((stage1 or {}).get("answer_now", 0.0)),
+        1.0,
+    ]
+
+
+@dataclass
+class SecondStageEstimator:
+    """P(the majority of the drawn samples is correct | post-sample evidence).
+
+    Fitted on REALISED votes over several draw orders per question, because the
+    quantity being predicted is the outcome of one concrete draw, not an
+    expectation over all of them. Same logistic head and out-of-fold isotonic
+    calibration as stage 1, for the same reason: the controller thresholds this
+    probability, so its level has to mean something.
+    """
+
+    k: int = 8
+    l2: float = 1.0
+    n_folds: int = 5
+    seed: int = 0
+    calibrate: bool = True
+    head: LogisticHead | None = None
+    cal: Isotonic | None = None
+    base_rate: float = 0.0
+
+    def fit(self, qids, small, orders, stage1=None) -> "SecondStageEstimator":
+        from collections import Counter
+        X, y = [], []
+        for q in qids:
+            rec = small[q]
+            p1 = stage1(rec) if stage1 is not None else None
+            for o in orders:
+                idxs = [i for i in o if i < rec.n_samples][:self.k]
+                if not idxs:
+                    continue
+                X.append(post_sample_features(rec, idxs, p1))
+                canon = rec.canonical_sample_answers()
+                votes = [canon[i] for i in idxs if canon[i] is not None]
+                top = Counter(votes).most_common(1)
+                y.append(float(bool(top) and top[0][0] == GOLD))
+        if len(X) < 2 * self.n_folds:
+            return self
+        X = np.asarray(X, dtype=float)
+        y = np.asarray(y, dtype=float)
+        self.base_rate = float(y.mean())
+        oof = np.zeros(len(y))
+        for fold in _folds(len(y), self.n_folds, self.seed):
+            mask = np.ones(len(y), dtype=bool)
+            mask[fold] = False
+            oof[fold] = (LogisticHead(self.l2).fit(X[mask], y[mask]).predict(X[fold])
+                         if mask.sum() >= 2 else y.mean())
+        self.head = LogisticHead(self.l2).fit(X, y)
+        self.cal = Isotonic().fit(oof, y) if self.calibrate else Isotonic()
+        return self
+
+    def __call__(self, small: PoolRecord, idxs: list[int],
+                 stage1: dict[str, float] | None = None) -> float:
+        if self.head is None:
+            return 0.0           # unfitted: never eligible, never a guess
+        x = np.asarray([post_sample_features(small, idxs, stage1)], dtype=float)
+        raw = float(self.head.predict(x)[0])
+        return float(self.cal.predict([raw])[0]) if self.calibrate else raw
+
+    def to_json(self) -> str:
+        return json.dumps({"k": self.k, "l2": self.l2, "n_folds": self.n_folds,
+                           "seed": self.seed, "calibrate": self.calibrate,
+                           "base_rate": self.base_rate,
+                           "feature_names": list(POST_FEATURES),
+                           "head": self.head.to_dict() if self.head else None,
+                           "cal": self.cal.to_dict() if self.cal else None}, indent=2)
+
+    @classmethod
+    def from_json(cls, s: str) -> "SecondStageEstimator":
+        d = json.loads(s)
+        e = cls(k=d["k"], l2=d["l2"], n_folds=d["n_folds"], seed=d["seed"],
+                calibrate=d["calibrate"])
+        e.base_rate = d.get("base_rate", 0.0)
+        e.head = LogisticHead.from_dict(d["head"]) if d.get("head") else None
+        e.cal = Isotonic.from_dict(d["cal"]) if d.get("cal") else None
         return e

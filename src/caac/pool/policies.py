@@ -43,6 +43,7 @@ __all__ = [
     "cascade",
     "caac",
     "caac_certified",
+    "caac_staged",
     "pricecheck",
     "agreement_with_greedy",
     "CHECKS",
@@ -260,7 +261,9 @@ def _calls_for_action(small, big, action, k, order):
     if action == "answer_now":
         return [_greedy_call(small)]
     if action == "sample_more":
-        idxs = order[:k]
+        # clamp to the samples the pool actually holds: a record with fewer
+        # than k (or none at all) must price the action it CAN take, not crash
+        idxs = [i for i in order if i < small.n_samples][:k]
         return [_greedy_call(small, 0), _samples_call(small, idxs, 1)]
     if action == "escalate":
         return [_greedy_call(small, 0), _greedy_call(big, 1)]
@@ -370,6 +373,91 @@ def caac_certified(
     out.meta["phat"] = phat
     out.meta["eligible"] = eligible
     out.meta["tau"] = tau
+    return out
+
+
+def caac_staged(
+    small: PoolRecord,
+    big: PoolRecord,
+    scorer: Scorer,
+    stage2,
+    tau: float,
+    order: list[int],
+    k: int = 8,
+    cost_profile: str = "flops",
+    actions: tuple[str, ...] = ("answer_now", "sample_more", "escalate"),
+) -> PolicyOutcome:
+    """CAAC with the third stage: re-decide after paying, cheapest gate first.
+
+    ``caac_certified`` commits to an action from pre-action features alone. But
+    once ``sample_more`` has been paid for, the drawn samples are EVIDENCE as
+    well as a candidate answer -- their agreement, margin and parse rate say a
+    great deal about whether the majority is right, and reading them costs
+    nothing more. That is the gap the §3.7 ablation exposed: PriceCheck's
+    8-sample check gates better than our pre-action estimator, while our
+    correcting actions lift the ceiling its check is stuck under. Here both
+    hold at once.
+
+    The policy is a cascade of gates, ordered by what each step costs on THIS
+    question (not hardcoded), and it stops at the first one that clears tau:
+
+        answer_now  -- already paid for; serve the greedy answer
+        sample_more -- draw k, then ask ``stage2`` whether the MAJORITY is
+                       right given the agreement it just observed
+        escalate    -- serve the big model's answer
+        otherwise   -- abstain, having paid for everything it tried
+
+    Every token spent on a gate that failed is still billed (the ledger sees
+    each round), so the cost of looking before leaping is never hidden.
+    """
+    from caac.pool.ledger import cost_profiles
+
+    phat = scorer(small, big)
+    calls = [_greedy_call(small, 0)]
+    tried: list[str] = []
+
+    if "answer_now" in actions and phat.get("answer_now", 0.0) >= tau:
+        out = greedy_only(small)
+        out.calls = calls
+        out.action = "answer_now"
+        out.meta.update({"phat": phat, "tau": tau, "tried": tried, "gate": "stage1"})
+        return out
+
+    # the correcting actions, cheapest first on this question
+    correcting = [a for a in actions if a != "answer_now"]
+    costs = {a: cost_profiles(_calls_for_action(small, big, a, k, order))[cost_profile]
+             for a in correcting}
+    rnd = 1
+    for action in sorted(correcting, key=lambda a: (costs[a], a)):
+        if action == "sample_more":
+            if small.n_samples == 0:
+                continue
+            idxs = [i for i in order if i < small.n_samples][:k]
+            calls.append(_samples_call(small, idxs, rnd))
+            rnd += 1
+            tried.append("sample_more")
+            p2 = stage2(small, idxs, phat) if stage2 is not None else 0.0
+            if p2 >= tau:
+                voted = _vote([small.canonical_sample_answers()[i] for i in idxs])
+                out = PolicyOutcome(True, voted, voted == GOLD, calls, "sample_more")
+                out.meta.update({"phat": phat, "p_stage2": p2, "tau": tau,
+                                 "tried": tried, "gate": "stage2"})
+                return out
+        elif action == "escalate":
+            if big is None:
+                continue
+            tried.append("escalate")
+            if phat.get("escalate", 0.0) >= tau:
+                calls.append(_greedy_call(big, rnd))
+                rnd += 1
+                bg = big.greedy
+                out = PolicyOutcome(True, bg.answer, bg.correct, calls, "escalate")
+                out.meta.update({"phat": phat, "tau": tau, "tried": tried,
+                                 "gate": "stage1"})
+                return out
+
+    out = PolicyOutcome(False, None, False, calls, "abstain")
+    out.meta.update({"phat": phat, "tau": tau, "tried": tried, "gate": "abstain"})
     return out
 
 
