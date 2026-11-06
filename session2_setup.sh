@@ -10,7 +10,7 @@ export HF_HOME=/workspace/hf_cache REPO=/workspace/caac
 REPO_URL=https://github.com/zZDuyZz/caac.git
 mkdir -p "$HF_HOME"
 
-echo "=== 0. GPU (phải là A100-SXM4-40GB như A2 — pool tái lập cần cùng loại card) ==="
+echo "=== 0. GPU (mọi pool của lần chạy này phải cùng một loại card) ==="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
 echo "=== 1. Repo ==="

@@ -12,10 +12,7 @@
 set -uo pipefail
 GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
 echo "GPU: $GPU"
-case "$GPU" in
-  *A100-SXM4-40GB*) ;;
-  *) echo "!!!!!! SAI LOẠI GPU (cần A100-SXM4-40GB như A2): '$GPU'. DỪNG. Tắt máy, đổi máy khác. !!!!!!"; exit 1;;
-esac
+# (không còn kiểm tra loại GPU — người dùng tự chọn máy; mọi pool của một lần chạy phải cùng loại GPU)
 cd /workspace/caac
 if [ ! -f /workspace/.s2_setup_done ]; then
   # pipefail: trạng thái = của session2_setup.sh (set -e bên trong), không phải của tee
