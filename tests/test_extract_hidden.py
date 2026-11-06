@@ -46,3 +46,38 @@ def test_shapes_and_padding_invariance():
     last1, mean1, _ = run(m, tok, ["x y"], batch_size=1, log=lambda *_: None)
     assert abs(last1[0].astype(float) - last[1].astype(float)).max() < 2e-2
     assert abs(mean1[0].astype(float) - mean[1].astype(float)).max() < 2e-2
+
+
+def test_load_text_model_falls_back_to_the_image_text_class():
+    """Qwen3.5 / Gemma 4 configs are multimodal; the causal-LM class refuses
+    them, the image-text class loads them. Old transformers only knows
+    torch_dtype=. Both paths must work without touching the network."""
+    from extract_hidden import load_text_model
+
+    class CausalLM:
+        @staticmethod
+        def from_pretrained(name, **kw):
+            raise ValueError("Unrecognized configuration class for this kind of AutoModel")
+
+    class ImageText:
+        @staticmethod
+        def from_pretrained(name, **kw):
+            if "dtype" in kw:
+                raise TypeError("unexpected keyword argument 'dtype'")
+            return ("model", kw)
+
+    m, used = load_text_model("x", "bf16", auto_classes=[CausalLM, ImageText])
+    assert m == ("model", {"torch_dtype": "bf16"}) and used == "ImageText"
+
+
+def test_load_text_model_reports_why_nothing_loaded():
+    import pytest
+    from extract_hidden import load_text_model
+
+    class Bad:
+        @staticmethod
+        def from_pretrained(name, **kw):
+            raise KeyError("model_type")
+
+    with pytest.raises(RuntimeError, match="no auto class"):
+        load_text_model("x", "bf16", auto_classes=[Bad])

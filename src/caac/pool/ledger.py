@@ -42,6 +42,14 @@ class ModelSpec:
     price_out_per_mtok: float = 0.0  # USD per 1M output (decode) tokens
     params_b_nonembed: float | None = None   # used for FLOPs when present
     price_source: str = ""          # provider + date the price was read
+    # False = sizes copied from a model card, NOT yet recounted from the weights
+    # by verify_params.py. No FLOPs number from an unverified entry may be
+    # reported (CAAC_MASTER §9); the flag exists so that rule can be checked.
+    params_verified: bool = True
+
+    @property
+    def has_price(self) -> bool:
+        return bool(self.price_source)
 
     @property
     def flops_params_b(self) -> float:
@@ -73,6 +81,25 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
         params_b=8.03, params_b_nonembed=6.98,
         price_in_per_mtok=0.02, price_out_per_mtok=0.05,
         price_source="DeepInfra (pricepertoken, page dated 2026-07-03), read 2026-11-05"),
+
+    # ---- 2026-11-06 model refresh (CAAC_MASTER §13.10). UNVERIFIED sizes from
+    # model cards / repo sizes; run verify_params.py on the GPU box (it counts
+    # the safetensors headers, text tower only) and replace these numbers.
+    # Prices: only Qwen3.5-9B has one so far, and a small/big pair must come
+    # from ONE provider, so api_usd stays NaN for these until both are known.
+    # Qwen3.5 small: hybrid Gated DeltaNet + attention, ships a vision encoder;
+    # 2B repo = 4.55 GB bf16 (~2.3B incl. vision), 9B = 9B LM (Hub: 10B incl.).
+    "Qwen/Qwen3.5-2B": ModelSpec(params_b=2.0, params_verified=False),
+    "Qwen/Qwen3.5-9B": ModelSpec(
+        params_b=9.0, params_verified=False,
+        # DeepInfra $0.10 in / $0.15 out (computeprices, updated 2026-11-05) -- NOT
+        # applied until the 2B has a price from the same provider.
+    ),
+    # Gemma 4: E2B = 2.3B effective, 5.1B incl. per-layer embeddings (model card);
+    # the effective count is the right FLOPs basis (PLE are lookups, not matmuls).
+    "google/gemma-4-E2B-it": ModelSpec(params_b=5.1, params_b_nonembed=2.3,
+                                       params_verified=False),
+    "google/gemma-4-12B-it": ModelSpec(params_b=12.0, params_verified=False),
 }
 
 
@@ -126,11 +153,15 @@ def cost_profiles(calls: list[Call], mem_coeff: float = 0.3) -> dict[str, float]
         fpt = _flops_per_token(spec.flops_params_b)
         out["flops"] += (call.prefill_tokens + total_decode) * fpt
 
-        # api $: input priced once, output per token
-        out["api_usd"] += (
-            call.prefill_tokens / 1e6 * spec.price_in_per_mtok
-            + total_decode / 1e6 * spec.price_out_per_mtok
-        )
+        # api $: input priced once, output per token. A model with no recorded
+        # price makes the whole profile NaN -- a silent $0 would make it look free.
+        if spec.has_price:
+            out["api_usd"] += (
+                call.prefill_tokens / 1e6 * spec.price_in_per_mtok
+                + total_decode / 1e6 * spec.price_out_per_mtok
+            )
+        else:
+            out["api_usd"] = float("nan")
 
         # eflops: flops + memory term growing with decode length per completion
         mem = mem_coeff * fpt * sum(d for d in call.decode_tokens)

@@ -23,21 +23,34 @@ so a kill between writes can only duplicate a sidecar line (loaders dedupe by
 query_id; content is identical because greedy is deterministic and samples are
 seeded), never lose one.
 
-Seeding (PLAN_V2 section 3 -- this is the fix for the whole seed saga):
-  vLLM 0.7.3 splits n>1 into n requests with seeds s, s+1, ..., s+n-1. So each
-  question's seed base is spaced by >= n (here * 1024) and derived from a stable
-  sha256 of (model|dataset|qid) -- NOT Python hash(), which is per-process salted
-  and would make the pool unreproducible. Greedy is a separate temperature=0 call.
+Seeding (PLAN_V2 section 3 -- the fix for the whole seed saga; revised 2026-11):
+  each question's seed base is derived from a stable sha256 of
+  (model|dataset|qid) -- NOT Python hash(), which is per-process salted -- and
+  spaced by 1024. Sample i is issued as its OWN request (n=1) with seed base+i.
+  vLLM 0.7.3 (V0) used to split one n>1 request into seeds s, s+1, ...; the V1
+  engine (default since 0.8, the only engine in 0.32) does not promise that, so
+  relying on it would silently change which seed produced which sample. One
+  request per sample makes the recorded seed the real seed on any version, and
+  prefix caching still shares the prompt's prefill. Greedy is a separate
+  temperature=0 request.
 
-Confidence semantics: vLLM V0 returns logprobs AFTER temperature, so for the
-sampled completions ``confidence`` is post-temperature (flagged in the record).
-Use the GREEDY confidence as the controller's calibrated signal.
+Confidence semantics: logprobs are requested with an explicit
+``logprobs_mode`` (default ``raw_logprobs`` = the model's distribution BEFORE
+temperature/top-p). The mode is written into every record and the manifest.
+The pre-registered proxy (conf_prefix32) is computed on the GREEDY completion,
+where raw and post-temperature coincide, so it means the same thing as on the
+A2 pools. Pools built with vLLM 0.7.3 carry ``vllm_v0_post_temperature``.
 
-Run ONLY after sanity_check_seed.py confirms samples differ within one run.
+Thinking: the chat template is always called with an explicit
+``enable_thinking`` (off unless --thinking), see caac.data.prompts.
+
+Multimodal checkpoints (Qwen3.5, Gemma 4): text-only prompts; the image/video/
+audio budget is set to 0 per prompt (read from the model config) so the engine
+does not reserve memory for encoders it will never run.
 
 Usage:
-  python build_pool.py --model Qwen/Qwen2.5-1.5B-Instruct --dataset math500 \
-      --n-samples 32 --max-tokens 1024 --out pools/math500_qwen1.5b.jsonl.gz
+  python build_pool.py --model Qwen/Qwen3.5-2B --dataset math500 \
+      --n-samples 32 --max-tokens 1024 --out pools/math500_qs.jsonl.gz
   # new pool, faster config (DO NOT change config for an existing pool):
   python build_pool.py ... --max-num-seqs 512 --batch-size 300
   # re-run only specific questions (e.g. the ones that were truncated):
@@ -50,7 +63,6 @@ import argparse
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 
 
@@ -60,6 +72,47 @@ def stable_seed(model: str, dataset: str, qid: str, spacing: int = 1024) -> int:
 
 
 PREFIX_K = 32  # pre-registered: first 32 generated tokens (CAAC_MASTER §8.4)
+
+# config sub-dicts that mark a modality encoder -> vLLM limit_mm_per_prompt keys
+_MM_KEYS = {"vision_config": ("image", "video"), "audio_config": ("audio",)}
+
+
+def sample_seeds(base: int, n: int) -> list[int]:
+    """One seed per sample, one request per sample (see module docstring)."""
+    return [base + i for i in range(n)]
+
+
+def mm_limits_from_config(cfg: dict | None) -> dict | None:
+    """Zero per-prompt budgets for every modality encoder the config declares.
+
+    Pure, so it is unit-tested. Returns None for a text-only model, which tells
+    the caller not to pass ``limit_mm_per_prompt`` at all (some engine versions
+    reject the argument for models that have no multimodal processor).
+    """
+    if not cfg:
+        return None
+    out = {}
+    for key, mods in _MM_KEYS.items():
+        if cfg.get(key):
+            for m in mods:
+                out[m] = 0
+    return out or None
+
+
+def env_versions() -> dict:
+    """Library + GPU versions for the manifest. Never raises."""
+    out = {}
+    for mod in ("vllm", "transformers", "torch"):
+        try:
+            out[mod] = __import__(mod).__version__
+        except Exception:                     # noqa: BLE001
+            out[mod] = None
+    try:
+        import torch
+        out["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+    except Exception:                         # noqa: BLE001
+        out["gpu"] = None
+    return out
 
 
 def mean_token_prob(logprobs: list[float]) -> float:
@@ -154,6 +207,11 @@ def main():
                    help="do NOT write the <pool>.text.jsonl.gz sidecar (not recommended)")
     p.add_argument("--no-tok", action="store_true",
                    help="do NOT write the <pool>.tok.jsonl.gz per-token sidecar (not recommended)")
+    p.add_argument("--thinking", action="store_true",
+                   help="build the prompt with enable_thinking=True (thinking subset only)")
+    p.add_argument("--logprobs-mode", default="raw_logprobs",
+                   choices=["raw_logprobs", "processed_logprobs"],
+                   help="vLLM V1 logprobs_mode; recorded in every record")
     args = p.parse_args()
 
     from vllm import LLM, SamplingParams
@@ -183,14 +241,26 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.model)
 
     def build_prompt(q: str) -> str:
-        return build_chat_prompt(tok, q)  # byte-identical to the A2 prompt
+        # same text as the A2 prompt for templates without a thinking switch
+        return build_chat_prompt(tok, q, thinking=args.thinking)
+
+    try:
+        from transformers import AutoConfig
+        model_cfg = AutoConfig.from_pretrained(args.model).to_dict()
+    except Exception:                         # noqa: BLE001  (fake transformers in tests)
+        model_cfg = None
+    mm_limits = mm_limits_from_config(model_cfg)
 
     llm_kw = dict(model=args.model, gpu_memory_utilization=args.gpu_mem,
                   max_model_len=args.max_model_len, enable_prefix_caching=True,
+                  logprobs_mode=args.logprobs_mode,
                   seed=0)  # engine seed harmless; per-request seeds below drive diversity
     if args.max_num_seqs:
         llm_kw["max_num_seqs"] = args.max_num_seqs
+    if mm_limits:
+        llm_kw["limit_mm_per_prompt"] = mm_limits
     llm = LLM(**llm_kw)
+    conf_sem = f"vllm_v1_{args.logprobs_mode}"
 
     # --- resume: which qids already have a complete record on disk ---
     done = set()
@@ -210,7 +280,12 @@ def main():
         "model": args.model, "dataset": args.dataset, "split": args.split,
         "n_samples": args.n_samples, "temperature": args.temperature,
         "max_tokens": args.max_tokens, "top_logprobs": args.top_logprobs,
-        "vllm_use_v1": os.environ.get("VLLM_USE_V1", "0"),
+        "engine": "vllm_v1", "logprobs_mode": args.logprobs_mode,
+        "confidence_semantics": conf_sem,
+        "seeding": "one request per sample, seed = stable_seed(model|dataset|qid) + i",
+        "thinking": args.thinking, "chat_template_kwargs": {"enable_thinking": args.thinking},
+        "limit_mm_per_prompt": mm_limits,
+        "versions": env_versions(),
         "max_num_seqs": args.max_num_seqs, "max_model_len": args.max_model_len,
         "grader": args.grader, "has_text_sidecar": not args.no_text,
         "has_token_sidecar": not args.no_tok, "prefix_k": PREFIX_K,
@@ -235,11 +310,18 @@ def main():
                                    logprobs=args.top_logprobs)
         greedy_out = llm.generate(prompts, greedy_sp)
 
-        sps = [SamplingParams(n=args.n_samples, temperature=args.temperature,
-                              max_tokens=args.max_tokens, logprobs=args.top_logprobs,
-                              seed=stable_seed(args.model, args.dataset, pr["id"]))
-               for pr in batch]
-        sample_outs = llm.generate(prompts, sps)
+        # one request per sample (n=1, explicit seed); regrouped per question below
+        n = args.n_samples
+        s_prompts, sps = [], []
+        for pr, text in zip(batch, prompts):
+            for sd in sample_seeds(stable_seed(args.model, args.dataset, pr["id"]), n):
+                s_prompts.append(text)
+                sps.append(SamplingParams(n=1, temperature=args.temperature,
+                                          max_tokens=args.max_tokens,
+                                          logprobs=args.top_logprobs, seed=sd))
+        flat = llm.generate(s_prompts, sps) if n > 0 else []
+        sample_outs = [[o.outputs[0] for o in flat[i * n:(i + 1) * n]]
+                       for i in range(len(batch))]
 
         records, texts, toks = [], [], []
         for pr, pf, g, so in zip(batch, prefill, greedy_out, sample_outs):
@@ -256,15 +338,15 @@ def main():
                     t["ent"] = _r(ent)
                 return d, txt, t
             g_d, g_txt, g_t = one(g.outputs[0], is_greedy=True)
-            base = stable_seed(args.model, args.dataset, pr["id"])
-            s_trip = [one(c, seed=base + i) for i, c in enumerate(so.outputs)]
+            seeds = sample_seeds(stable_seed(args.model, args.dataset, pr["id"]), n)
+            s_trip = [one(c, seed=sd) for sd, c in zip(seeds, so)]
             rec = {
                 "query_id": pr["id"], "dataset": args.dataset, "model": args.model,
                 "gold": pr["answer"], "prompt_tokens": pf,
                 "greedy": g_d,
                 "samples": [d for d, _, _ in s_trip],
                 "temperature": args.temperature,
-                "confidence_semantics": "vllm_v0_post_temperature",
+                "confidence_semantics": conf_sem,
                 "schema_version": "1.0",
             }
             records.append(json.dumps(rec, ensure_ascii=False))

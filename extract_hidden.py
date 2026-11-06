@@ -1,7 +1,11 @@
 """A4: question-only hidden states for the stage-0 probe (CAAC_MASTER §8.1).
 
 One HF forward pass over the SAME chat prompt build_pool uses (prefill only, no
-generation). vLLM 0.7.3 does not return hidden states, hence transformers.
+generation, thinking OFF like the pools). Hidden states come from transformers,
+not vLLM, so the probe does not depend on the serving engine's version.
+Multimodal checkpoints (Qwen3.5, Gemma 4) are loaded through the image-text
+class when the causal-LM class refuses them; with text-only input their
+``hidden_states`` are the language model's.
 For every question we keep, at a few relative depths, (a) the hidden state of
 the LAST prompt token and (b) the attention-masked MEAN over prompt tokens.
 
@@ -16,8 +20,8 @@ Cost per CAAC_MASTER §9: probe = one forward pass of the question (prefill).
 Default model = the SMALL model (the router runs before any generation).
 
 Usage (GPU box):
-  python extract_hidden.py --model Qwen/Qwen2.5-1.5B-Instruct --dataset math500 \
-      --out /workspace/hidden/math500_q1.5b.npz
+  python extract_hidden.py --model Qwen/Qwen3.5-2B --dataset math500 \
+      --out /workspace/hidden/math500_qs.npz
   python extract_hidden.py ... --dataset math_train --qids-file qids/a3_math_train.txt
 """
 
@@ -58,6 +62,34 @@ def pool_states(hidden_states, attention_mask, layers):
     return (torch.stack(last, 1).cpu().numpy(), torch.stack(mean, 1).cpu().numpy())
 
 
+def load_text_model(name: str, dtype, auto_classes=None):
+    """Load a checkpoint for a text-only forward pass.
+
+    Tries the causal-LM auto class first, then the image-text-to-text class
+    (multimodal checkpoints whose config is not registered as a causal LM).
+    ``dtype`` is passed as ``dtype=`` (current transformers) and falls back to
+    the older ``torch_dtype=``. ``auto_classes`` is injectable for tests.
+    Returns (model, class_name_used).
+    """
+    if auto_classes is None:
+        import transformers
+        auto_classes = [getattr(transformers, n) for n in
+                        ("AutoModelForCausalLM", "AutoModelForImageTextToText")
+                        if hasattr(transformers, n)]
+    errors = []
+    for cls in auto_classes:
+        for kw in ({"dtype": dtype}, {"torch_dtype": dtype}):
+            try:
+                return cls.from_pretrained(name, **kw), getattr(cls, "__name__", str(cls))
+            except TypeError as e:            # old transformers: no dtype= kwarg
+                errors.append(f"{cls}: {e}")
+                continue
+            except (ValueError, KeyError) as e:  # config not mapped to this class
+                errors.append(f"{cls}: {e}")
+                break
+    raise RuntimeError("no auto class could load " + name + ": " + " | ".join(errors))
+
+
 def run(model, tok, prompts, batch_size, layers=None, device="cpu", log=print):
     import torch
     tok.padding_side = "left"
@@ -80,7 +112,7 @@ def run(model, tok, prompts, batch_size, layers=None, device="cpu", log=print):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="Qwen/Qwen2.5-1.5B-Instruct")
+    ap.add_argument("--model", required=True)
     ap.add_argument("--dataset", required=True)
     ap.add_argument("--split", default="test")
     ap.add_argument("--qids-file", default=None)
@@ -90,7 +122,7 @@ def main():
     a = ap.parse_args()
 
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoTokenizer
     from caac.data.benchmarks import load_benchmark
     from caac.data.prompts import build_chat_prompt, SUFFIX
 
@@ -104,9 +136,9 @@ def main():
         items = [by_id[q] for q in keep]
     tok = AutoTokenizer.from_pretrained(a.model)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = AutoModelForCausalLM.from_pretrained(
-        a.model, torch_dtype=getattr(torch, a.dtype)).to(device).eval()
-    prompts = [build_chat_prompt(tok, it["question"]) for it in items]
+    model, model_cls = load_text_model(a.model, getattr(torch, a.dtype))
+    model = model.to(device).eval()
+    prompts = [build_chat_prompt(tok, it["question"], thinking=False) for it in items]
     last, mean, layers = run(model, tok, prompts, a.batch_size, device=device,
                              log=lambda m: print(m, flush=True))
     out = Path(a.out); out.parent.mkdir(parents=True, exist_ok=True)
@@ -115,7 +147,10 @@ def main():
     Path(str(out) + ".manifest.json").write_text(json.dumps({
         "model": a.model, "dataset": a.dataset, "split": a.split, "qids_file": a.qids_file,
         "n": len(items), "layers": layers, "dtype_model": a.dtype, "dtype_saved": "float16",
-        "prompt_suffix": SUFFIX, "pooling": ["last_token", "masked_mean"]}, indent=2))
+        "prompt_suffix": SUFFIX, "pooling": ["last_token", "masked_mean"],
+        "chat_template_kwargs": {"enable_thinking": False}, "model_class": model_cls,
+        "transformers": __import__("transformers").__version__,
+        "torch": torch.__version__}, indent=2))
     print(f"done -> {out}  shape={last.shape}", flush=True)
 
 

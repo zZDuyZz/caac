@@ -42,3 +42,15 @@ def test_missing_sidecar(tmp_path):
     token_sidecar_path(pool).unlink()
     errs, _ = S.check(pool)
     assert any("sidecar mismatch" in e for e in errs)
+
+
+def test_thinking_leak_is_a_failure(tmp_path):
+    """Every pool is built with thinking OFF; a <think> in the output means the
+    template switch did not take and the token budget went to reasoning text."""
+    pool = _write(tmp_path)
+    tp = text_sidecar_path(pool)
+    tp.unlink()
+    append_texts(tp, [{"query_id": f"q{i}", "greedy_text": "<think>hmm</think> so \\boxed{42}",
+                       "sample_texts": ["a", "b"]} for i in range(3)])
+    errs, _ = S.check(pool)
+    assert any("thinking marker" in e for e in errs)

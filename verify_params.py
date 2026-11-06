@@ -7,6 +7,8 @@ and says whether they agree.
 
     python verify_params.py --config /path/to/Qwen2.5-1.5B-Instruct/config.json
     python verify_params.py --hf Qwen/Qwen2.5-1.5B-Instruct     # needs the hub
+    python verify_params.py --weights Qwen/Qwen3.5-2B           # EXACT, from the
+                                     # downloaded safetensors headers (no weights read)
 
 Run it on the GPU box in Session 2/3, where the weights are downloaded anyway,
 and paste the output into CAAC_MASTER §9. Exit code is non-zero if any model
@@ -16,6 +18,13 @@ Counts a Llama/Qwen-style decoder exactly: embeddings, per-layer attention
 (with Qwen2's q/k/v biases) and gated MLP, the RMSNorms, and an untied LM head
 when ``tie_word_embeddings`` is false. "Non-embedding" excludes the token
 embedding matrix and the LM head, which is the convention the 2N rule assumes.
+
+``--weights`` (2026-11) is the method of record for the refreshed models: the
+config formula above cannot describe hybrid Gated-DeltaNet layers (Qwen3.5) or
+per-layer embeddings (Gemma 4), whereas a safetensors header lists every
+tensor's shape. Tensors are classed by name: encoder towers (vision/audio) and
+multi-token-prediction heads are reported but EXCLUDED, because a text-only
+decode never runs them; token and per-layer embeddings count as embedding.
 """
 
 from __future__ import annotations
@@ -58,6 +67,60 @@ def count_params(cfg: dict) -> dict:
             "per_layer": per_layer}
 
 
+_TOWER_MARKERS = ("visual", "vision", "audio", "multi_modal_projector", "mm_projector",
+                  "embed_vision", "embed_audio", "image_newline")
+
+
+def classify_tensor(name: str) -> str:
+    """text | embed | lm_head | tower | mtp -- see module docstring."""
+    n = name.lower()
+    if n.startswith("mtp.") or ".mtp." in n:
+        return "mtp"
+    if any(t in n for t in _TOWER_MARKERS):
+        return "tower"
+    if "lm_head" in n:
+        return "lm_head"
+    if "embed_tokens" in n or n.endswith("wte.weight"):
+        return "embed"                     # includes Gemma 4 embed_tokens_per_layer
+    return "text"
+
+
+def read_safetensors_header(path) -> dict:
+    """The JSON header of a .safetensors file (8-byte LE length + JSON)."""
+    with open(path, "rb") as f:
+        n = int.from_bytes(f.read(8), "little")
+        return json.loads(f.read(n))
+
+
+def count_safetensors(paths) -> dict:
+    """Exact parameter counts by class from safetensors headers."""
+    counts = {"text": 0, "embed": 0, "lm_head": 0, "tower": 0, "mtp": 0}
+    for p in paths:
+        for name, meta in read_safetensors_header(p).items():
+            if name == "__metadata__":
+                continue
+            numel = 1
+            for d in meta["shape"]:
+                numel *= d
+            counts[classify_tensor(name)] += numel
+    counts["non_embed"] = counts["text"]
+    counts["total"] = counts["text"] + counts["embed"] + counts["lm_head"]
+    return counts
+
+
+def resolve_weights(src: str) -> tuple[str, list]:
+    """A local directory, or a hub id already in the local cache."""
+    d = Path(src)
+    if not d.is_dir():
+        from huggingface_hub import snapshot_download
+        d = Path(snapshot_download(src, local_files_only=True,
+                                   allow_patterns=["*.safetensors", "*.json"]))
+    files = sorted(d.glob("*.safetensors"))
+    if not files:
+        raise FileNotFoundError(f"no .safetensors in {d}")
+    return src, files
+
+
 def load_cfg(path_or_id: str, is_hf: bool) -> tuple[str, dict]:
     if is_hf:
         from huggingface_hub import hf_hub_download
@@ -72,15 +135,48 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", action="append", default=[], help="path to config.json")
     ap.add_argument("--hf", action="append", default=[], help="hub model id")
+    ap.add_argument("--weights", action="append", default=[],
+                    help="model dir or cached hub id: exact count from safetensors headers")
     ap.add_argument("--tol", type=float, default=0.02, help="relative tolerance")
     a = ap.parse_args()
-    if not a.config and not a.hf:
-        ap.error("give at least one --config or --hf")
+    if not a.config and not a.hf and not a.weights:
+        ap.error("give at least one --config, --hf or --weights")
+    bad = 0
+    if a.weights:
+        print("\n=== EXACT COUNTS FROM SAFETENSORS (text tower; towers/MTP excluded) ===")
+        for src in a.weights:
+            try:
+                name, files = resolve_weights(src)
+                c = count_safetensors(files)
+            except Exception as e:                  # noqa: BLE001
+                print(f"  {src}: could not count: {e}")
+                bad += 1
+                continue
+            spec = MODEL_REGISTRY.get(name)
+            tot_b, ne_b = c["total"] / 1e9, c["non_embed"] / 1e9
+            print(f"  {name}: total(text) {tot_b:.3f}B  non-embed {ne_b:.3f}B  "
+                  f"embed {c['embed'] / 1e9:.3f}B  lm_head {c['lm_head'] / 1e9:.3f}B  "
+                  f"[excluded: tower {c['tower'] / 1e9:.3f}B, mtp {c['mtp'] / 1e9:.3f}B]")
+            if spec is None:
+                print("    NOT IN REGISTRY"); bad += 1; continue
+            reg_ne = spec.params_b_nonembed or spec.params_b
+            ok = (abs(tot_b - spec.params_b) / spec.params_b <= a.tol
+                  and abs(ne_b - reg_ne) / reg_ne <= a.tol)
+            print(f"    registry: total {spec.params_b:.3f}B non-embed {reg_ne:.3f}B "
+                  f"verified={spec.params_verified} -> {'OK' if ok else 'MISMATCH'}")
+            if not ok or not spec.params_verified:
+                bad += 1
+                print(f'    PASTE: "{name}": ModelSpec(params_b={tot_b:.3f}, '
+                      f'params_b_nonembed={ne_b:.3f}, params_verified=True, ...)')
+        if not a.config and not a.hf:
+            if bad:
+                print(f"\n  {bad} model(s) need attention -- fix MODEL_REGISTRY before "
+                      f"reporting any FLOPs or dollar number.")
+            return 1 if bad else 0
 
     print(f"\n=== PARAMETER COUNTS vs MODEL_REGISTRY (tolerance {a.tol:.0%}) ===")
     print(f"  {'model':36} {'total B':>9} {'non-emb B':>10} {'registry':>9} "
           f"{'reg non-emb':>12} {'verdict':>9}")
-    bad = 0
     for src, is_hf in [(c, False) for c in a.config] + [(m, True) for m in a.hf]:
         try:
             name, cfg = load_cfg(src, is_hf)

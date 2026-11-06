@@ -6,7 +6,10 @@ Exit code 0 = OK; non-zero = STOP (the run script aborts before spending GPU hou
 Checks: pool/text/token sidecars aligned by query_id; per-token arrays as long as
 decode_tokens; conf_prefix32 and answer_raw present; the generated text really
 contains the raw answer; at least --min-correct of the greedy answers graded
-correct by Math-Verify (a dead grader or broken prompt shows up as ~0).
+correct by Math-Verify (a dead grader or broken prompt shows up as ~0); and
+(2026-11) no saved completion contains a thinking marker -- every pool is built
+with thinking OFF, so a ``<think>`` in the output means the chat-template switch
+did not take and the whole token budget would go to reasoning text.
 Always prints the table (gold / raw / MV / legacy / conf32) so it lands in the log.
 """
 
@@ -16,6 +19,8 @@ import argparse
 import sys
 
 from caac.pool.schema import load_pool, load_texts, text_sidecar_path, token_sidecar_path
+
+THINK_MARKERS = ("<think>", "</think>", "<|think|>")
 
 
 def check(pool_path, min_correct=0):
@@ -43,6 +48,10 @@ def check(pool_path, min_correct=0):
         tx = texts.get(q)
         if tx is not None and g.answer_raw is not None and g.answer_raw not in tx["greedy_text"]:
             errs.append(f"{q}: raw answer not found inside the saved greedy text")
+        if tx is not None:
+            outs = [tx.get("greedy_text") or ""] + list(tx.get("sample_texts") or [])
+            if any(m in (t or "") for t in outs for m in THINK_MARKERS):
+                errs.append(f"{q}: thinking marker in the output (thinking should be OFF)")
         n_ok += bool(g.correct)
         rows.append((q, r.gold, g.answer_raw, g.correct, g.correct_legacy, g.conf_prefix32,
                      sum(s.correct for s in r.samples), len(r.samples), g.finish_reason))

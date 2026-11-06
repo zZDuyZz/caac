@@ -45,9 +45,13 @@ def _install_fakes(monkeypatch, calls):
                 ans = a + b
                 if s.n == 1 and s.temperature == 0.0:
                     outs.append(NS(outputs=[_fake_output(f"so \\boxed{{{ans}}}", 40)]))
-                else:  # half right, half wrong
+                else:
+                    # one request per sample: sample index i = seed - base (base is a
+                    # multiple of 1024) -> half right, half wrong, lengths 10+i
+                    assert s.n == 1, "samples must be one request each (V1 seeding)"
+                    i = s.seed % 1024
                     outs.append(NS(outputs=[_fake_output(
-                        f"\\boxed{{{ans if i % 2 == 0 else ans + 1}}}", 10 + i, i) for i in range(s.n)]))
+                        f"\\boxed{{{ans if i % 2 == 0 else ans + 1}}}", 10 + i, i)]))
             calls.append(("gen", len(prompts)))
             return outs
 
@@ -55,7 +59,8 @@ def _install_fakes(monkeypatch, calls):
     tr = types.ModuleType("transformers")
 
     class Tok:
-        def apply_chat_template(self, msgs, tokenize=False, add_generation_prompt=True):
+        def apply_chat_template(self, msgs, tokenize=False, add_generation_prompt=True, **kw):
+            calls.append(("template", kw))
             return "USER:" + msgs[0]["content"] + "\nASSISTANT:"
 
         def __call__(self, text):
@@ -128,3 +133,47 @@ def test_token_signals_math():
     assert tc[1] == pytest.approx((0.2 + 0.9 + 1.9) / 3)   # top-3 by rank, chosen excluded
     ps = [math.exp(-0.5), math.exp(-1.5), math.exp(-2.5)]; z = sum(ps)
     assert ent[0] == pytest.approx(-sum(p / z * math.log(p / z) for p in ps))
+
+
+def test_v1_protocol_is_recorded_and_explicit(monkeypatch, tmp_path):
+    """Seeds are real per-sample seeds, thinking is passed explicitly, and the
+    logprobs mode / engine / versions land in the manifest and the records."""
+    calls = []
+    _install_fakes(monkeypatch, calls)
+    out = tmp_path / "v.jsonl.gz"
+    _run(monkeypatch, out)
+    init = [c[1] for c in calls if c[0] == "init"][0]
+    assert init["logprobs_mode"] == "raw_logprobs" and init["enable_prefix_caching"]
+    assert "limit_mm_per_prompt" not in init          # text-only model
+    assert all(c[1] == {"enable_thinking": False} for c in calls if c[0] == "template")
+    import build_pool
+    r = _read(out)[0]
+    base = build_pool.stable_seed("m", "synthetic", r["query_id"])
+    assert [c["seed"] for c in r["samples"]] == [base, base + 1, base + 2, base + 3]
+    assert r["confidence_semantics"] == "vllm_v1_raw_logprobs"
+    man = json.loads((tmp_path / "v.jsonl.gz.manifest.json").read_text())
+    assert man["engine"] == "vllm_v1" and man["thinking"] is False
+    assert set(man["versions"]) >= {"vllm", "transformers", "torch", "gpu"}
+
+
+def test_thinking_flag_reaches_the_chat_template(monkeypatch, tmp_path):
+    calls = []
+    _install_fakes(monkeypatch, calls)
+    _run(monkeypatch, tmp_path / "t.jsonl.gz", ["--thinking"])
+    assert all(c[1] == {"enable_thinking": True} for c in calls if c[0] == "template")
+
+
+def test_mm_limits_follow_the_config():
+    import build_pool
+    assert build_pool.mm_limits_from_config(None) is None
+    assert build_pool.mm_limits_from_config({"hidden_size": 8}) is None
+    assert build_pool.mm_limits_from_config({"vision_config": {"x": 1}}) == {"image": 0, "video": 0}
+    assert build_pool.mm_limits_from_config(
+        {"vision_config": {"x": 1}, "audio_config": {"y": 2}}) == {"image": 0, "video": 0, "audio": 0}
+    assert build_pool.mm_limits_from_config({"vision_config": None}) is None
+
+
+def test_sample_seeds_are_consecutive_from_the_base():
+    import build_pool
+    assert build_pool.sample_seeds(2048, 3) == [2048, 2049, 2050]
+    assert build_pool.sample_seeds(0, 0) == []
