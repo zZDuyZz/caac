@@ -64,12 +64,25 @@ per-token sidecars, hidden states — these are **not** committed to git).
 ## Offline analysis (CPU)
 
 ```bash
+# every method certified under one protocol; train / calib / test share no question
+python certify.py --train-small P/a3_math_train_qs.jsonl.gz --train-big P/a3_math_train_qb.jsonl.gz \
+    --calib-small P/a3_math_test_ex500_qs.jsonl.gz --calib-big P/a3_math_test_ex500_qb.jsonl.gz \
+    --test-small P/math500_qs.jsonl.gz --test-big P/math500_qb.jsonl.gz --alpha 0.10 --json out/math500.json
+# GSM8K: no separate calibration pool, so the train pool is split in two by question id
+python certify.py --train-small P/a3_gsm8k_train_qs.jsonl.gz --train-big P/a3_gsm8k_train_qb.jsonl.gz \
+    --test-small P/gsm8k_qs.jsonl.gz --test-big P/gsm8k_qb.jsonl.gz --alpha 0.10 --json out/gsm8k.json
+# does the certificate hold? violation rate over random calibration/test re-splits
+python resplit.py --train-small P/a3_math_train_qs.jsonl.gz --train-big P/a3_math_train_qb.jsonl.gz \
+    --pool-small P/a3_math_test_ex500_qs.jsonl.gz --pool-big P/a3_math_test_ex500_qb.jsonl.gz --splits 500
 python chow_frontier.py --small P/math500_qs.jsonl.gz --big P/math500_qb.jsonl.gz --label "MATH-500" --out figs/chow --alpha 0.10
-python train_estimator.py --small P/a3_math_train_qs.jsonl.gz --big P/a3_math_train_qb.jsonl.gz --out models/est_math.json
-python certify.py --policy caac_staged --calib-small ... --calib-big ... --test-small ... --test-big ... --alpha 0.10 --json out.json
 python run_baselines.py --small P/gsm8k_qs.jsonl.gz --big P/gsm8k_qb.jsonl.gz --json figs/baselines_gsm8k.json
 python verify_params.py --weights Qwen/Qwen3.5-2B --weights Qwen/Qwen3.5-9B   # exact sizes for the FLOPs axis
 ```
+
+`certify.py` sweeps the price ratio `lam` (one big-model token costs `lam`
+small-model tokens) and, at each value, reports every method's most-coverage
+pick, its cheapest pick at each target coverage, the plug-in rule without a
+test, the oracle, and which method is cheapest where (the phase map).
 
 ## Layout
 
@@ -79,10 +92,11 @@ python verify_params.py --weights Qwen/Qwen3.5-2B --weights Qwen/Qwen3.5-9B   # 
 | `extract_hidden.py` | question-only hidden states for the stage-0 probe |
 | `regrade_pool.py`, `compare_pools.py`, `smoke_check.py`, `s2_summary.py` | re-grading, determinism check, smoke gate, session summary |
 | `make_qids.py`, `qids/` | stratified question ids for the calibration/train splits |
-| `chow_frontier.py`, `certify.py`, `train_estimator.py`, `run_baselines.py` | the paper's analyses |
+| `certify.py`, `resplit.py` | the main comparison under one certification protocol, and its validity check |
+| `chow_frontier.py`, `train_estimator.py`, `run_baselines.py` | the Chow ceiling, a stand-alone estimator fit, the always-answer sweep |
 | `verify_params.py` | parameter counts (config formula, or exact from safetensors headers) checked against the cost registry |
 | `session2_*.sh` | one-command GPU session |
-| `src/caac/pool/` | pool schema, replay, policies (PriceCheck, CAAC 2-stage and 3-stage), estimators, LTT, Chow frontier, adaptive-sampling baselines, cost ledger |
+| `src/caac/pool/` | pool schema with label-free answer classes, policies, method families, the certification protocol, estimators (pre-action, after sampling, after escalation), LTT, Chow frontier, adaptive-sampling baselines, cost ledger |
 | `src/caac/data/`, `src/caac/eval/` | benchmark loaders (incl. clean sets), the single chat prompt, answer matching, Math-Verify grading, calibration metrics |
 | `outputs/a2/` | pilot pools (Qwen2.5), kept for the appendix |
 

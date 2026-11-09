@@ -91,7 +91,7 @@ s0_params() {
   return 0
 }
 # Big model: 16 samples on the TEST pools. It is the escalate target, so its pass@k ceiling is
-# the ceiling of the whole controller. A3 pools keep fewer samples: they train and calibrate.
+# the ceiling of the whole controller.
 s1_test_pools() {
   $BP --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
   $BP --model $QB --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
@@ -117,13 +117,16 @@ s2_compare() {
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0
 }
+# A3 = train + calibration. Calibration must run the SAME policies as test, so it needs as many
+# draws as any policy may take: CAAC samples up to 16 from the small model, and PriceCheck's
+# races draw up to 6 re-solves from the big one (8 leaves headroom).
 s4_a3() {
-  $BP --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 4 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
+  $BP --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 16 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
+  $BP --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
   for D in math_train math_test_ex500; do
     S=train; [ $D = math_test_ex500 ] && S=test
-    $BP --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens $MT_M --out "$P/a3_${D}_qs.jsonl.gz" || return 1
-    $BP --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 4 --max-tokens $MT_M --out "$P/a3_${D}_qb.jsonl.gz" || return 1
+    $BP --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 16 --max-tokens $MT_M --out "$P/a3_${D}_qs.jsonl.gz" || return 1
+    $BP --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens $MT_M --out "$P/a3_${D}_qb.jsonl.gz" || return 1
   done
 }
 s5_hidden() {

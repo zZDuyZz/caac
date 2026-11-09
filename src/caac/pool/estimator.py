@@ -42,7 +42,9 @@ from __future__ import annotations
 
 import json
 import math
+from collections import Counter
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 import numpy as np
 
@@ -53,6 +55,7 @@ __all__ = [
     "features", "feature_names", "action_targets", "realised_targets",
     "LogisticHead", "Isotonic", "PerActionEstimator",
     "POST_FEATURES", "post_sample_features", "SecondStageEstimator",
+    "ESC_FEATURES", "post_escalate_features", "EscalateGate",
 ]
 
 # ``abstain`` is not estimated: it serves nothing, so its correctness is not
@@ -407,7 +410,7 @@ class PerActionEstimator:
 # --------------------------------------------------------------------------- #
 
 POST_FEATURES = ("top_share", "margin", "agree_greedy", "mean_sample_conf",
-                 "parse_rate", "stage1_answer_now", "bias_post")
+                 "parse_rate", "stage1_answer_now", "log_k", "bias_post")
 
 
 def post_sample_features(small: PoolRecord, idxs: list[int],
@@ -438,6 +441,7 @@ def post_sample_features(small: PoolRecord, idxs: list[int],
         sum(confs) / len(confs) if confs else 0.0,
         len(valid) / k,
         float((stage1 or {}).get("answer_now", 0.0)),
+        np.log2(k) / 4.0,          # the same margin means more after more draws
         1.0,
     ]
 
@@ -458,34 +462,40 @@ class SecondStageEstimator:
     n_folds: int = 5
     seed: int = 0
     calibrate: bool = True
+    ks: tuple = ()             # draw counts to fit on; the staged controller checks after each
     head: LogisticHead | None = None
     cal: Isotonic | None = None
     base_rate: float = 0.0
 
     def fit(self, qids, small, orders, stage1=None) -> "SecondStageEstimator":
         from collections import Counter
-        X, y = [], []
-        for q in qids:
+        X, y, group = [], [], []
+        for gi, q in enumerate(qids):
             rec = small[q]
             p1 = stage1(rec) if stage1 is not None else None
-            for o in orders:
-                idxs = [i for i in o if i < rec.n_samples][:self.k]
-                if not idxs:
-                    continue
-                X.append(post_sample_features(rec, idxs, p1))
-                canon = rec.canonical_sample_answers()
-                votes = [canon[i] for i in idxs if canon[i] is not None]
-                top = Counter(votes).most_common(1)
-                y.append(float(bool(top) and rec.label_correct(top[0][0])))
-        if len(X) < 2 * self.n_folds:
+            canon = rec.canonical_sample_answers()
+            for kk in (self.ks or (self.k,)):
+                for o in orders:
+                    idxs = [i for i in o if i < rec.n_samples][:kk]
+                    if not idxs:
+                        continue
+                    X.append(post_sample_features(rec, idxs, p1))
+                    votes = [canon[i] for i in idxs if canon[i] is not None]
+                    top = Counter(votes).most_common(1)
+                    y.append(float(bool(top) and rec.label_correct(top[0][0])))
+                    group.append(gi)
+        if len(set(group)) < 2 * self.n_folds:
             return self
         X = np.asarray(X, dtype=float)
         y = np.asarray(y, dtype=float)
+        group = np.asarray(group)
         self.base_rate = float(y.mean())
         oof = np.zeros(len(y))
-        for fold in _folds(len(y), self.n_folds, self.seed):
-            mask = np.ones(len(y), dtype=bool)
-            mask[fold] = False
+        # folds by QUESTION: rows of one question are correlated, so splitting
+        # them across folds would make the out-of-fold calibration optimistic
+        for qfold in _folds(int(group.max()) + 1, self.n_folds, self.seed):
+            fold = np.isin(group, qfold)
+            mask = ~fold
             oof[fold] = (LogisticHead(self.l2).fit(X[mask], y[mask]).predict(X[fold])
                          if mask.sum() >= 2 else y.mean())
         self.head = LogisticHead(self.l2).fit(X, y)
@@ -503,6 +513,7 @@ class SecondStageEstimator:
     def to_json(self) -> str:
         return json.dumps({"k": self.k, "l2": self.l2, "n_folds": self.n_folds,
                            "seed": self.seed, "calibrate": self.calibrate,
+                           "ks": list(self.ks),
                            "base_rate": self.base_rate,
                            "feature_names": list(POST_FEATURES),
                            "head": self.head.to_dict() if self.head else None,
@@ -512,8 +523,116 @@ class SecondStageEstimator:
     def from_json(cls, s: str) -> "SecondStageEstimator":
         d = json.loads(s)
         e = cls(k=d["k"], l2=d["l2"], n_folds=d["n_folds"], seed=d["seed"],
-                calibrate=d["calibrate"])
+                calibrate=d["calibrate"], ks=tuple(d.get("ks", ())))
         e.base_rate = d.get("base_rate", 0.0)
         e.head = LogisticHead.from_dict(d["head"]) if d.get("head") else None
         e.cal = Isotonic.from_dict(d["cal"]) if d.get("cal") else None
         return e
+
+
+# --------------------------------------------------------------------------- #
+# Post-escalation gate: P(the big model's answer is right | what is now visible)
+# --------------------------------------------------------------------------- #
+
+ESC_FEATURES = ("big_conf", "big_truncated", "big_parsed", "agree_small_greedy",
+                "agree_sample_majority", "drew_samples", "stage1_escalate",
+                "small_greedy_conf", "bias_esc")
+
+
+@lru_cache(maxsize=None)
+def _same(a: str | None, b: str | None) -> bool:
+    """Label-free: do two extracted answers name the same thing?"""
+    if a is None or b is None:
+        return False
+    from caac.eval.grade import answer_clusters
+    ids = answer_clusters([a, b])
+    return ids[0] is not None and ids[0] == ids[1]
+
+
+def _raw(c) -> str | None:
+    return (c.answer_raw or c.answer) if c.answer is not None else None
+
+
+def post_escalate_features(small: PoolRecord, big: PoolRecord, drawn: list[int],
+                           stage1: dict[str, float] | None = None) -> list[float]:
+    """Evidence after paying for the big model's answer. Agreement with what the
+    small model already said is the strongest label-free signal there is: two
+    models of different size rarely make the same mistake."""
+    bg, sg = big.greedy, small.greedy
+    maj = 0.0
+    if drawn:
+        canon = small.canonical_sample_answers()
+        votes = [canon[i] for i in drawn if canon[i] is not None]
+        if votes:
+            top = Counter(votes).most_common(1)[0][0]
+            rep = next(i for i in drawn if canon[i] == top)
+            maj = float(_same(_raw(bg), _raw(small.samples[rep])))
+    return [
+        bg.confidence if bg.confidence is not None else 0.0,
+        float(bg.finish_reason == "length"),
+        float(bg.answer is not None),
+        float(_same(_raw(bg), _raw(sg))),
+        maj,
+        float(bool(drawn)),
+        float((stage1 or {}).get("escalate", 0.0)),
+        sg.confidence if sg.confidence is not None else 0.0,
+        1.0,
+    ]
+
+
+def _fit_calibrated(X, y, group, l2, n_folds, seed, calibrate):
+    """Logistic head + isotonic calibration fitted out-of-fold, folds by question."""
+    X, y, group = np.asarray(X, float), np.asarray(y, float), np.asarray(group)
+    oof = np.zeros(len(y))
+    for qfold in _folds(int(group.max()) + 1, n_folds, seed):
+        fold = np.isin(group, qfold)
+        mask = ~fold
+        oof[fold] = (LogisticHead(l2).fit(X[mask], y[mask]).predict(X[fold])
+                     if mask.sum() >= 2 else y.mean())
+    head = LogisticHead(l2).fit(X, y)
+    cal = Isotonic().fit(oof, y) if calibrate else Isotonic()
+    return head, cal, float(y.mean())
+
+
+@dataclass
+class EscalateGate:
+    """P(big model's greedy answer is correct | post-escalation evidence).
+
+    Fitted on the TRAIN split, two rows per question: escalating straight from
+    the greedy turn, and escalating after the first ``k`` samples were drawn --
+    the two states the staged controller can escalate from.
+    """
+
+    k: int = 8
+    l2: float = 1.0
+    n_folds: int = 5
+    seed: int = 0
+    calibrate: bool = True
+    head: LogisticHead | None = None
+    cal: Isotonic | None = None
+    base_rate: float = 0.0
+
+    def fit(self, qids, small, big, stage1=None) -> "EscalateGate":
+        X, y, group = [], [], []
+        for gi, q in enumerate(qids):
+            s, b = small[q], (big or {}).get(q)
+            if b is None:
+                continue
+            p1 = stage1(s) if stage1 is not None else None
+            for drawn in ([], list(range(min(self.k, s.n_samples)))):
+                X.append(post_escalate_features(s, b, drawn, p1))
+                y.append(float(b.greedy.correct))
+                group.append(gi)
+        if len(set(group)) < 2 * self.n_folds:
+            return self
+        self.head, self.cal, self.base_rate = _fit_calibrated(
+            X, y, group, self.l2, self.n_folds, self.seed, self.calibrate)
+        return self
+
+    def __call__(self, small: PoolRecord, big: PoolRecord, drawn: list[int],
+                 stage1: dict[str, float] | None = None) -> float:
+        if self.head is None:
+            return 0.0
+        x = np.asarray([post_escalate_features(small, big, drawn, stage1)], dtype=float)
+        raw = float(self.head.predict(x)[0])
+        return float(self.cal.predict([raw])[0]) if self.calibrate else raw

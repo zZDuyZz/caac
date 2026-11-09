@@ -1,44 +1,22 @@
-"""Learn-then-Test certification run: calibrate a policy, certify, evaluate.
+"""Certify every method under one protocol and compare them at each price ratio.
 
-This is the results pipeline for CAAC_MASTER §8.2, and it drives BOTH policies
-through the identical protocol -- same grid size, same ordering, same binomial
-p-value, same multiplicity correction, same held-out evaluation:
+    python certify.py --train-small T_s --train-big T_b --calib-small C_s --calib-big C_b \
+        --test-small X_s --test-big X_b --alpha 0.10 --json out/math500.json
 
-  --policy pricecheck   the baseline: label-free checks vote on the greedy
-                        answer; the served answer is always the greedy one, so
-                        coverage is capped by the Chow bound (§3.5).
-  --policy caac         ours: the cheapest action whose CALIBRATED P(correct)
-                        clears tau, else abstain. The answer-correcting actions
-                        raise the cap the baseline is stuck under.
+Data: the estimators are fitted on TRAIN, every family is certified on CALIB
+(one draw order per question, exact binomial counts), and every number reported
+comes from TEST (averaged over draw orders). The three parts share no question.
+Without --calib-*, the train pool is split in two by a hash of the question id.
 
-Running both from one driver is the point: the only difference the comparison
-can be attributed to is the action set, not the statistics.
-
-For each configuration lambda on a pre-specified grid:
-  1. run the policy on the CALIBRATION pool -> (n_served, n_wrong, coverage, cost)
-  2. certify P(selective risk <= alpha) >= 1-delta, two ways:
-       * Bonferroni over the whole grid (what PriceCheck reports)
-       * fixed-sequence, testing from the most conservative lambda downwards
-         (spends no multiplicity, usually certifies more)
-  3. pick the certified lambda with the most coverage
-  4. run that lambda on the TEST pool and report what it actually achieves
-
-It also reports the **price of the guarantee**: the coverage given up relative
-to the best lambda that satisfies the risk constraint on test with hindsight.
-That number is the honest cost of certification and, per §10, is one of the two
-results nobody has published at realistic calibration sizes.
-
-  python certify.py --calib-small A.jsonl.gz --calib-big B.jsonl.gz \
-      --test-small C.jsonl.gz --test-big D.jsonl.gz --alpha 0.10 --json out.json
-
-With only --calib-* given, the pool is split deterministically by a hash of the
-query id. The TEST half is the same questions for both policies, so the two are
-compared on identical data; for ``caac`` the other half is split again into
-fitting and calibration questions, which leaves CAAC with HALF the calibration
-set PriceCheck gets. That handicap runs against our own claim, so it is the
-right way round for a preliminary number.
-That is a PRELIMINARY mode for before the A3 split exists; with A3, pass
---train-qids plus disjoint --calib-*/--test-* pools and nothing is shared.
+For each price ratio lam (one big-model token costs lam small-model tokens):
+  * each family's certified configurations are found once; for the
+    lam-independent baselines the certificate does not change with lam
+  * selections: most coverage; and the cheapest configuration whose calibration
+    coverage reaches each target in --coverages (the matched-coverage table)
+  * the plug-in selector (no test) is reported beside each, to show what the
+    guarantee buys; the oracle bounds everything from above
+  * phase map: at each (lam, coverage target), the cheapest family on test, and
+    the action mix CAAC chose there
 """
 
 from __future__ import annotations
@@ -48,246 +26,220 @@ import hashlib
 import json
 from pathlib import Path
 
-from caac.pool.ltt import (LambdaResult, certification_floor, certify_bonferroni,
-                           certify_fixed_sequence, min_served_certifiable,
-                           select_max_coverage)
-from caac.pool.estimator import PerActionEstimator, SecondStageEstimator
-from caac.pool.policies import caac_certified, caac_staged, pricecheck
-from caac.pool.replay import make_orders, run_policy
+from caac.pool import families as F
+from caac.pool.estimator import EscalateGate, PerActionEstimator, SecondStageEstimator
+from caac.pool.ltt import min_served_certifiable
+from caac.pool.protocol import (build_table, certified_frontier, certify, pick_max_coverage,
+                                pick_min_cost, plugin_select, prune, summarize)
+from caac.pool.replay import make_orders
 from caac.pool.schema import load_pool
 
-DELTA = 0.1
+DEFAULT_LAMS = "0.5,1,1.5,2,3,5,8,12,20,35,60"
+BASELINES = ("small_abstain", "big_abstain", "cascade_abstain", "sc_abstain", "esc_abstain",
+             "adaptive_consistency_abstain", "pricecheck")
+CAAC = ("caac", "caac_staged", "caac_staged_no_sample", "caac_staged_no_escalate")
 
 
-def split_half(pool: dict, seed: str = "caac-split-v1"):
-    """Deterministic, model-independent half split by sha256 of the query id.
-
-    Used ONLY in preliminary mode. The real calibration set is the A3 split,
-    which is disjoint from the test questions by construction (§6.2)."""
+def hash_split(pool: dict, frac: float, seed: str = "caac-split-v2"):
     a, b = {}, {}
     for q, r in pool.items():
-        h = hashlib.sha256(f"{seed}|{q}".encode()).hexdigest()
-        (a if int(h[:8], 16) % 2 == 0 else b)[q] = r
+        h = int(hashlib.sha256(f"{seed}|{q}".encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+        (a if h < frac else b)[q] = r
     return a, b
 
 
-def make_policy(small, big, check, k, conf_threshold):
-    """lambda -> policy_fn(qid, order) suitable for replay.run_policy."""
-    def factory(lam):
-        def fn(qid, order):
-            return pricecheck(small[qid], lam=lam, check=check, k=k, order=order,
-                              conf_threshold=conf_threshold)
-        return fn
-    return factory
+def baseline_family(name: str, n_big: int):
+    return {"small_abstain": F.small_abstain, "big_abstain": F.big_abstain,
+            "cascade_abstain": F.cascade_abstain, "sc_abstain": F.sc_abstain,
+            "esc_abstain": lambda: F.adaptive_abstain("esc"),
+            "adaptive_consistency_abstain": lambda: F.adaptive_abstain("adaptive_consistency"),
+            "pricecheck": lambda: F.pricecheck(n_big)}[name]()
 
 
-def make_staged_policy(small, big, est, est2, k, actions, cost_profile):
-    """tau -> policy_fn for the three-stage controller."""
-    def factory(tau):
-        def fn(qid, order):
-            return caac_staged(small[qid], (big or {}).get(qid), est, est2, tau=tau,
-                               order=order, k=k, cost_profile=cost_profile,
-                               actions=actions)
-        return fn
-    return factory
+def fit_estimators(tr_s, tr_b, k_steps):
+    """Stage 1 (pre-action), stage 2 (after samples), stage 3 (after escalation),
+    all on the TRAIN split only."""
+    q = sorted(tr_s)
+    est = F.Memo(PerActionEstimator(k=8).fit(q, tr_s, tr_b))
+    est2 = SecondStageEstimator(k=max(k_steps), ks=k_steps).fit(
+        q, tr_s, make_orders(min(r.n_samples for r in tr_s.values()), 4, seed=11),
+        stage1=lambda r: est(r))
+    est3 = EscalateGate().fit(q, tr_s, tr_b, stage1=lambda r: est(r)) if tr_b else None
+    return est, est2, est3
 
 
-def make_caac_policy(small, big, est, k, actions, cost_profile):
-    """tau -> policy_fn. Same signature as make_policy, so the sweep, the
-    certification and the held-out evaluation below are shared code."""
-    def factory(tau):
-        def fn(qid, order):
-            return caac_certified(small[qid], (big or {}).get(qid), est, tau=tau,
-                                  order=order, k=k, cost_profile=cost_profile,
-                                  actions=actions)
-        return fn
-    return factory
+def caac_family(name: str, ests, lam: float, big_model, k_steps):
+    est, est2, est3 = ests
+    full = ("answer_now", "sample_more", "escalate")
+    if name == "caac":
+        return F.caac(est, lam, big_model)
+    acts = {"caac_staged": full, "caac_staged_no_sample": ("answer_now", "escalate"),
+            "caac_staged_no_escalate": ("answer_now", "sample_more")}[name]
+    return F.caac_staged_family(est, est2, lam, big_model, actions=acts, k_steps=k_steps,
+                                name=name, est3=est3)
 
 
-def sweep(qids, factory, grid, orders, cost_profile):
-    """Run every lambda, returning LambdaResults in the GIVEN grid order."""
-    out = []
-    for lam in grid:
-        m = run_policy(qids, factory(lam), orders)
-        out.append((LambdaResult(lam=lam, n_served=m.served, n_wrong=m.wrong_served,
-                                 coverage=m.coverage,
-                                 mean_cost=m.mean_cost[cost_profile]), m))
+def evaluate(fam, train, calib, test, a, orders, lams, coverages):
+    """Certify one family on calib, report on test, for every lam in ``lams``."""
+    t_train = build_table(fam, sorted(train[0]), *train)
+    fam = prune(fam, t_train, len(calib[0]), a.alpha, a.delta)
+    if not fam.configs:
+        return {"n_configs": 0, "by_lam": {}}
+    t_cal = build_table(fam, sorted(calib[0]), *calib)
+    t_tst = build_table(fam, sorted(test[0]), *test, orders=orders)
+    ok, _ = certify(t_cal, None, a.alpha, a.delta)
+    plug = plugin_select(t_cal, None, a.alpha)
+    out = {"n_configs": len(fam.configs), "n_certified": int(ok.sum()), "by_lam": {}}
+    for lam in lams:
+        rec = {}
+        j = pick_max_coverage(t_cal, None, ok)
+        rec["max_coverage"] = _pick(t_cal, t_tst, j, lam)
+        jp = pick_max_coverage(t_cal, None, plug)
+        rec["plugin_max_coverage"] = _pick(t_cal, t_tst, jp, lam)
+        rec["min_cost"] = {f"{c:g}": _pick(t_cal, t_tst, pick_min_cost(t_cal, None, ok, lam, c), lam)
+                           for c in coverages}
+        rec["frontier"] = [_pick(t_cal, t_tst, j2, lam)
+                           for j2 in certified_frontier(t_cal, None, ok, lam)]
+        out["by_lam"][f"{lam:g}"] = rec
     return out
 
 
-def best_hindsight(pairs, alpha):
-    """Most coverage among lambdas whose EMPIRICAL risk is already <= alpha.
-    No guarantee attached -- this is the yardstick the guarantee is priced against."""
-    ok = [(r, m) for r, m in pairs if m.served and m.selective_risk <= alpha]
-    return max(ok, key=lambda rm: rm[0].coverage) if ok else None
+def _pick(t_cal, t_tst, j, lam):
+    if j is None:
+        return None
+    test = summarize(t_tst, None, j, lam)
+    test["actions"] = t_tst.actions[j]
+    return {"config": _jsonable(t_cal.configs[j]), "calib": _strip(summarize(t_cal, None, j, lam)),
+            "test": _strip(test)}
+
+
+def _jsonable(x):
+    return list(x) if isinstance(x, tuple) else x
+
+
+def _strip(d):
+    d = dict(d)
+    d.pop("config", None)
+    return d
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--calib-small", required=True)
-    ap.add_argument("--calib-big", default=None)
-    ap.add_argument("--test-small", default=None)
-    ap.add_argument("--test-big", default=None)
-    ap.add_argument("--policy", default="pricecheck",
-                    choices=["pricecheck", "caac", "caac_staged"])
-    ap.add_argument("--estimator", default=None,
-                    help="caac: a JSON estimator from train_estimator.py; "
-                         "without it, one is fitted on the TRAIN part")
-    ap.add_argument("--train-qids", default=None,
-                    help="caac: fit the estimator on exactly these qids")
-    ap.add_argument("--actions", default="answer_now,sample_more,escalate",
-                    help="caac: action set (the ablation table varies this)")
-    ap.add_argument("--check", default="resolve_vote",
-                    choices=["confidence", "resolve_vote", "both"])
-    ap.add_argument("--k", type=int, default=8)
-    ap.add_argument("--conf-threshold", type=float, default=0.95)
+    for part in ("train", "calib", "test"):
+        ap.add_argument(f"--{part}-small", required=part != "calib")
+        ap.add_argument(f"--{part}-big", default=None)
+    ap.add_argument("--calib-frac", type=float, default=0.5,
+                    help="share of the train pool used for calibration when --calib-* is absent")
     ap.add_argument("--alpha", type=float, default=0.10)
-    ap.add_argument("--delta", type=float, default=DELTA)
-    ap.add_argument("--grid", type=int, default=21, help="grid size")
-    ap.add_argument("--grid-max", type=float, default=None,
-                    help="most conservative grid value. Default: 1.0 for "
-                         "pricecheck; 0.95 for caac, because tau=1.0 demands "
-                         "calibrated CERTAINTY and so serves almost nothing -- a "
-                         "degenerate point that cannot be certified at any "
-                         "calibration size and, being first, would halt the "
-                         "fixed-sequence test before it starts. Excluded by "
-                         "design, not after seeing the numbers.")
-    ap.add_argument("--split", default="auto", choices=["auto", "half", "three"],
-                    help="preliminary splitting: 'three' also gives PRICECHECK "
-                         "the smaller calibration set, for an exactly matched "
-                         "comparison")
-    ap.add_argument("--perms", type=int, default=20, help="common random permutations")
-    ap.add_argument("--cost-profile", default="flops", choices=["flops", "tokens", "rounds"])
+    ap.add_argument("--delta", type=float, default=0.10)
+    ap.add_argument("--lams", default=DEFAULT_LAMS)
+    ap.add_argument("--coverages", default="0.5,0.6,0.7,0.8,0.9")
+    ap.add_argument("--families", default=",".join(BASELINES + CAAC))
+    ap.add_argument("--k-steps", default="4,8,16")
+    ap.add_argument("--perms", type=int, default=10, help="draw orders averaged on test")
     ap.add_argument("--json", default=None)
     a = ap.parse_args()
 
-    cal_s = load_pool(a.calib_small)
-    cal_b = load_pool(a.calib_big) if a.calib_big else None
-    trn_s, trn_b = None, None
-    if a.test_small:
-        tst_s = load_pool(a.test_small)
-        mode = "disjoint pools"
-    elif a.split == "three" or (a.split == "auto"
-                                and a.policy in ("caac", "caac_staged")
-                                and not a.estimator):
-        # three disjoint parts: fit | certify | report. The estimator must never
-        # see a question that the guarantee or the reported number depends on.
-        # test half FIRST, with the same seed pricecheck uses, so both policies
-        # are scored on exactly the same held-out questions
-        rest, tst_s = split_half(cal_s)
-        trn_s, cal_s = split_half(rest, seed="caac-split-train")
-        trn_b = cal_b
-        mode = ("PRELIMINARY one pool: test half shared with pricecheck, "
-                "remaining half split into fit/calib")
+    tr_s = load_pool(a.train_small)
+    tr_b = load_pool(a.train_big) if a.train_big else None
+    if a.calib_small:
+        ca_s = load_pool(a.calib_small)
+        ca_b = load_pool(a.calib_big) if a.calib_big else None
     else:
-        cal_s, tst_s = split_half(cal_s)
-        mode = "PRELIMINARY half-split of one pool"
-    tst_b = load_pool(a.test_big) if a.test_big else cal_b
+        ca_s, tr_s = hash_split(tr_s, a.calib_frac)
+        ca_b = tr_b
+    te_s = load_pool(a.test_small)
+    te_b = load_pool(a.test_big) if a.test_big else None
+    for nm, s, b in (("train", tr_s, tr_b), ("calib", ca_s, ca_b), ("test", te_s, te_b)):
+        if b is not None:
+            missing = set(s) - set(b)
+            if missing:
+                raise SystemExit(f"{nm}: {len(missing)} questions have no big-model record")
+    if set(tr_s) & set(ca_s) or set(tr_s) & set(te_s) or set(ca_s) & set(te_s):
+        raise SystemExit("train, calib and test must not share a question")
 
-    actions = tuple(x.strip() for x in a.actions.split(",") if x.strip())
-    est = est2 = None
-    if a.policy in ("caac", "caac_staged"):
-        if a.estimator:
-            est = PerActionEstimator.from_json(Path(a.estimator).read_text())
-            fit_note = f"loaded {a.estimator}"
+    lams = [float(x) for x in a.lams.split(",")]
+    coverages = [float(x) for x in a.coverages.split(",")]
+    k_steps = tuple(int(x) for x in a.k_steps.split(","))
+    names = [x.strip() for x in a.families.split(",") if x.strip()]
+    n_big = min((r.n_samples for r in (ca_b or {}).values()), default=0)
+    big_model = next(iter(te_b.values())).model if te_b else None
+    width = min(r.n_samples for r in te_s.values())
+    orders = make_orders(width, a.perms, seed=1)
+
+    ests = fit_estimators(tr_s, tr_b, k_steps) if any(n in CAAC for n in names) else None
+
+    train, calib, test = (tr_s, tr_b), (ca_s, ca_b), (te_s, te_b)
+    res = {"alpha": a.alpha, "delta": a.delta, "n_train": len(tr_s), "n_calib": len(ca_s),
+           "n_test": len(te_s), "lams": lams, "coverages": coverages, "k_steps": list(k_steps),
+           "n_min_fixed_sequence": min_served_certifiable(a.alpha, a.delta),
+           "families": {}, "oracle": {}, "phase_map": {}}
+    for nm in names:
+        if nm in CAAC:
+            res["families"][nm] = {"by_lam": {}}
+            for lam in lams:
+                fam = caac_family(nm, ests, lam, big_model, k_steps)
+                r = evaluate(fam, train, calib, test, a, orders, [lam], coverages)
+                res["families"][nm]["by_lam"].update(r["by_lam"])
+                res["families"][nm].setdefault("n_certified", {})[f"{lam:g}"] = r.get("n_certified", 0)
         else:
-            if a.train_qids:
-                want = {l.strip() for l in Path(a.train_qids).read_text().splitlines()
-                        if l.strip()}
-                trn_s = {q: r for q, r in (trn_s or cal_s).items() if q in want}
-                trn_b = trn_b or cal_b
-            est = PerActionEstimator(k=a.k).fit(sorted(trn_s), trn_s, trn_b)
-            fit_note = f"fitted on {len(trn_s)} held-apart questions"
-        if a.policy == "caac_staged":
-            # stage 2 is fitted on the SAME held-apart questions, never on the
-            # calibration or test half
-            src = trn_s if trn_s else cal_s
-            est2 = SecondStageEstimator(k=a.k).fit(
-                sorted(src), src,
-                make_orders(min(r.n_samples for r in src.values()), 4, seed=11),
-                stage1=lambda r: est(r))
-            fit_note += f"; stage2 on {len(src)} (base {est2.base_rate:.3f})"
+            res["families"][nm] = evaluate(baseline_family(nm, n_big), train, calib, test, a,
+                                           orders, lams, coverages)
+        print(f"  done: {nm}", flush=True)
+    for lam in lams:
+        res["oracle"][f"{lam:g}"] = F.oracle(sorted(te_s), te_s, te_b, lam, k_steps)
+        res["phase_map"][f"{lam:g}"] = phase_row(res, lam, coverages)
 
-    def factory_for(small, big):
-        if a.policy == "caac_staged":
-            return make_staged_policy(small, big, est, est2, a.k, actions, a.cost_profile)
-        if a.policy == "caac":
-            return make_caac_policy(small, big, est, a.k, actions, a.cost_profile)
-        return make_policy(small, big, a.check, a.k, a.conf_threshold)
-
-    # grid ordered MOST CONSERVATIVE FIRST (high threshold -> abstains more).
-    # The order is fixed here, before seeing any calibration number -- that is
-    # what fixed-sequence testing requires.
-    gmax = a.grid_max if a.grid_max is not None else (
-        1.0 if a.policy == "pricecheck" else 0.95)
-    grid = [round(gmax * (1.0 - i / (a.grid - 1)), 4) for i in range(a.grid)]
-    n_samp = min(r.n_samples for r in cal_s.values())
-    orders = make_orders(n_samp, a.perms, seed=0)
-
-    cal_pairs = sweep(sorted(cal_s), factory_for(cal_s, cal_b),
-                      grid, orders, a.cost_profile)
-    bonf = certify_bonferroni([r for r, _ in cal_pairs], a.alpha, a.delta)
-    pick_b = select_max_coverage(bonf)
-    # fixed-sequence needs a FRESH list (certify_* mutate in place)
-    fs_pairs = sweep(sorted(cal_s), factory_for(cal_s, cal_b),
-                     grid, orders, a.cost_profile)
-    fseq = certify_fixed_sequence([r for r, _ in fs_pairs], a.alpha, a.delta)
-    pick_f = select_max_coverage(fseq)
-
-    knob = "lambda" if a.policy == "pricecheck" else "tau"
-    detail = (f"check={a.check}" if a.policy == "pricecheck"
-              else f"actions={'+'.join(actions)}, estimator {fit_note}")
-    print(f"\n=== LTT CERTIFICATION [{a.policy}] ({mode}; {detail}, k={a.k}, "
-          f"alpha={a.alpha}, delta={a.delta}, |G|={len(grid)}) ===")
-    n_min = min_served_certifiable(a.alpha, a.delta)
-    n_min_b = min_served_certifiable(a.alpha, a.delta / len(grid))
-    print(f"  calib n={len(cal_s)}   test n={len(tst_s)}   cost profile={a.cost_profile}"
-          f"   grid max={gmax}")
-    print(f"  certification floor: >={n_min} served (fixed-seq) / >={n_min_b} (Bonferroni)"
-          f" => coverage >= {certification_floor(len(cal_s), a.alpha, a.delta):.3f}"
-          f" / {certification_floor(len(cal_s), a.alpha, a.delta / len(grid)):.3f}")
-    print(f"  {knob:>7} {'coverage':>9} {'risk':>7} {'p-value':>9}  {'Bonf':>5} {'FixSeq':>6}")
-    for (r, m), rf in zip(cal_pairs, fseq):
-        print(f"  {r.lam:7.3f} {r.coverage:9.3f} {m.selective_risk:7.3f} {r.pvalue:9.2e}"
-              f"  {'YES' if r.certified else '  .':>5} {'YES' if rf.certified else '  .':>6}")
-
-    out = {"policy": a.policy, "mode": mode, "check": a.check, "k": a.k,
-           "actions": list(actions), "alpha": a.alpha, "delta": a.delta,
-           "grid": grid, "grid_max": gmax, "n_calib": len(cal_s), "n_test": len(tst_s),
-           "min_served_certifiable": n_min,
-           "min_served_certifiable_bonferroni": n_min_b,
-           "certification_floor_coverage": certification_floor(len(cal_s), a.alpha, a.delta),
-           "cost_profile": a.cost_profile, "selected": {}}
-
-    for name, pick in (("bonferroni", pick_b), ("fixed_sequence", pick_f)):
-        if pick is None:
-            print(f"  [{name}] nothing certified at alpha={a.alpha}")
-            out["selected"][name] = None
-            continue
-        fn = factory_for(tst_s, tst_b)(pick.lam)
-        m = run_policy(sorted(tst_s), fn, make_orders(
-            min(r.n_samples for r in tst_s.values()), a.perms, seed=1))
-        hs = best_hindsight(cal_pairs, a.alpha)
-        price = (hs[0].coverage - pick.coverage) if hs else None
-        print(f"  [{name}] {knob}={pick.lam:.3f}  calib coverage={pick.coverage:.3f}"
-              f"  -> TEST coverage={m.coverage:.3f} risk={m.selective_risk:.3f}"
-              f" acc={m.accuracy:.3f} cost={m.mean_cost[a.cost_profile]:.4g}"
-              + (f"   price of guarantee = {price:+.3f} coverage" if price is not None else ""))
-        out["selected"][name] = {
-            "lambda": pick.lam, "calib_coverage": pick.coverage, "pvalue": pick.pvalue,
-            "test_coverage": m.coverage, "test_selective_risk": m.selective_risk,
-            "test_accuracy": m.accuracy, "test_cost": m.mean_cost[a.cost_profile],
-            "price_of_guarantee_coverage": price,
-            "test_risk_violated": m.selective_risk > a.alpha,
-            "test_action_mix": dict(m.action_dist) if hasattr(m, "action_dist") else None,
-        }
-        if getattr(m, "action_dist", None):
-            mix = ", ".join(f"{k2} {v}" for k2, v in sorted(m.action_dist.items()))
-            print(f"           actions on test: {mix}")
+    report(res)
     if a.json:
         Path(a.json).parent.mkdir(parents=True, exist_ok=True)
-        Path(a.json).write_text(json.dumps(out, indent=2))
-        print(f"  -> {a.json}")
+        Path(a.json).write_text(json.dumps(res, indent=1))
+        print(f"-> {a.json}")
+
+
+def phase_row(res, lam, coverages):
+    """Cheapest family on test at each coverage target, among certified picks."""
+    row = {}
+    for c in coverages:
+        best = None
+        for nm, fr in res["families"].items():
+            pk = fr["by_lam"].get(f"{lam:g}", {}).get("min_cost", {}).get(f"{c:g}")
+            if pk and (best is None or pk["test"]["cost"] < best[1]["test"]["cost"]):
+                best = (nm, pk)
+        caac = res["families"].get("caac_staged", {}).get("by_lam", {}).get(f"{lam:g}", {})
+        cpk = caac.get("min_cost", {}).get(f"{c:g}")
+        row[f"{c:g}"] = {"winner": best[0] if best else None,
+                         "winner_cost": best[1]["test"]["cost"] if best else None,
+                         "caac_staged_actions": cpk["test"]["actions"] if cpk else None}
+    return row
+
+
+def report(res):
+    a, lams = res["alpha"], res["lams"]
+    print(f"\n=== certified comparison: alpha={a} delta={res['delta']}  train/calib/test = "
+          f"{res['n_train']}/{res['n_calib']}/{res['n_test']} ===")
+    for lam in lams:
+        L = f"{lam:g}"
+        print(f"\n-- lam = {L}  (oracle: coverage {res['oracle'][L]['coverage']:.3f}, "
+              f"cost {res['oracle'][L]['cost']:.0f})")
+        print(f"  {'family':30s} {'cert':>4s} {'cov':>6s} {'risk':>6s} {'cost':>8s}   "
+              + "  ".join(f"cost@{c:g}" for c in res["coverages"]))
+        for nm, fr in res["families"].items():
+            r = fr["by_lam"].get(L)
+            if not r:
+                print(f"  {nm:30s}  (nothing certifiable)")
+                continue
+            m = r["max_coverage"]
+            ncert = fr["n_certified"][L] if isinstance(fr.get("n_certified"), dict) else fr.get("n_certified")
+            head = (f"{m['test']['coverage']:6.3f} {m['test']['selective_risk']:6.3f} "
+                    f"{m['test']['cost']:8.0f}") if m else f"{'-':>6s} {'-':>6s} {'-':>8s}"
+            cells = "  ".join(f"{r['min_cost'][f'{c:g}']['test']['cost']:9.0f}"
+                              if r["min_cost"].get(f"{c:g}") else f"{'-':>9s}"
+                              for c in res["coverages"])
+            flag = " !" if m and m["test"]["selective_risk"] > a else ""
+            print(f"  {nm:30s} {ncert:4d} {head}   {cells}{flag}")
+        winners = ", ".join(f"{c}:{v['winner']}" for c, v in res["phase_map"][L].items())
+        print(f"  cheapest at each coverage: {winners}")
 
 
 if __name__ == "__main__":
