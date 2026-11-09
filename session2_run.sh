@@ -23,6 +23,7 @@ QS=Qwen/Qwen3.5-2B; QB=Qwen/Qwen3.5-9B
 # (STOP_AFTER=capprobe -> cap_curve.py prints "RECOMMEND: MT_M=.. MT_G=.. MML=.."):
 #   TAG=v3 MT_M=<..> MT_G=<..> MML=<..> bash session2_all.sh
 TAG=${TAG:-v2}; MT_M=${MT_M:-1024}; MT_G=${MT_G:-512}
+case "${STOP_AFTER:-}" in ""|capprobe|test_pools) ;; *) echo "STOP_AFTER không hợp lệ: '$STOP_AFTER' (dùng capprobe hoặc test_pools)"; exit 1;; esac
 # Every set the run generates, with its cap. preflight_prompts.py checks each prompt against
 # max_model_len; for a new TAG it also chooses max_model_len, so the value is never guessed.
 SETS="--set math500:test::$MT_M --set gsm8k:test::$MT_G \
@@ -84,17 +85,13 @@ s0_smoke() {
   rm -f "$P"/smoke_*
 }
 s0_params() {
-  # Đếm tham số CHÍNH XÁC từ header safetensors (tháp ảnh/âm thanh bị loại). Registry hiện là số
-  # từ model card (params_verified=False) -> go/no-go FLOPs ở s3 chỉ là TẠM cho tới khi mình cập
-  # nhật registry bằng file này rồi chạy lại gonogo trên CPU (không cần GPU).
+  # Exact parameter counts from the safetensors headers (vision/audio towers excluded). The FLOPs
+  # axis uses the registry, so the registry is updated from this file before any analysis.
   python verify_params.py --weights $QS --weights $QB | tee "$OUT/params_verified.txt"
   return 0
 }
-# 2026-11-09: big model 8 -> 16 samples on the TEST pools. The big model is the escalate
-# target, so ITS pass@k ceiling is the ceiling of the whole controller; k=8 made the Chow
-# frontier for the big model an extrapolation instead of a measurement. gonogo.py keeps the
-# PRE-REGISTERED K=8 (tag prereg-gonogo-v1) -- the extra samples are not used by the verdict.
-# A3 pools stay at 4 samples: they train the estimator, they do not set a ceiling.
+# Big model: 16 samples on the TEST pools. It is the escalate target, so its pass@k ceiling is
+# the ceiling of the whole controller. A3 pools keep fewer samples: they train and calibrate.
 s1_test_pools() {
   $BP --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
   $BP --model $QB --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
@@ -119,11 +116,6 @@ s2_compare() {
   $BP --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens $MT_G --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0
-}
-s3_gonogo() {
-  python gonogo.py --small "$P/math500_qs.jsonl.gz" --big "$P/math500_qb.jsonl.gz" --json "$OUT/gonogo_math500.json"
-  python gonogo.py --small "$P/gsm8k_qs.jsonl.gz"   --big "$P/gsm8k_qb.jsonl.gz"   --json "$OUT/gonogo_gsm8k.json"
-  return 0   # §8.4: A3 vẫn chạy dù GO hay NO-GO
 }
 s4_a3() {
   $BP --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
@@ -170,13 +162,11 @@ stage s0_smoke s0_smoke      || die "smoke test lỗi (xem 'SMOKE FAIL' ở trê
 stage s0_params s0_params
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
 stage s2_compare s2_compare
-stage s3_gonogo s3_gonogo
-# STOP_AFTER=s3_gonogo -> stop after test pools + compare + go/no-go and collect for download (2a);
+# STOP_AFTER=test_pools -> stop after the test pools + determinism check and collect for download (2a);
 # the next machine restores them with session2_restore.sh and re-runs this command without STOP_AFTER (2b).
-# (không đặt biến -> chạy tiếp A3/A4/gom kết quả = ngày 2; các chặng đã xong tự bỏ qua nhờ file mốc).
-if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
-  stage s6_day1 s6_collect   || die "gom kết quả lỗi"
-  echo "$(tick)>>> NGÀY 1 XONG (đã dừng sau s3_gonogo theo STOP_AFTER). Chưa chạy A3/A4."
+if [ "${STOP_AFTER:-}" = "test_pools" ]; then
+  stage s6_part1 s6_collect  || die "gom kết quả lỗi"
+  echo "$(tick)>>> PHẦN 2a XONG (đã dừng sau pool test theo STOP_AFTER). Chưa chạy A3/A4."
 else
   stage s4_a3 s4_a3            || die "A3 lỗi"
   stage s5_hidden s5_hidden    || die "A4 hidden state lỗi"
@@ -195,7 +185,7 @@ echo "   scp -P <PORT> root@<IP>:$BULK .          # sidecar + hidden (bắt bu�
 echo "   scp -P <PORT> root@<IP>:$OUTTAR .    # pool + summary"
 [ -f "$M/probe_$TAG.tar.gz" ] && echo "   scp -P <PORT> root@<IP>:$M/probe_$TAG.tar.gz .   # cap probe"
 echo " Gửi mình: $OUT/s2_summary.md  (trong tar) hoặc dán đoạn trên."
-if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
+if [ "${STOP_AFTER:-}" = "test_pools" ]; then
   echo " >>> TẢI 2 FILE TRÊN VỀ, rồi xóa máy. Phần sau (A3 + hidden) chạy ở máy mới: scp 2 file lên /workspace, bash session2_restore.sh $TAG, chạy lại ĐÚNG lệnh này nhưng bỏ STOP_AFTER. <<<"
 else
   echo " >>> SAU KHI TẢI XONG: DỪNG VÀ XÓA MÁY. <<<"

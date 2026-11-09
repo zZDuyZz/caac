@@ -17,7 +17,7 @@ tar -xf "$BULK" -C "$M"
 if [ -f "$REPO/$OUT/markers.txt" ]; then
   while read -r m; do [ -n "$m" ] && touch "$M/$m"; done < "$REPO/$OUT/markers.txt"
 elif [ "$TAG" = v2 ]; then      # day-1 tarballs predate markers.txt
-  for st in s0_smoke s0_params s1_test_pools s2_compare s3_gonogo; do touch "$M/${MK}${st}"; done
+  for st in s0_smoke s0_params s1_test_pools s2_compare; do touch "$M/${MK}${st}"; done
 else
   echo "không có $OUT/markers.txt: không tạo file mốc (chặng sẽ chạy lại)"; fi
 echo "đã khôi phục TAG=$TAG:"; ls -la "$M"/pools_"$TAG" | head -20; ls -la "$M"/${MK}* 2>/dev/null || true

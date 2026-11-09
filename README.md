@@ -2,11 +2,13 @@
 
 For each question, a controller chooses among **answering now** (small model,
 greedy), **sampling more** (small model, majority vote), **escalating** to a
-larger model, or **abstaining**, and the error rate of the answers it serves is
-**certified** with Learn-then-Test (LTT). The central argument is a Chow-type
-ceiling: a policy that can only serve or abstain cannot cover more than
-`min{1, π/(1−α)}` of the questions at risk level α; actions that *correct* an
-answer raise that ceiling.
+larger model that writes a new answer, or **abstaining**. The goal is the
+lowest expected cost per question subject to a **certified** bound on the error
+rate of the answers it serves: the whole multi-stage policy is one configuration,
+certified in a single Learn-then-Test (LTT) pass, and cost enters only the
+objective, so the price ratio between the models can be swept at evaluation time
+without touching the guarantee. Every baseline goes through the same
+certification protocol.
 
 The repository follows one rule: **the GPU generates a sample pool once;
 everything else runs offline on CPU** by replaying that pool (policies,
@@ -21,9 +23,8 @@ baselines, calibration, certification, cost accounting).
 | Role | Small → big | Notes |
 |---|---|---|
 | Main pair | `Qwen/Qwen3.5-2B` → `Qwen/Qwen3.5-9B` | thinking OFF, text-only |
-| Generalisation | `google/gemma-4-E2B-it` → `google/gemma-4-12B-it` | thinking OFF, text-only |
-| Generalisation | `meta-llama/Llama-3.2-1B-Instruct` → `meta-llama/Llama-3.1-8B-Instruct` | gated on the Hub |
-| Separate experiment | Qwen3.5 with thinking ON (subset) | longer `max_model_len` |
+| Second family | `meta-llama/Llama-3.2-1B-Instruct` → `meta-llama/Llama-3.1-8B-Instruct` | gated on the Hub |
+| Size axis | `Qwen/Qwen3.5-0.8B`, `Qwen/Qwen3.5-4B` → `Qwen/Qwen3.5-9B` | model gap from about 2× to 11× |
 | Pilot (`outputs/a2/`) | `Qwen/Qwen2.5-1.5B-Instruct` → `Qwen/Qwen2.5-7B-Instruct` | vLLM 0.7.3, engine V0 |
 
 Pools are built with **vLLM 0.32.0 (engine V1)** in a Python 3.12 virtualenv;
@@ -47,20 +48,22 @@ the engine); do not install the `gpu` extra into a CPU environment.
 
 ```bash
 cd /workspace && git clone https://github.com/zZDuyZz/caac.git && cd caac
-# day 1: setup, smoke (small AND big model), parameter count, test pools, determinism, provisional go/no-go
-tmux new -s caac 'STOP_AFTER=s3_gonogo bash session2_all.sh 2>&1 | tee /workspace/s2.log'
-# day 2: same command without STOP_AFTER -> calibration/train pools (A3) and hidden states (A4)
-tmux new -s caac 'bash session2_all.sh 2>&1 | tee /workspace/s2.log'
+# 0) token caps: probe train questions at a high cap, read cap_curve.txt
+tmux new -s caac 'TAG=v3 STOP_AFTER=capprobe bash session2_all.sh 2>&1 | tee /workspace/s2.log'
+# 1) setup, smoke (small AND big model), parameter count, test pools, determinism
+tmux new -s caac 'TAG=v3 MT_M=<cap> MT_G=<cap> STOP_AFTER=test_pools bash session2_all.sh 2>&1 | tee /workspace/s2.log'
+# 2) same command without STOP_AFTER -> train/calibration pools (A3) and hidden states (A4);
+#    on a fresh machine run `bash session2_restore.sh v3` first
+tmux new -s caac 'TAG=v3 MT_M=<cap> MT_G=<cap> bash session2_all.sh 2>&1 | tee /workspace/s2.log'
 ```
 
 Each stage leaves a marker file, so re-running the same command resumes. The run
-ends with `outputs/s2/s2_summary.md` and `/workspace/s2_bulk.tar` (text and
+ends with `outputs/s2_<TAG>/s2_summary.md` and `/workspace/s2_bulk_<TAG>.tar` (text and
 per-token sidecars, hidden states — these are **not** committed to git).
 
 ## Offline analysis (CPU)
 
 ```bash
-python gonogo.py --small P/math500_qs.jsonl.gz --big P/math500_qb.jsonl.gz --json out/gonogo_math500.json
 python chow_frontier.py --small P/math500_qs.jsonl.gz --big P/math500_qb.jsonl.gz --label "MATH-500" --out figs/chow --alpha 0.10
 python train_estimator.py --small P/a3_math_train_qs.jsonl.gz --big P/a3_math_train_qb.jsonl.gz --out models/est_math.json
 python certify.py --policy caac_staged --calib-small ... --calib-big ... --test-small ... --test-big ... --alpha 0.10 --json out.json
@@ -76,7 +79,6 @@ python verify_params.py --weights Qwen/Qwen3.5-2B --weights Qwen/Qwen3.5-9B   # 
 | `extract_hidden.py` | question-only hidden states for the stage-0 probe |
 | `regrade_pool.py`, `compare_pools.py`, `smoke_check.py`, `s2_summary.py` | re-grading, determinism check, smoke gate, session summary |
 | `make_qids.py`, `qids/` | stratified question ids for the calibration/train splits |
-| `gonogo.py` | pre-registered go/no-go (thresholds frozen at tag `prereg-gonogo-v1`; models at `prereg-gonogo-v2`) |
 | `chow_frontier.py`, `certify.py`, `train_estimator.py`, `run_baselines.py` | the paper's analyses |
 | `verify_params.py` | parameter counts (config formula, or exact from safetensors headers) checked against the cost registry |
 | `session2_*.sh` | one-command GPU session |

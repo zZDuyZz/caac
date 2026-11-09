@@ -1,8 +1,8 @@
 """Calibration metrics for the correctness estimator.
 
-These implement the measurements behind RQ1/H1 -- the go/no-go gate. If no
-signal reaches usable calibration at any scale, the VOC rule has nothing
-trustworthy to compute with. Pure numpy, runs anywhere.
+A controller that picks the cheapest action predicted safe can only be as good
+as those predictions, so every estimator is reported with ECE, Brier and the
+area under the risk-coverage curve. Pure numpy, runs anywhere.
 """
 
 from __future__ import annotations

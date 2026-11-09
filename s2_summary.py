@@ -5,8 +5,8 @@
 Per pool: size, greedy accuracy, maj@k, truncation, grader disagreement (MV vs
 answers_match), mean decode tokens, token-sidecar coverage, the engine/version
 recorded in its manifest, a thinking-leak count, the determinism check
-(re-generated slice vs the main pool, same model and seeds), and the go/no-go
-verdicts if present. Missing files are reported, not fatal.
+(re-generated slices vs the main pool, same model and seeds, in the same and in
+a different batch composition). Missing files are reported, not fatal.
 
 2026-11-06: the old "reproducibility vs A2" section is gone -- A2 is Qwen2.5 and
 Session 2 now builds Qwen3.5 pools, so a per-question comparison would compare
@@ -95,29 +95,21 @@ def main():
     missing = [nm for nm in TEST_POOLS if not (P / f"{nm}.jsonl.gz").exists()]
     if missing:
         lines += ["", f"Missing test pools: {', '.join(missing)}"]
-    lines += ["", "## Determinism (re-generated 30-question GSM8K slice vs main pool, same seeds)", ""]
-    det_main, det_new = P / "gsm8k_qs.jsonl.gz", P / "det_gsm8k_qs.jsonl.gz"
-    if det_main.exists() and det_new.exists():
+    lines += ["", "## Determinism (re-generated GSM8K slices vs the main pool, same seeds)", ""]
+    det_main = P / "gsm8k_qs.jsonl.gz"
+    for nm, label, want in (("det_same_gsm8k_qs", "same batch composition", 0.98),
+                            ("det_gsm8k_qs", "different batch composition", None)):
+        det_new = P / f"{nm}.jsonl.gz"
+        if not (det_main.exists() and det_new.exists()):
+            lines.append(f"- {label}: not run")
+            continue
         from compare_pools import compare
         r = compare(load_pool(det_main), load_pool(det_new))
-        flag = "" if r["greedy_answer_match"] >= 0.98 else "  **<98%: INVESTIGATE (V1 batch variance?)**"
-        lines.append(f"- gsm8k_qs: common={r['n_common']}  greedy={r['greedy_answer_match']:.3f}  "
+        # Only the same-batch arm must match: V1 is not batch-invariant by design.
+        flag = ("  **<98%: INVESTIGATE (our pipeline, not vLLM)**"
+                if want is not None and r["greedy_answer_match"] < want else "")
+        lines.append(f"- {label}: common={r['n_common']}  greedy={r['greedy_answer_match']:.3f}  "
                      f"length={r['greedy_len_match']:.3f}  samples={r['sample_match']:.3f}{flag}")
-    else:
-        lines.append("- not run")
-    lines += ["", "## Pre-registered go/no-go (thresholds of tag prereg-gonogo-v1; models per prereg-gonogo-v2)", "",
-              "_PROVISIONAL: FLOPs use MODEL_REGISTRY sizes, which are unverified for the refreshed "
-              "models until params_verified.txt is pasted in; the official verdict is recomputed on CPU._", ""]
-    for nm in ("gonogo_math500", "gonogo_gsm8k"):
-        f = Path(a.out).parent / f"{nm}.json"
-        if f.exists():
-            j = json.loads(f.read_text())
-            hb = j["criterion_b"]
-            lines.append(f"- {nm}: n={j['n']}  A(sample)={j['criterion_a']['sample_more_diff']:+.3f}  "
-                         f"A(escalate)={j['criterion_a']['escalate_diff']:+.3f}  headroom={hb['headroom']}  "
-                         f"=> **{'GO' if j['GO'] else 'NO-GO'}** (A={j['pass_a']}, B={j['pass_b']})")
-        else:
-            lines.append(f"- {nm}: not found")
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text("\n".join(lines) + "\n")
     print("\n".join(lines))

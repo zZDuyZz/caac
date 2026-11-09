@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# MỘT LỆNH CHẠY TOÀN BỘ PHIÊN 2 (setup + smoke + pool test + go/no-go + A3 + A4 + gom kết quả)
+# MỘT LỆNH CHẠY TOÀN BỘ PHIÊN 2 (setup + smoke + pool test + A3 + A4 + gom kết quả)
 #
 #   cd /workspace && git clone https://github.com/zZDuyZz/caac.git && cd caac
 #   tmux new -s caac 'bash session2_all.sh 2>&1 | tee /workspace/s2.log'

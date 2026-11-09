@@ -14,7 +14,7 @@ can re-grade on CPU later without re-running the GPU (see regrade_pool.py).
 Per-token signals (2026-11): a second sidecar ``<pool>.tok.jsonl.gz`` stores,
 for greedy AND every sample, the chosen-token logprob and the DeepConf token
 confidence (-mean top-k logprob); greedy also gets the top-k entropy. Needed for
-(a) the PRE-REGISTERED go/no-go proxy = mean token prob of the first 32 greedy
+(a) a cheap difficulty proxy = mean token prob of the first 32 greedy
 tokens (also stored directly as ``conf_prefix32``), (b) offline DeepConf replay,
 (c) prefix-based controller features. No extra GPU: vLLM already returns them.
 
@@ -37,7 +37,7 @@ Seeding (PLAN_V2 section 3 -- the fix for the whole seed saga; revised 2026-11):
 Confidence semantics: logprobs are requested with an explicit
 ``logprobs_mode`` (default ``raw_logprobs`` = the model's distribution BEFORE
 temperature/top-p). The mode is written into every record and the manifest.
-The pre-registered proxy (conf_prefix32) is computed on the GREEDY completion,
+The prefix proxy (conf_prefix32) is computed on the GREEDY completion,
 where raw and post-temperature coincide, so it means the same thing as on the
 A2 pools. Pools built with vLLM 0.7.3 carry ``vllm_v0_post_temperature``.
 
