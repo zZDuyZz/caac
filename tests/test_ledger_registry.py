@@ -124,13 +124,19 @@ def test_a_model_without_a_price_makes_api_cost_nan_not_free():
 
 
 def test_refreshed_models_are_flagged_unverified_until_recounted():
-    """The 2026-11 entries come from model cards; the flag is what stops their
-    FLOPs from being reported before verify_params.py has run on the weights."""
-    for name in ("Qwen/Qwen3.5-2B", "Qwen/Qwen3.5-9B",
-                 "google/gemma-4-E2B-it", "google/gemma-4-12B-it"):
+    """Entries that come from model cards stay flagged until verify_params.py has
+    run on the weights (this is what stops their FLOPs from being reported)."""
+    for name in ("google/gemma-4-E2B-it", "google/gemma-4-12B-it"):
         assert MODEL_REGISTRY[name].params_verified is False
-    for name in ("Qwen/Qwen2.5-1.5B-Instruct", "Qwen/Qwen2.5-7B-Instruct"):
+    for name in ("Qwen/Qwen2.5-1.5B-Instruct", "Qwen/Qwen2.5-7B-Instruct",
+                 "Qwen/Qwen3.5-2B", "Qwen/Qwen3.5-9B"):
         assert MODEL_REGISTRY[name].params_verified is True
+
+
+def test_qwen35_counts_match_the_safetensors_recount_of_2026_11_09():
+    s, b = MODEL_REGISTRY["Qwen/Qwen3.5-2B"], MODEL_REGISTRY["Qwen/Qwen3.5-9B"]
+    assert (s.params_b, s.params_b_nonembed) == (1.882, 1.373)
+    assert (b.params_b, b.params_b_nonembed) == (8.954, 6.920)
 
 
 def _fake_safetensors(path, tensors):

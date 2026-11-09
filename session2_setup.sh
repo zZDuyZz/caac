@@ -22,7 +22,12 @@ cd "$REPO" && git pull --ff-only && git log --oneline -1
 
 echo "=== 2. Môi trường: venv Python 3.12 + vLLM $VLLM_VERSION (engine V1) ==="
 # vLLM >= 0.32 cần Python >= 3.11; Ubuntu 22.04 mặc định 3.10 -> dựng venv riêng bằng uv.
-command -v uv >/dev/null 2>&1 || python3 -m pip install -q uv
+# Image "runtime" (2026-11-09): no gcc (Triton compiles small C stubs), no python3/pip, no tmux.
+if ! command -v gcc >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
+  apt-get update -qq && apt-get install -y -qq tmux git curl python3 python3-pip build-essential
+fi
+command -v uv >/dev/null 2>&1 || python3 -m pip install -q --break-system-packages uv
 [ -x "$VENV/bin/python" ] || uv venv -p 3.12 "$VENV"
 # shellcheck disable=SC1091
 set +u; source "$VENV/bin/activate"; set -u   # +u: script activate có thể đọc biến chưa đặt

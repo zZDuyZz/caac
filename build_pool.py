@@ -115,6 +115,17 @@ def env_versions() -> dict:
     return out
 
 
+# Environment variables that can change what the engine computes. Day 1 (2026-11-09) ran
+# with VLLM_USE_FLASHINFER_SAMPLER=0 because the 'runtime' image has no nvcc; the day-1
+# manifests do NOT record it (CAAC_MASTER §12.1) -- every later pool does.
+ENV_FLAGS = ("VLLM_USE_FLASHINFER_SAMPLER", "VLLM_ATTENTION_BACKEND", "CUDA_VISIBLE_DEVICES")
+
+
+def env_flags() -> dict:
+    import os
+    return {k: os.environ.get(k) for k in ENV_FLAGS}
+
+
 def mean_token_prob(logprobs: list[float]) -> float:
     if not logprobs:
         return 0.0
@@ -287,6 +298,7 @@ def main():
         "limit_mm_per_prompt": mm_limits,
         "versions": env_versions(),
         "max_num_seqs": args.max_num_seqs, "max_model_len": args.max_model_len,
+        "env_flags": env_flags(),
         "grader": args.grader, "has_text_sidecar": not args.no_text,
         "has_token_sidecar": not args.no_tok, "prefix_k": PREFIX_K,
         "qids_file": args.qids_file,

@@ -89,9 +89,12 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
     # from ONE provider, so api_usd stays NaN for these until both are known.
     # Qwen3.5 small: hybrid Gated DeltaNet + attention, ships a vision encoder;
     # 2B repo = 4.55 GB bf16 (~2.3B incl. vision), 9B = 9B LM (Hub: 10B incl.).
-    "Qwen/Qwen3.5-2B": ModelSpec(params_b=2.0, params_verified=False),
+    # 2026-11-09: Qwen3.5 counts VERIFIED from the safetensors headers (verify_params.py
+    # --weights, text tower; vision tower 0.331B/0.456B and MTP 0.061B/0.243B excluded).
+    # 2B: tied embeddings (lm_head 0), 9B: untied (embed 1.017B + lm_head 1.017B).
+    "Qwen/Qwen3.5-2B": ModelSpec(params_b=1.882, params_b_nonembed=1.373),
     "Qwen/Qwen3.5-9B": ModelSpec(
-        params_b=9.0, params_verified=False,
+        params_b=8.954, params_b_nonembed=6.920,
         # DeepInfra $0.10 in / $0.15 out (computeprices, updated 2026-11-05) -- NOT
         # applied until the 2B has a price from the same provider.
     ),

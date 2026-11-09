@@ -9,25 +9,51 @@
 set -uo pipefail
 export HF_HOME=/workspace/hf_cache HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1
 export CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src:.
+# Day 1 ran with the FlashInfer sampler OFF (the 'runtime' image has no nvcc to JIT it) -> keep it
+# OFF for every pool so all pools share one configuration. Recorded in each manifest (env_flags).
+export VLLM_USE_FLASHINFER_SAMPLER=${VLLM_USE_FLASHINFER_SAMPLER:-0}
 # shellcheck disable=SC1091
 set +u; source /workspace/venv/bin/activate; set -u     # dựng bởi session2_setup.sh (Python 3.12 + vLLM 0.32.0, V1); +u: script activate có thể đọc biến chưa đặt
 cd /workspace/caac
 # 2026-11-06: cặp chính mới (CAAC_MASTER §13.10). Tên file: qs = model nhỏ, qb = model lớn.
 QS=Qwen/Qwen3.5-2B; QB=Qwen/Qwen3.5-9B
-P=/workspace/pools_v2; H=/workspace/hidden; OUT=outputs/s2; M=/workspace
+# Protocol tag + token caps. TAG=v2 = day-1 protocol (cap 1024 MATH / 512 GSM8K, max_model_len 2048),
+# kept for the appendix ("tight token budget"). A new TAG gets its own pools_<TAG>/, outputs/s2_<TAG>/
+# and marker files, so it never touches day-1 data. Caps for the new protocol come from the cap probe
+# (STOP_AFTER=capprobe -> cap_curve.py prints "RECOMMEND: MT_M=.. MT_G=.. MML=.."):
+#   TAG=v3 MT_M=<..> MT_G=<..> MML=<..> bash session2_all.sh
+TAG=${TAG:-v2}; MT_M=${MT_M:-1024}; MT_G=${MT_G:-512}; MML=${MML:-2048}
+P=/workspace/pools_$TAG; H=/workspace/hidden; M=/workspace
+if [ "$TAG" = v2 ]; then OUT=outputs/s2; MK=".s2_done_"; BULK=$M/s2_bulk.tar; OUTTAR=$M/s2_outputs.tar.gz
+else OUT=outputs/s2_$TAG; MK=".s2_done_${TAG}_"; BULK=$M/s2_bulk_$TAG.tar; OUTTAR=$M/s2_outputs_$TAG.tar.gz; fi
 mkdir -p "$P" "$H" "$OUT"
+echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
 T0=$(date +%s)
-BP="python build_pool.py"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
+BP="python build_pool.py --max-model-len $MML"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
 
 tick() { local e=$(( $(date +%s) - T0 )); printf '[%02dh%02dm | ~%d VND] ' $((e/3600)) $(((e%3600)/60)) $((e*${RATE:-52516}/3600)); }
 stage() {  # stage <tên> <hàm>
-  if [ -f "$M/.s2_done_$1" ]; then echo "$(tick)#### $1: đã xong trước đó — bỏ qua"; return 0; fi
+  if [ -f "$M/$MK$1" ]; then echo "$(tick)#### $1: đã xong trước đó — bỏ qua"; return 0; fi
   echo "$(tick)#### $1: BẮT ĐẦU"
-  if "$2"; then touch "$M/.s2_done_$1"; echo "$(tick)#### $1: XONG"; else echo "$(tick)#### $1: LỖI"; return 1; fi
+  if "$2"; then touch "$M/$MK$1"; echo "$(tick)#### $1: XONG"; else echo "$(tick)#### $1: LỖI"; return 1; fi
 }
 die() { echo; echo "!!!!!! DỪNG: $* !!!!!!  (máy VẪN ĐANG TÍNH TIỀN — gửi mình log rồi tắt máy nếu chưa sửa được)"; exit 1; }
 
 # ---------------------------------------------------------------- chặng
+s0_capprobe() {
+  # Does the token cap decide the result?  Generate 100 MATH-500 + 100 GSM8K questions (greedy + 2 samples)
+  # with a cap far above need, then cap_curve.py (CPU) gives the truncation share per cap.
+  PR=$M/probe_$TAG; mkdir -p "$PR"
+  PB="python build_pool.py --max-model-len 5120 --max-tokens 4096 --n-questions 100 --n-samples 2"
+  $PB --model $QS --dataset math500 --out "$PR/math500_qs.jsonl.gz" || return 1
+  $PB --model $QB --dataset math500 --out "$PR/math500_qb.jsonl.gz" || return 1
+  $PB --model $QS --dataset gsm8k   --out "$PR/gsm8k_qs.jsonl.gz"   || return 1
+  $PB --model $QB --dataset gsm8k   --out "$PR/gsm8k_qb.jsonl.gz"   || return 1
+  python cap_curve.py "$PR"/math500_qs.jsonl.gz "$PR"/math500_qb.jsonl.gz "$PR"/gsm8k_qs.jsonl.gz "$PR"/gsm8k_qb.jsonl.gz \
+    | tee "$OUT/cap_curve.txt"
+  tar -czf "$M/probe_$TAG.tar.gz" -C "$M" "probe_$TAG" "caac/$OUT/cap_curve.txt" 2>/dev/null || true
+  return 0
+}
 s0_smoke() {
   rm -f "$P"/smoke_*
   $BP --model $QS --dataset gsm8k   --n-questions 5 --n-samples 4 --max-tokens 512  --out "$P/smoke_gsm8k.jsonl.gz" || return 1
@@ -47,17 +73,17 @@ s0_params() {
   return 0
 }
 s1_test_pools() {
-  $BP --model $QS --dataset math500 --n-samples 32 --max-tokens 1024 --out "$P/math500_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset math500 --n-samples 8  --max-tokens 1024 --out "$P/math500_qb.jsonl.gz" || return 1
-  $BP --model $QS --dataset gsm8k   --n-samples 16 --max-tokens 512  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
-  $BP --model $QB --dataset gsm8k   --n-samples 8  --max-tokens 512  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
+  $BP --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
+  $BP --model $QB --dataset math500 --n-samples 8  --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
+  $BP --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
+  $BP --model $QB --dataset gsm8k   --n-samples 8  --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
 }
 s2_compare() {
   # Pool A2 là Qwen2.5 -> không còn đối chiếu tái lập với A2. Thay bằng KIỂM TÍNH XÁC ĐỊNH:
   # sinh lại 30 câu GSM8K đầu (cùng model, cùng seed, batch khác) rồi so với pool chính.
   # V1 không bất biến theo batch, nên có thể lệch nhẹ: CHỈ BÁO CÁO, không chặn.
   rm -f "$P"/det_gsm8k_qs*
-  $BP --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens 512 --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
+  $BP --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens $MT_G --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0
 }
@@ -67,12 +93,12 @@ s3_gonogo() {
   return 0   # §8.4: A3 vẫn chạy dù GO hay NO-GO
 }
 s4_a3() {
-  $BP --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens 512 --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 4 --max-tokens 512 --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
+  $BP --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
+  $BP --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 4 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
   for D in math_train math_test_ex500; do
     S=train; [ $D = math_test_ex500 ] && S=test
-    $BP --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens 1024 --out "$P/a3_${D}_qs.jsonl.gz" || return 1
-    $BP --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 4 --max-tokens 1024 --out "$P/a3_${D}_qb.jsonl.gz" || return 1
+    $BP --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens $MT_M --out "$P/a3_${D}_qs.jsonl.gz" || return 1
+    $BP --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 4 --max-tokens $MT_M --out "$P/a3_${D}_qb.jsonl.gz" || return 1
   done
 }
 s5_hidden() {
@@ -87,6 +113,9 @@ s6_collect() {
   for f in "$P"/*.jsonl.gz; do case "$f" in *.text.*|*.tok.*) ;; *) cp "$f" "$OUT"/;; esac; done
   cp qids/*.txt qids/*.summary.json "$OUT"/ 2>/dev/null
   cp "$M/env_s2.txt" "$OUT"/ 2>/dev/null
+  ls -1 "$M"/"$MK"* 2>/dev/null | xargs -r -n1 basename > "$OUT/markers.txt"   # for session2_restore.sh
+  { echo "tag=$TAG max_tokens_math=$MT_M max_tokens_gsm8k=$MT_G max_model_len=$MML"
+    echo "VLLM_USE_FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; nvidia-smi --query-gpu=name,driver_version --format=csv,noheader; hostname; } > "$OUT/protocol.txt"
   cp "$H"/*.manifest.json "$OUT"/ 2>/dev/null
   for f in "$P"/*.jsonl.gz; do   # bảng bất đồng grader (ghi vào log, không giữ file)
     case "$f" in *.text.*|*.tok.*|*.regraded.*|*/det_*) continue;; esac
@@ -94,10 +123,15 @@ s6_collect() {
   done > "$OUT/grader_disagreement.log" 2>&1
   rm -f /tmp/rg.jsonl.gz
   python s2_summary.py --pools "$P" --out "$OUT/s2_summary.md" > /dev/null
-  tar -cf "$M/s2_bulk.tar" -C "$M" pools_v2 hidden          # sidecar + hidden: KHÔNG vào git
+  tar -cf "$BULK" -C "$M" "pools_$TAG" hidden                # sidecar + hidden: KHÔNG vào git
 }
 
 # ---------------------------------------------------------------- chạy
+if [ "${STOP_AFTER:-}" = "capprobe" ]; then   # chỉ đo độ cắt rồi dừng (không chạy pool nào)
+  stage capprobe s0_capprobe || die "cap probe lỗi"
+  echo; echo "$(tick)>>> CAP PROBE XONG. Gửi mình toàn bộ phần 'cap_curve' ở trên (hoặc $OUT/cap_curve.txt)."
+  exit 0
+fi
 stage s0_smoke s0_smoke      || die "smoke test lỗi (xem 'SMOKE FAIL' ở trên). Chưa tốn giờ GPU đáng kể."
 stage s0_params s0_params
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
@@ -113,7 +147,7 @@ else
   stage s5_hidden s5_hidden    || die "A4 hidden state lỗi"
   stage s6_collect s6_collect  || die "gom kết quả lỗi"
 fi
-cp "$M/s2.log" "$OUT/s2.log" 2>/dev/null || true
+cp "$M"/s2*.log "$OUT"/ 2>/dev/null || true
 
 # ---------------------------------------------------------------- đẩy lên GitHub (tùy chọn)
 if [ -n "${GH_TOKEN:-}" ]; then
@@ -122,15 +156,15 @@ if [ -n "${GH_TOKEN:-}" ]; then
     && git push -q "https://x-access-token:${GH_TOKEN}@github.com/zZDuyZz/caac.git" HEAD:main \
     && echo "ĐÃ PUSH outputs/s2 lên GitHub" || echo "PUSH LỖI — dùng tar bên dưới"
 else
-  tar -czf "$M/s2_outputs.tar.gz" -C . "$OUT" qids
+  tar -czf "$OUTTAR" -C . "$OUT" qids
 fi
 
 echo; cat "$OUT/s2_summary.md"
 echo
 echo "============================================================================"
 echo " $(tick)PHIÊN 2 HOÀN TẤT.  Tải về máy bạn (từ PowerShell trên máy bạn):"
-echo "   scp -P <PORT> root@<IP>:/workspace/s2_bulk.tar .          # sidecar + hidden (bắt buộc)"
-[ -z "${GH_TOKEN:-}" ] && echo "   scp -P <PORT> root@<IP>:/workspace/s2_outputs.tar.gz .    # pool + summary (thay cho git push)"
+echo "   scp -P <PORT> root@<IP>:$BULK .          # sidecar + hidden (bắt buộc)"
+[ -z "${GH_TOKEN:-}" ] && echo "   scp -P <PORT> root@<IP>:$OUTTAR .    # pool + summary (thay cho git push)"
 echo " Gửi mình: outputs/s2/s2_summary.md  (trong tar) hoặc dán đoạn trên."
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
   echo " >>> SAU KHI TẢI XONG: DỪNG MÁY (ĐỪNG XÓA nếu đĩa được giữ — ngày 2 cần pool + file mốc). <<<"
