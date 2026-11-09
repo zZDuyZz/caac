@@ -72,17 +72,32 @@ s0_params() {
   python verify_params.py --weights $QS --weights $QB | tee "$OUT/params_verified.txt"
   return 0
 }
+# 2026-11-09: big model 8 -> 16 samples on the TEST pools. The big model is the escalate
+# target, so ITS pass@k ceiling is the ceiling of the whole controller; k=8 made the Chow
+# frontier for the big model an extrapolation instead of a measurement. gonogo.py keeps the
+# PRE-REGISTERED K=8 (tag prereg-gonogo-v1) -- the extra samples are not used by the verdict.
+# A3 pools stay at 4 samples: they train the estimator, they do not set a ceiling.
 s1_test_pools() {
   $BP --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset math500 --n-samples 8  --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
+  $BP --model $QB --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
   $BP --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
-  $BP --model $QB --dataset gsm8k   --n-samples 8  --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
+  $BP --model $QB --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
 }
 s2_compare() {
   # Pool A2 là Qwen2.5 -> không còn đối chiếu tái lập với A2. Thay bằng KIỂM TÍNH XÁC ĐỊNH:
   # sinh lại 30 câu GSM8K đầu (cùng model, cùng seed, batch khác) rồi so với pool chính.
   # V1 không bất biến theo batch, nên có thể lệch nhẹ: CHỈ BÁO CÁO, không chặn.
   rm -f "$P"/det_gsm8k_qs*
+  # (a) SAME batch composition as the main pool's first batch (150 questions, 16 samples,
+  #     batch-size 150). Nothing about the generate() call differs, so a mismatch here means
+  #     OUR pipeline is non-deterministic, not vLLM. Expect ~100%.
+  $BP --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
+      --max-tokens $MT_G --out "$P/det_same_gsm8k_qs.jsonl.gz" || return 0
+  python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_same_gsm8k_qs.jsonl.gz" \
+      | tee "$OUT/determinism_same_batch.txt"
+  # (b) DIFFERENT batch composition (30 questions, 4 samples). vLLM V1 is not batch-invariant,
+  #     so this is expected to disagree; reporting both arms separates the two causes in the
+  #     Limitations section instead of leaving one alarming number.
   $BP --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens $MT_G --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0

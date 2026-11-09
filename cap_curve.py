@@ -9,10 +9,10 @@ reports, for a grid of caps, the share of completions that would have been cut::
 
     trunc(c) = P(decode_tokens > c)      (a completion cut at the probe cap counts as > c)
 
-and the smallest grid cap with trunc(c) <= --target (default 5%).  It reads only the
+and the smallest grid cap with trunc(c) <= --target (default 2%).  It reads only the
 pool .jsonl.gz (no GPU, no text sidecar) and prints a PASTE line for session2_run.sh.
 
-    python cap_curve.py probe/math500_qs.jsonl.gz probe/gsm8k_qs.jsonl.gz ... [--target 0.05]
+    python cap_curve.py probe/math500_qs.jsonl.gz probe/gsm8k_qs.jsonl.gz ... [--target 0.02]
 """
 
 from __future__ import annotations
@@ -65,7 +65,9 @@ def round_up(x: int, m: int = 512) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("pools", nargs="+")
-    ap.add_argument("--target", type=float, default=0.05)
+    ap.add_argument("--target", type=float, default=0.02)  # 2026-11-09: 5%->2%, 5% leaves enough
+    # truncated-and-scored-wrong answers for a reviewer to object; the token cost of the
+    # tighter tail is small next to the credibility it buys (see CAAC_MASTER 3.12).
     args = ap.parse_args()
     rec: dict[str, int] = {}
     max_prompt = 0
