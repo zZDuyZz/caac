@@ -94,9 +94,11 @@ def main() -> None:
               "raise the probe cap (--max-tokens) or accept a higher target, then re-run.")
         sys.exit(2)
     mt_m, mt_g = rec.get("MT_M", 1024), rec.get("MT_G", 512)
-    mml = round_up(max(mt_m, mt_g) + max_prompt + 64)
-    print(f"RECOMMEND: MT_M={mt_m} MT_G={mt_g} MML={mml}   (target {args.target:.0%}, "
-          f"max prompt {max_prompt} tokens)")
+    # max_model_len is NOT derived here: the probe sees a few hundred prompts, while the run
+    # must fit the longest prompt of every set (859 tokens on MATH-500). session2_run.sh asks
+    # preflight_prompts.py for it once the caps are known.
+    print(f"RECOMMEND: MT_M={mt_m} MT_G={mt_g}   (target {args.target:.0%}; "
+          f"longest probe prompt {max_prompt} tokens; max_model_len comes from preflight)")
 
 
 if __name__ == "__main__":

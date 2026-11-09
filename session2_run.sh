@@ -22,12 +22,23 @@ QS=Qwen/Qwen3.5-2B; QB=Qwen/Qwen3.5-9B
 # and marker files, so it never touches day-1 data. Caps for the new protocol come from the cap probe
 # (STOP_AFTER=capprobe -> cap_curve.py prints "RECOMMEND: MT_M=.. MT_G=.. MML=.."):
 #   TAG=v3 MT_M=<..> MT_G=<..> MML=<..> bash session2_all.sh
-TAG=${TAG:-v2}; MT_M=${MT_M:-1024}; MT_G=${MT_G:-512}; MML=${MML:-2048}
+TAG=${TAG:-v2}; MT_M=${MT_M:-1024}; MT_G=${MT_G:-512}
+# Every set the run generates, with its cap. preflight_prompts.py checks each prompt against
+# max_model_len; for a new TAG it also chooses max_model_len, so the value is never guessed.
+SETS="--set math500:test::$MT_M --set gsm8k:test::$MT_G \
+ --set gsm8k:train:qids/a3_gsm8k_train.txt:$MT_G --set math_train:train:qids/a3_math_train.txt:$MT_M \
+ --set math_test_ex500:test:qids/a3_math_test_ex500.txt:$MT_M"
+if [ "$TAG" = v2 ]; then MML=${MML:-2048}; fi
 P=/workspace/pools_$TAG; H=/workspace/hidden; M=/workspace
 if [ "$TAG" = v2 ]; then OUT=outputs/s2; MK=".s2_done_"; BULK=$M/s2_bulk.tar; OUTTAR=$M/s2_outputs.tar.gz
 else OUT=outputs/s2_$TAG; MK=".s2_done_${TAG}_"; BULK=$M/s2_bulk_$TAG.tar; OUTTAR=$M/s2_outputs_$TAG.tar.gz; fi
 mkdir -p "$P" "$H" "$OUT"
-echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
+if [ "${STOP_AFTER:-}" != capprobe ] && [ -z "${MML:-}" ]; then
+  MML=$(python preflight_prompts.py --model $QS --model $QB $SETS) || { echo "preflight lỗi"; exit 1; }
+fi
+MML=${MML:-2048}
+if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap 4096, max_model_len 6144)  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
+else echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; fi
 T0=$(date +%s)
 BP="python build_pool.py --max-model-len $MML"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
 
@@ -41,17 +52,24 @@ die() { echo; echo "!!!!!! DỪNG: $* !!!!!!  (máy VẪN ĐANG TÍNH TIỀN —
 
 # ---------------------------------------------------------------- chặng
 s0_capprobe() {
-  # Does the token cap decide the result?  Generate 100 MATH-500 + 100 GSM8K questions (greedy + 2 samples)
-  # with a cap far above need, then cap_curve.py (CPU) gives the truncation share per cap.
+  # The cap is a protocol hyperparameter, so it is chosen on TRAIN questions (no test item is
+  # touched) drawn stratified with seed 1 -- the loaders' first N follow file order, which is
+  # not random. Greedy + 2 samples at a cap far above need; cap_curve.py reads lengths only.
   PR=$M/probe_$TAG; mkdir -p "$PR"
-  PB="python build_pool.py --max-model-len 5120 --max-tokens 4096 --n-questions 100 --n-samples 2"
-  $PB --model $QS --dataset math500 --out "$PR/math500_qs.jsonl.gz" || return 1
-  $PB --model $QB --dataset math500 --out "$PR/math500_qb.jsonl.gz" || return 1
-  $PB --model $QS --dataset gsm8k   --out "$PR/gsm8k_qs.jsonl.gz"   || return 1
-  $PB --model $QB --dataset gsm8k   --out "$PR/gsm8k_qb.jsonl.gz"   || return 1
-  python cap_curve.py "$PR"/math500_qs.jsonl.gz "$PR"/math500_qb.jsonl.gz "$PR"/gsm8k_qs.jsonl.gz "$PR"/gsm8k_qb.jsonl.gz \
+  [ -f qids/probe_math_train.txt ]  || python make_qids.py --dataset math_train --n 200 --seed 1 --out qids/probe_math_train.txt || return 1
+  [ -f qids/probe_gsm8k_train.txt ] || python make_qids.py --dataset gsm8k --split train --n 200 --seed 1 --out qids/probe_gsm8k_train.txt || return 1
+  PSETS="--set math_train:train:qids/probe_math_train.txt:4096 --set gsm8k:train:qids/probe_gsm8k_train.txt:4096"
+  python preflight_prompts.py --model $QS --model $QB $PSETS --max-model-len 6144 || return 1
+  PB="python build_pool.py --max-model-len 6144 --max-tokens 4096 --n-samples 2"
+  for MD in "$QS qs" "$QB qb"; do
+    set -- $MD
+    $PB --model $1 --dataset math_train --split train --qids-file qids/probe_math_train.txt --out "$PR/math_train_$2.jsonl.gz" || return 1
+    $PB --model $1 --dataset gsm8k --split train --qids-file qids/probe_gsm8k_train.txt --out "$PR/gsm8k_train_$2.jsonl.gz" || return 1
+  done
+  python cap_curve.py "$PR"/math_train_qs.jsonl.gz "$PR"/math_train_qb.jsonl.gz "$PR"/gsm8k_train_qs.jsonl.gz "$PR"/gsm8k_train_qb.jsonl.gz \
     | tee "$OUT/cap_curve.txt"
-  tar -czf "$M/probe_$TAG.tar.gz" -C "$M" "probe_$TAG" "caac/$OUT/cap_curve.txt" 2>/dev/null || true
+  cp qids/probe_* "$OUT"/
+  tar -czf "$M/probe_$TAG.tar.gz" -C "$M" "probe_$TAG" "caac/$OUT" 2>/dev/null || true
   return 0
 }
 s0_smoke() {
@@ -102,23 +120,6 @@ s2_compare() {
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0
 }
-# Saturation contingency, decided DURING the run, not after it. When s1 finishes, read the big
-# model's MATH-500 accuracy from s2_summary/the pool. At >=0.92 the benchmark has no headroom
-# left for a cost controller to act on, and every later number inherits that. Re-run with
-# HARD_SET=1 to draw a level 4-5 pool from MATH test-minus-500 before s4 starts, so the harder
-# set comes from the SAME rental and the same engine configuration as everything else.
-s3b_hard() {
-  [ "${HARD_SET:-0}" = 1 ] || { echo "HARD_SET!=1 -- bo qua (chi chay khi MATH-500 9B >= 0.92)"; return 0; }
-  python make_qids.py --dataset math_test_ex500 --split test --n 500 --min-level 4 \
-      --out qids/hard_math_l45.txt || return 1
-  $BP --model $QS --dataset math_test_ex500 --split test --qids-file qids/hard_math_l45.txt \
-      --n-samples 16 --max-tokens $MT_M --out "$P/hard_math_l45_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset math_test_ex500 --split test --qids-file qids/hard_math_l45.txt \
-      --n-samples 16 --max-tokens $MT_M --out "$P/hard_math_l45_qb.jsonl.gz" || return 1
-  python gonogo.py --small "$P/hard_math_l45_qs.jsonl.gz" --big "$P/hard_math_l45_qb.jsonl.gz" \
-      --json "$OUT/gonogo_hard_math_l45.json"
-  return 0
-}
 s3_gonogo() {
   python gonogo.py --small "$P/math500_qs.jsonl.gz" --big "$P/math500_qb.jsonl.gz" --json "$OUT/gonogo_math500.json"
   python gonogo.py --small "$P/gsm8k_qs.jsonl.gz"   --big "$P/gsm8k_qb.jsonl.gz"   --json "$OUT/gonogo_gsm8k.json"
@@ -164,14 +165,12 @@ if [ "${STOP_AFTER:-}" = "capprobe" ]; then   # chỉ đo độ cắt rồi dừ
   echo; echo "$(tick)>>> CAP PROBE XONG. Gửi mình toàn bộ phần 'cap_curve' ở trên (hoặc $OUT/cap_curve.txt)."
   exit 0
 fi
+python preflight_prompts.py --model $QS --model $QB $SETS --max-model-len $MML || die "prompt không vừa max_model_len=$MML"
 stage s0_smoke s0_smoke      || die "smoke test lỗi (xem 'SMOKE FAIL' ở trên). Chưa tốn giờ GPU đáng kể."
 stage s0_params s0_params
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
 stage s2_compare s2_compare
 stage s3_gonogo s3_gonogo
-# Only registered when requested: a skipped stage would still get its done-marker and then
-# be skipped again on the re-run that actually sets HARD_SET=1.
-[ "${HARD_SET:-0}" = 1 ] && { stage s3b_hard s3b_hard || die "hard-set lỗi"; }
 # STOP_AFTER=s3_gonogo -> NGÀY 1: dừng sau pool test + so sánh + go/no-go, rồi gom kết quả để tải về
 # (không đặt biến -> chạy tiếp A3/A4/gom kết quả = ngày 2; các chặng đã xong tự bỏ qua nhờ file mốc).
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
@@ -200,7 +199,8 @@ echo "==========================================================================
 echo " $(tick)PHIÊN 2 HOÀN TẤT.  Tải về máy bạn (từ PowerShell trên máy bạn):"
 echo "   scp -P <PORT> root@<IP>:$BULK .          # sidecar + hidden (bắt buộc)"
 [ -z "${GH_TOKEN:-}" ] && echo "   scp -P <PORT> root@<IP>:$OUTTAR .    # pool + summary (thay cho git push)"
-echo " Gửi mình: outputs/s2/s2_summary.md  (trong tar) hoặc dán đoạn trên."
+[ -f "$M/probe_$TAG.tar.gz" ] && echo "   scp -P <PORT> root@<IP>:$M/probe_$TAG.tar.gz .   # cap probe"
+echo " Gửi mình: $OUT/s2_summary.md  (trong tar) hoặc dán đoạn trên."
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
   echo " >>> SAU KHI TẢI XONG: DỪNG MÁY (ĐỪNG XÓA nếu đĩa được giữ — ngày 2 cần pool + file mốc). <<<"
 else

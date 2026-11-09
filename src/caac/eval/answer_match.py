@@ -24,7 +24,7 @@ _LATEX_FRAC = re.compile(r"\\d?frac\{(-?\d+)\}\{(-?\d+)\}")
 
 
 def _find_boxed(text):
-    """All \\boxed{...} contents, handling nested braces (e.g. \\frac{1}{2}).
+    r"""All \\boxed{...} contents, handling nested braces (e.g. \\frac{1}{2}).
 
     Fixed 2026-09-24: the old implementation was a flat regex
     `\\boxed\{([^}]*)\}` that stopped at the FIRST closing brace, so

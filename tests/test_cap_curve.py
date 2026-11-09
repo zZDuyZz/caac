@@ -36,7 +36,7 @@ def test_cli_recommends_cap_and_model_len(tmp_path):
     _pool(g, [200] * 100)                       # fits in 256
     out = subprocess.run([sys.executable, "cap_curve.py", str(m), str(g)],
                          capture_output=True, text=True, check=True).stdout
-    assert "RECOMMEND: MT_M=1536 MT_G=256 MML=2048" in out, out
+    assert "RECOMMEND: MT_M=1536 MT_G=256 " in out and "MML=" not in out, out
 
 
 def test_cli_fails_when_largest_cap_still_truncates(tmp_path):
