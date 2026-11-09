@@ -102,6 +102,23 @@ s2_compare() {
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0
 }
+# Saturation contingency, decided DURING the run, not after it. When s1 finishes, read the big
+# model's MATH-500 accuracy from s2_summary/the pool. At >=0.92 the benchmark has no headroom
+# left for a cost controller to act on, and every later number inherits that. Re-run with
+# HARD_SET=1 to draw a level 4-5 pool from MATH test-minus-500 before s4 starts, so the harder
+# set comes from the SAME rental and the same engine configuration as everything else.
+s3b_hard() {
+  [ "${HARD_SET:-0}" = 1 ] || { echo "HARD_SET!=1 -- bo qua (chi chay khi MATH-500 9B >= 0.92)"; return 0; }
+  python make_qids.py --dataset math_test_ex500 --split test --n 500 --min-level 4 \
+      --out qids/hard_math_l45.txt || return 1
+  $BP --model $QS --dataset math_test_ex500 --split test --qids-file qids/hard_math_l45.txt \
+      --n-samples 16 --max-tokens $MT_M --out "$P/hard_math_l45_qs.jsonl.gz" || return 1
+  $BP --model $QB --dataset math_test_ex500 --split test --qids-file qids/hard_math_l45.txt \
+      --n-samples 16 --max-tokens $MT_M --out "$P/hard_math_l45_qb.jsonl.gz" || return 1
+  python gonogo.py --small "$P/hard_math_l45_qs.jsonl.gz" --big "$P/hard_math_l45_qb.jsonl.gz" \
+      --json "$OUT/gonogo_hard_math_l45.json"
+  return 0
+}
 s3_gonogo() {
   python gonogo.py --small "$P/math500_qs.jsonl.gz" --big "$P/math500_qb.jsonl.gz" --json "$OUT/gonogo_math500.json"
   python gonogo.py --small "$P/gsm8k_qs.jsonl.gz"   --big "$P/gsm8k_qb.jsonl.gz"   --json "$OUT/gonogo_gsm8k.json"
@@ -152,6 +169,7 @@ stage s0_params s0_params
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
 stage s2_compare s2_compare
 stage s3_gonogo s3_gonogo
+stage s3b_hard  s3b_hard        # chi chay khi HARD_SET=1 (MATH-500 9B >= 0.92)
 # STOP_AFTER=s3_gonogo -> NGÀY 1: dừng sau pool test + so sánh + go/no-go, rồi gom kết quả để tải về
 # (không đặt biến -> chạy tiếp A3/A4/gom kết quả = ngày 2; các chặng đã xong tự bỏ qua nhờ file mốc).
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then

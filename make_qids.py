@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -65,10 +66,22 @@ def main():
     ap.add_argument("--n", type=int, required=True)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", required=True)
+    # Contingency for benchmark saturation: if the big model is near ceiling on MATH-500 there
+    # is no headroom left for a cost controller to demonstrate, so we re-draw from the hard tail
+    # instead of a proportional sample. Levels are MATH's own "Level 1".."Level 5" strings.
+    ap.add_argument("--min-level", type=int, default=None,
+                    help="keep only items whose MATH level is >= this (e.g. 4)")
     a = ap.parse_args()
 
     from caac.data.benchmarks import load_benchmark
     items = load_benchmark(a.dataset, split=a.split)
+    if a.min_level is not None:
+        def lvl(it):
+            m = re.search(r"\d+", str(it.get("level") or ""))
+            return int(m.group()) if m else -1
+        items = [it for it in items if lvl(it) >= a.min_level]
+        if not items:
+            raise SystemExit(f"--min-level {a.min_level}: no items left; check the level field")
     picked = stratified_sample(items, a.n, seed=a.seed)
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +90,7 @@ def main():
     def dist(xs, key):
         return dict(sorted(Counter(str(it.get(key)) for it in xs).items()))
     summary = {"dataset": a.dataset, "split": a.split, "seed": a.seed,
+               "min_level": a.min_level,
                "n_population": len(items), "n_picked": len(picked),
                "subject_pop": dist(items, "subject"), "subject_picked": dist(picked, "subject"),
                "level_pop": dist(items, "level"), "level_picked": dist(picked, "level")}
