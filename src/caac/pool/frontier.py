@@ -37,9 +37,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from math import sqrt
 
-from caac.pool.estimators import chow_coverage_bound, maj_at_k_exact
+from caac.pool.estimators import chow_coverage_bound
 from caac.pool.ledger import Call, cost_profiles
-from caac.pool.schema import GOLD, PoolRecord
+from caac.pool.schema import PoolRecord
 
 __all__ = [
     "RecoveryRate", "recovery_rate", "pi_after", "cap_serve", "cap_correct",
@@ -93,7 +93,7 @@ def _maj_correct(rec: PoolRecord, k: int, threshold: float = 0.5) -> bool:
     """
     if rec.n_samples == 0:
         return False
-    return maj_at_k_exact(rec.canonical_sample_answers(), GOLD, min(k, rec.n_samples)) > threshold
+    return rec.maj_at_k(k) > threshold
 
 
 def recovery_rate(small: dict[str, PoolRecord], big: dict[str, PoolRecord] | None = None,

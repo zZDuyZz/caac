@@ -168,7 +168,6 @@ def test_stage2_separates_right_from_wrong_majorities():
     extra cost, so this is the precondition for the whole design."""
     from collections import Counter
 
-    from caac.pool.schema import GOLD
     small, big = make_pools(600, seed=53)
     q = sorted(small)
     est = PerActionEstimator().fit(q[:400], small, big)
@@ -182,7 +181,7 @@ def test_stage2_separates_right_from_wrong_majorities():
         p = est2(rec, idxs, est(rec))
         canon = rec.canonical_sample_answers()
         votes = [canon[i] for i in idxs if canon[i] is not None]
-        ok = bool(votes) and Counter(votes).most_common(1)[0][0] == GOLD
+        ok = bool(votes) and rec.label_correct(Counter(votes).most_common(1)[0][0])
         (hi if ok else lo).append(p)
     assert sum(hi) / len(hi) > sum(lo) / len(lo) + 0.2
 

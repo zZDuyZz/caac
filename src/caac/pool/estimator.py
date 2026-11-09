@@ -46,8 +46,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from caac.pool.estimators import maj_at_k_exact
-from caac.pool.schema import GOLD, PoolRecord
+from caac.pool.schema import PoolRecord
 
 __all__ = [
     "SERVING_ACTIONS", "FEATURE_GROUPS",
@@ -114,8 +113,7 @@ def action_targets(small: PoolRecord, big: PoolRecord | None, k: int = 8) -> dic
     """FITTING targets. ``sample_more`` is the exact maj@k probability."""
     t = {"answer_now": float(small.greedy.correct)}
     if small.n_samples:
-        t["sample_more"] = maj_at_k_exact(small.canonical_sample_answers(), GOLD,
-                                          min(k, small.n_samples))
+        t["sample_more"] = small.maj_at_k(k)
     if big is not None:
         t["escalate"] = float(big.greedy.correct)
     return t
@@ -134,7 +132,7 @@ def realised_targets(small: PoolRecord, big: PoolRecord | None, order: list[int]
         idxs = [i for i in order if i < small.n_samples][:k]
         votes = [small.canonical_sample_answers()[i] for i in idxs]
         votes = [v for v in votes if v is not None]
-        t["sample_more"] = float(bool(votes) and Counter(votes).most_common(1)[0][0] == GOLD)
+        t["sample_more"] = float(bool(votes) and small.label_correct(Counter(votes).most_common(1)[0][0]))
     if big is not None:
         t["escalate"] = float(big.greedy.correct)
     return t
@@ -416,9 +414,9 @@ def post_sample_features(small: PoolRecord, idxs: list[int],
                          stage1: dict[str, float] | None = None) -> list[float]:
     """Evidence available after drawing ``idxs`` -- all of it already paid for.
 
-    Deliberately excludes anything that needs the gold label. ``agree_greedy``
-    uses the schema's answer-identity convention (policies.agreement_with_greedy),
-    which a deployed system computes by comparing answer strings.
+    Deliberately excludes anything that needs the gold label: answer classes
+    and ``agree_greedy`` compare answers with each other, as a deployed system
+    would.
     """
     from collections import Counter
 
@@ -478,7 +476,7 @@ class SecondStageEstimator:
                 canon = rec.canonical_sample_answers()
                 votes = [canon[i] for i in idxs if canon[i] is not None]
                 top = Counter(votes).most_common(1)
-                y.append(float(bool(top) and top[0][0] == GOLD))
+                y.append(float(bool(top) and rec.label_correct(top[0][0])))
         if len(X) < 2 * self.n_folds:
             return self
         X = np.asarray(X, dtype=float)

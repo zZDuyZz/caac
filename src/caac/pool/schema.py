@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Iterator
 
 SCHEMA_VERSION = "1.0"
-GOLD = "__GOLD__"  # canonical label for any answer graded correct
 
 
 
@@ -74,17 +73,68 @@ class PoolRecord:
     def sample_answers(self) -> list[str | None]:
         return [s.answer for s in self.samples]
 
-    def canonical_sample_answers(self) -> list[str | None]:
-        """Sample answers with every CORRECT one mapped to the single label GOLD.
+    def _answer_labels(self) -> tuple[list[str | None], dict[str, bool]]:
+        """Label-free answer classes for [greedy] + samples, and each class's grade.
 
-        Voting must not compare normalized answers to the raw gold string: MATH
-        golds are LaTeX (e.g. \\frac{1}{2}) and normalization rarely reproduces
-        them byte-for-byte, so string equality would score correct answers as
-        wrong. ``Completion.correct`` is already graded by the project's
-        equivalence matcher, so we key the vote on it. Wrong answers keep their
-        own labels (equivalent wrong forms stay split: a conservative choice).
+        Classes come from comparing answers with each other (eval.grade.
+        answer_clusters), never with the gold string, so a vote or an agreement
+        check sees exactly what it would see in deployment. The gold label is
+        used only afterwards, to score the class a policy served: a class is
+        correct when most of its members were graded correct (ties: the first
+        member, greedy before samples).
         """
-        return [GOLD if c.correct else c.answer for c in self.samples]
+        cached = self.__dict__.get("_label_cache")
+        if cached is not None:
+            return cached
+        from caac.eval.grade import answer_clusters
+
+        comps = [self.greedy] + list(self.samples)
+        raw = [(c.answer_raw or c.answer) if c.answer is not None else None for c in comps]
+        ids = answer_clusters(raw)
+        labels = [None if i is None else f"A{i}" for i in ids]
+        votes: dict[str, list[bool]] = {}
+        for lab, c in zip(labels, comps):
+            if lab is not None:
+                votes.setdefault(lab, []).append(bool(c.correct))
+        grade = {lab: (sum(v) * 2 > len(v)) if sum(v) * 2 != len(v) else v[0]
+                 for lab, v in votes.items()}
+        self.__dict__["_label_cache"] = (labels, grade)
+        return labels, grade
+
+    def greedy_label(self) -> str | None:
+        return self._answer_labels()[0][0]
+
+    def canonical_sample_answers(self) -> list[str | None]:
+        """Per-sample answer class (label-free); None for an unparsable answer."""
+        return self._answer_labels()[0][1:]
+
+    def label_correct(self, label: str | None) -> bool:
+        """Grade of a served answer class; an unparsable answer is wrong."""
+        return label is not None and self._answer_labels()[1].get(label, False)
+
+    def correct_labels(self) -> list[str]:
+        return [lab for lab, ok in self._answer_labels()[1].items() if ok]
+
+    def mixed_classes(self) -> int:
+        """Classes whose members the grader scored differently (a grader/matcher
+        disagreement worth reporting, not hiding)."""
+        labels, _ = self._answer_labels()
+        comps = [self.greedy] + list(self.samples)
+        seen: dict[str, set] = {}
+        for lab, c in zip(labels, comps):
+            if lab is not None:
+                seen.setdefault(lab, set()).add(bool(c.correct))
+        return sum(len(v) > 1 for v in seen.values())
+
+    def maj_at_k(self, k: int) -> float:
+        """Exact maj@k of the samples, scored by class grade. The events "class c
+        wins" are disjoint and ties split credit evenly, so the sum over correct
+        classes is the exact expected correctness of a k-sample vote."""
+        from caac.pool.estimators import maj_at_k_exact
+
+        labels = self.canonical_sample_answers()
+        k = min(k, len(labels))
+        return sum(maj_at_k_exact(labels, c, k) for c in self.correct_labels()) if k else 0.0
 
     def sample_correct(self) -> list[bool]:
         return [s.correct for s in self.samples]

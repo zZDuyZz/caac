@@ -18,7 +18,7 @@ def _rec(greedy_ok, samples, conf=0.5, greedy_ans=None):
                       [s if isinstance(s, Completion) else _c(s) for s in samples])
 
 
-def test_agreement_uses_schema_convention():
+def test_agreement_compares_answer_classes():
     # greedy correct: agreement = share of correct samples
     r = _rec(True, [True, True, False, False])
     assert agreement_with_greedy(r, [0, 1, 2, 3]) == pytest.approx(0.5)

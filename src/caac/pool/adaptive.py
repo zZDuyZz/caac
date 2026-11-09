@@ -40,7 +40,7 @@ from math import comb
 
 from caac.pool.ledger import Call
 from caac.pool.policies import PolicyOutcome, _vote
-from caac.pool.schema import GOLD, PoolRecord
+from caac.pool.schema import PoolRecord
 
 __all__ = [
     "beta_win_probability", "adaptive_consistency", "esc", "deepconf_offline",
@@ -98,7 +98,7 @@ def _billed(rec: PoolRecord, groups: list[list[int]],
 def _outcome(rec: PoolRecord, drawn: list[int], groups: list[list[int]],
              answer: str | None, action: str, share_prefill: bool = True,
              **meta) -> PolicyOutcome:
-    out = PolicyOutcome(True, answer, answer == GOLD,
+    out = PolicyOutcome(True, answer, rec.label_correct(answer),
                         _billed(rec, groups, share_prefill), action)
     out.meta.update({"n_drawn": len(drawn),
                      "n_rounds": sum(1 for g in groups if g)})

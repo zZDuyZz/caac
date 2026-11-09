@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from caac.pool.ledger import Call
-from caac.pool.schema import Completion, PoolRecord, GOLD
+from caac.pool.schema import Completion, PoolRecord
 
 __all__ = [
     "PolicyOutcome",
@@ -94,10 +94,9 @@ def greedy_only(small: PoolRecord) -> PolicyOutcome:
 
 def self_consistency(small: PoolRecord, k: int, order: list[int]) -> PolicyOutcome:
     idxs = order[:k]
-    canon = small.canonical_sample_answers()  # correct -> GOLD (see schema)
-    answers = [canon[i] for i in idxs]
-    voted = _vote(answers)
-    correct = voted == GOLD
+    canon = small.canonical_sample_answers()
+    voted = _vote([canon[i] for i in idxs])
+    correct = small.label_correct(voted)
     return PolicyOutcome(True, voted, correct, [_samples_call(small, idxs, 0)], "sample_more")
 
 
@@ -137,30 +136,19 @@ CHECKS = ("confidence", "resolve_vote", "both")
 
 
 def agreement_with_greedy(rec: PoolRecord, idxs: list[int]) -> float:
-    """Fraction of the chosen samples whose answer matches the greedy answer.
+    """Fraction of the chosen samples whose answer class equals the greedy one.
 
-    Matching convention is the schema's (see canonical_sample_answers): two
-    completions graded correct are the same answer; a correct and an incorrect
-    one differ; two incorrect ones match only if their normalized strings match
-    (equivalent wrong answers stay split -- conservative, and it can only make
-    the check look WEAKER, never stronger).
-
-    This is label-free in deployment: the grader is used here only as a stand-in
-    for "are these two strings the same answer", never to reveal the gold label
-    to the policy. A deployed PriceCheck compares strings directly.
+    Classes are label-free (schema._answer_labels): answers are compared with
+    each other, never with gold, so this is the check a deployed system runs.
+    An unparsable answer never agrees.
     """
     if not idxs:
         return 0.0
-    g = rec.greedy
-    n = 0
-    for i in idxs:
-        c = rec.samples[i]
-        if g.correct and c.correct:
-            n += 1
-        elif (not g.correct) and (not c.correct) and c.answer is not None \
-                and c.answer == g.answer:
-            n += 1
-    return n / len(idxs)
+    g = rec.greedy_label()
+    if g is None:
+        return 0.0
+    canon = rec.canonical_sample_answers()
+    return sum(canon[i] == g for i in idxs) / len(idxs)
 
 
 def pricecheck(small: PoolRecord, lam: float, check: str = "resolve_vote",
@@ -439,7 +427,7 @@ def caac_staged(
             p2 = stage2(small, idxs, phat) if stage2 is not None else 0.0
             if p2 >= tau:
                 voted = _vote([small.canonical_sample_answers()[i] for i in idxs])
-                out = PolicyOutcome(True, voted, voted == GOLD, calls, "sample_more")
+                out = PolicyOutcome(True, voted, small.label_correct(voted), calls, "sample_more")
                 out.meta.update({"phat": phat, "p_stage2": p2, "tau": tau,
                                  "tried": tried, "gate": "stage2"})
                 return out

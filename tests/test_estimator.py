@@ -17,8 +17,7 @@ from caac.eval.calibration import expected_calibration_error
 from caac.pool.estimator import (SERVING_ACTIONS, Isotonic, LogisticHead,
                                  PerActionEstimator, action_targets, feature_names,
                                  features, realised_targets)
-from caac.pool.estimators import maj_at_k_exact
-from caac.pool.schema import GOLD, Completion
+from caac.pool.schema import Completion
 from caac.pool.synth import make_pair, make_pools
 
 
@@ -77,8 +76,7 @@ def test_soft_target_is_exact_maj_at_k():
     t = action_targets(s, b, k=8)
     assert t["answer_now"] == float(s.greedy.correct)
     assert t["escalate"] == float(b.greedy.correct)
-    assert t["sample_more"] == pytest.approx(
-        maj_at_k_exact(s.canonical_sample_answers(), GOLD, 8))
+    assert t["sample_more"] == pytest.approx(s.maj_at_k(8))
     assert 0.0 <= t["sample_more"] <= 1.0
 
 

@@ -6,6 +6,8 @@ must also hold on real data, so build_pool output can be trusted downstream.
 
 from __future__ import annotations
 
+import pytest
+
 import random
 from functools import partial
 
@@ -146,44 +148,45 @@ def test_caac_controller_runs_and_certifies():
     assert sum(r.certified for r in ordered) >= sum(r.certified for r in results) - 0  # sane
 
 
-def test_vote_uses_graded_correctness_not_raw_gold_string():
-    """MATH golds are LaTeX; normalized answers differ byte-for-byte from them.
-    Voting must key on the graded `correct` flag, else correct answers vanish."""
-    from caac.pool.schema import GOLD
-
+def test_vote_compares_answers_with_each_other_not_with_gold():
+    """Equivalent forms merge by comparing answers with each other; the gold
+    string is never consulted, and a correct answer written differently from a
+    LaTeX gold still wins the vote."""
     def comp(ans, ok):
         return Completion(answer=ans, correct=ok, decode_tokens=100,
                           finish_reason="stop", confidence=0.5, seed=1)
 
-    # raw gold is "\\frac{1}{2}", but correct samples were normalized to "1/2"/"0.5"
     samples = [comp("1/2", True)] * 3 + [comp("0.5", True)] * 2 + [comp("3", False)] * 2
     rec = PoolRecord(query_id="q", dataset="math500", model="m", gold="\\frac{1}{2}",
                      prompt_tokens=50, greedy=comp("1/2", True), samples=samples)
-    # old behaviour (string equality with raw gold): gold never appears -> 0.0
-    assert maj_at_k_exact(rec.sample_answers(), rec.gold, 5) == 0.0
-    # new behaviour: all 5 correct forms merge into GOLD and beat the 2 wrong ones
-    assert maj_at_k_exact(rec.canonical_sample_answers(), GOLD, 5) > 0.99
-    # and the replay policy agrees
-    out = P.self_consistency(rec, 7, list(range(7)))
-    assert out.correct is True
+    assert maj_at_k_exact(rec.sample_answers(), rec.gold, 5) == 0.0   # raw strings never equal gold
+    labels = rec.canonical_sample_answers()
+    assert len(set(labels)) == 2                                     # 1/2 and 0.5 are one class
+    assert rec.maj_at_k(5) > 0.99
+    assert P.self_consistency(rec, 7, list(range(7))).correct is True
 
 
-if __name__ == "__main__":
-    import sys, traceback
-    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    import tempfile, pathlib
-    passed = 0
-    for fn in fns:
-        try:
-            if "tmp_path" in fn.__code__.co_varnames[: fn.__code__.co_argcount]:
-                with tempfile.TemporaryDirectory() as d:
-                    fn(pathlib.Path(d))
-            else:
-                fn()
-            print(f"PASS {fn.__name__}")
-            passed += 1
-        except Exception:
-            print(f"FAIL {fn.__name__}")
-            traceback.print_exc()
-    print(f"\n{passed}/{len(fns)} passed")
-    sys.exit(0 if passed == len(fns) else 1)
+def test_answer_classes_ignore_the_gold_label():
+    """Two wrong answers that are the same number are one class, and agreement
+    with a wrong greedy answer counts them -- exactly what a deployed check sees."""
+    def comp(ans, ok):
+        return Completion(answer=ans, correct=ok, decode_tokens=10, finish_reason="stop")
+
+    rec = PoolRecord("q", "d", "m", "7", 10, comp("3", False),
+                     [comp("3.0", False), comp("7", True), comp(None, False), comp("3", False)])
+    labels = rec.canonical_sample_answers()
+    assert labels[0] == labels[3] == rec.greedy_label()
+    assert labels[2] is None
+    assert not rec.label_correct(rec.greedy_label()) and rec.label_correct(labels[1])
+    assert P.agreement_with_greedy(rec, [0, 1, 2, 3]) == 0.5
+
+
+def test_math_verify_merges_latex_forms_label_free():
+    pytest.importorskip("math_verify")
+    def comp(ans, ok):
+        return Completion(answer=ans, correct=ok, decode_tokens=10, finish_reason="stop")
+
+    rec = PoolRecord("q", "d", "m", "x", 10, comp("\\sqrt{2}/2", True),
+                     [comp("\\frac{\\sqrt{2}}{2}", True), comp("\\frac{1}{2}", False)])
+    labels = rec.canonical_sample_answers()
+    assert labels[0] == rec.greedy_label() != labels[1]

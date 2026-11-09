@@ -19,8 +19,7 @@ import argparse
 import json
 from pathlib import Path
 
-from caac.pool.estimators import maj_at_k_exact
-from caac.pool.schema import GOLD, load_pool, text_sidecar_path, token_sidecar_path
+from caac.pool.schema import load_pool, text_sidecar_path, token_sidecar_path
 
 TEST_POOLS = ["math500_qs", "math500_qb", "gsm8k_qs", "gsm8k_qb"]
 THINK_MARKERS = ("<think>", "</think>", "<|think|>")
@@ -57,7 +56,7 @@ def pool_stats(path):
     dis = sum(bool(r.greedy.correct) != bool(r.greedy.correct_legacy) for r in recs) / n
     ns = min(r.n_samples for r in recs)
     k = min(ns, 16)
-    maj = (sum(maj_at_k_exact(r.canonical_sample_answers(), GOLD, k) for r in recs) / n) if ns >= 1 else float("nan")
+    maj = (sum(r.maj_at_k(k) for r in recs) / n) if ns >= 1 else float("nan")
     tr_g = sum(r.greedy.finish_reason == "length" for r in recs) / n
     tot = sum(len(r.samples) for r in recs) or 1
     tr_s = sum(c.finish_reason == "length" for r in recs for c in r.samples) / tot

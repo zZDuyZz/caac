@@ -82,3 +82,66 @@ def grade(gold: str, pred: str | None, legacy_correct: bool,
 
 def mathverify_available() -> bool:
     return _mv_fns() is not None
+
+
+def _is_number(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+
+def answer_clusters(answers: list[str | None]) -> list[int | None]:
+    """Group extracted answers into equivalence classes WITHOUT the gold label.
+
+    Voting and agreement checks must work the way a deployed system would: by
+    comparing answers with each other. Two answers are the same when their
+    normalized forms match or Math-Verify accepts them in both directions.
+    Two plain numbers that normalize differently are different, so most pairs
+    never reach Math-Verify. Each new answer is compared with the first member
+    of every existing class; None (unparsable) gets no class.
+    """
+    from caac.eval.answer_match import normalize_answer
+
+    fns = _mv_fns()
+    parsed: dict[str, object] = {}
+
+    def parse_once(a: str):
+        if a not in parsed:
+            try:
+                kw = {"parsing_timeout": None} if _NO_TIMEOUT else {}
+                parsed[a] = fns[0]("\\boxed{" + a + "}", **kw)
+            except Exception:
+                parsed[a] = None
+        return parsed[a]
+
+    def mv_same(a: str, b: str) -> bool:
+        if fns is None:
+            return False
+        pa, pb = parse_once(a), parse_once(b)
+        if not pa or not pb:
+            return False
+        kw = {"timeout_seconds": None} if _NO_TIMEOUT else {}
+        try:
+            return bool(fns[1](pa, pb, **kw)) and bool(fns[1](pb, pa, **kw))
+        except Exception:
+            return False
+
+    reps: list[tuple[str, str]] = []
+    out: list[int | None] = []
+    for a in answers:
+        n = normalize_answer(a) if a is not None else None
+        if n is None:
+            out.append(None)
+            continue
+        cid = None
+        for j, (rn, ra) in enumerate(reps):
+            if rn == n or (not (_is_number(rn) and _is_number(n)) and mv_same(str(a), ra)):
+                cid = j
+                break
+        if cid is None:
+            reps.append((n, str(a)))
+            cid = len(reps) - 1
+        out.append(cid)
+    return out

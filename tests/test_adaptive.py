@@ -14,7 +14,7 @@ from caac.pool.adaptive import (adaptive_consistency, beta_win_probability,
                                 deepconf_offline, esc, trace_confidence)
 from caac.pool.ledger import cost_profiles
 from caac.pool.policies import self_consistency
-from caac.pool.schema import GOLD, Completion, PoolRecord
+from caac.pool.schema import Completion, PoolRecord
 from caac.pool.synth import make_pools
 
 MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
