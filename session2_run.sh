@@ -169,7 +169,9 @@ stage s0_params s0_params
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
 stage s2_compare s2_compare
 stage s3_gonogo s3_gonogo
-stage s3b_hard  s3b_hard        # chi chay khi HARD_SET=1 (MATH-500 9B >= 0.92)
+# Only registered when requested: a skipped stage would still get its done-marker and then
+# be skipped again on the re-run that actually sets HARD_SET=1.
+[ "${HARD_SET:-0}" = 1 ] && { stage s3b_hard s3b_hard || die "hard-set lỗi"; }
 # STOP_AFTER=s3_gonogo -> NGÀY 1: dừng sau pool test + so sánh + go/no-go, rồi gom kết quả để tải về
 # (không đặt biến -> chạy tiếp A3/A4/gom kết quả = ngày 2; các chặng đã xong tự bỏ qua nhờ file mốc).
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
