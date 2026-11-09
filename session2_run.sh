@@ -171,7 +171,8 @@ stage s0_params s0_params
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
 stage s2_compare s2_compare
 stage s3_gonogo s3_gonogo
-# STOP_AFTER=s3_gonogo -> NGÀY 1: dừng sau pool test + so sánh + go/no-go, rồi gom kết quả để tải về
+# STOP_AFTER=s3_gonogo -> stop after test pools + compare + go/no-go and collect for download (2a);
+# the next machine restores them with session2_restore.sh and re-runs this command without STOP_AFTER (2b).
 # (không đặt biến -> chạy tiếp A3/A4/gom kết quả = ngày 2; các chặng đã xong tự bỏ qua nhờ file mốc).
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
   stage s6_day1 s6_collect   || die "gom kết quả lỗi"
@@ -183,26 +184,19 @@ else
 fi
 cp "$M"/s2*.log "$OUT"/ 2>/dev/null || true
 
-# ---------------------------------------------------------------- đẩy lên GitHub (tùy chọn)
-if [ -n "${GH_TOKEN:-}" ]; then
-  git add -f "$OUT" qids
-  git -c user.name=zZDuyZz -c user.email=minhduytmd06@gmail.com commit -q -m "Session 2: regenerated test pools (text+token sidecars), A3 pools, go/no-go, summary" \
-    && git push -q "https://x-access-token:${GH_TOKEN}@github.com/zZDuyZz/caac.git" HEAD:main \
-    && echo "ĐÃ PUSH outputs/s2 lên GitHub" || echo "PUSH LỖI — dùng tar bên dưới"
-else
-  tar -czf "$OUTTAR" -C . "$OUT" qids
-fi
+# Outputs always leave the machine as a tarball. No push from here: GH_TOKEN never goes on a rental.
+tar -czf "$OUTTAR" -C . "$OUT" qids
 
 echo; cat "$OUT/s2_summary.md"
 echo
 echo "============================================================================"
 echo " $(tick)PHIÊN 2 HOÀN TẤT.  Tải về máy bạn (từ PowerShell trên máy bạn):"
 echo "   scp -P <PORT> root@<IP>:$BULK .          # sidecar + hidden (bắt buộc)"
-[ -z "${GH_TOKEN:-}" ] && echo "   scp -P <PORT> root@<IP>:$OUTTAR .    # pool + summary (thay cho git push)"
+echo "   scp -P <PORT> root@<IP>:$OUTTAR .    # pool + summary"
 [ -f "$M/probe_$TAG.tar.gz" ] && echo "   scp -P <PORT> root@<IP>:$M/probe_$TAG.tar.gz .   # cap probe"
 echo " Gửi mình: $OUT/s2_summary.md  (trong tar) hoặc dán đoạn trên."
 if [ "${STOP_AFTER:-}" = "s3_gonogo" ]; then
-  echo " >>> SAU KHI TẢI XONG: DỪNG MÁY (ĐỪNG XÓA nếu đĩa được giữ — ngày 2 cần pool + file mốc). <<<"
+  echo " >>> TẢI 2 FILE TRÊN VỀ, rồi xóa máy. Phần sau (A3 + hidden) chạy ở máy mới: scp 2 file lên /workspace, bash session2_restore.sh $TAG, chạy lại ĐÚNG lệnh này nhưng bỏ STOP_AFTER. <<<"
 else
   echo " >>> SAU KHI TẢI XONG: DỪNG VÀ XÓA MÁY. <<<"
 fi
