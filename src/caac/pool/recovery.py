@@ -38,6 +38,7 @@ from __future__ import annotations
 from collections import Counter
 
 from caac.pool.schema import PoolRecord
+from caac.pool.voting import greedy_vote_correct, greedy_vote_prob
 
 __all__ = [
     "PRIMITIVE_GROUPS", "REGIONS", "CORRECTING_ACTIONS",
@@ -59,17 +60,13 @@ def sample_correct_prob(small: PoolRecord, k: int) -> float:
     permutation to average away. Answer classes are label-free, and the gold
     label only grades the class that would be served.
     """
-    return small.maj_at_k(k) if small.n_samples else 0.0
+    return greedy_vote_prob(small, k) if small.n_samples else 0.0
 
 
 def sample_correct_realised(small: PoolRecord, order: list[int], k: int) -> float:
     """The same quantity for ONE concrete draw order: what a single run achieved."""
     idxs = [i for i in order if i < small.n_samples][:k]
-    canon = small.canonical_sample_answers()
-    votes = [canon[i] for i in idxs if canon[i] is not None]
-    if not votes:
-        return 0.0
-    return float(small.label_correct(Counter(votes).most_common(1)[0][0]))
+    return greedy_vote_correct(small, idxs)
 
 
 def oracle_rescue(small: PoolRecord, k: int) -> float:

@@ -36,7 +36,7 @@ from caac.pool.replay import make_orders
 from caac.pool.schema import load_pool
 
 DEFAULT_LAMS = "0.5,1,1.5,2,3,5,8,12,20,35,60"
-BASELINES = ("small_abstain", "big_abstain", "cascade_abstain", "sc_abstain", "esc_abstain",
+BASELINES = ("small_abstain", "big_abstain", "cascade_abstain", "sc_abstain", "sc_abstain_greedy", "esc_abstain",
              "adaptive_consistency_abstain", "pricecheck", "conformal_cascade",
              "conformal_cascade_abstain")
 # "caac_staged_value" is the recoverability arm: it buys a correcting action
@@ -61,6 +61,7 @@ def hash_split(pool: dict, frac: float, seed: str = "caac-split-v2"):
 def baseline_family(name: str, n_big: int):
     return {"small_abstain": F.small_abstain, "big_abstain": F.big_abstain,
             "cascade_abstain": F.cascade_abstain, "sc_abstain": F.sc_abstain,
+            "sc_abstain_greedy": lambda: F.sc_abstain(greedy_vote=True),
             "esc_abstain": lambda: F.adaptive_abstain("esc"),
             "adaptive_consistency_abstain": lambda: F.adaptive_abstain("adaptive_consistency"),
             "pricecheck": lambda: F.pricecheck(n_big),

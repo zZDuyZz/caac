@@ -34,6 +34,7 @@ from typing import Callable
 
 from caac.pool.ledger import Call
 from caac.pool.schema import Completion, PoolRecord
+from caac.pool.voting import serve_with_greedy
 
 __all__ = [
     "PolicyOutcome",
@@ -479,7 +480,7 @@ def caac_staged(
                     tried.append("sample_more")
                 p2 = stage2(small, drawn, phat) if stage2 is not None else 0.0
                 if p2 >= tau:
-                    voted = _vote([small.canonical_sample_answers()[i] for i in drawn])
+                    voted = serve_with_greedy(small, drawn)
                     return done(PolicyOutcome(True, voted, small.label_correct(voted), calls,
                                               "sample_more"), "stage2", p_stage2=p2)
         elif action == "escalate":

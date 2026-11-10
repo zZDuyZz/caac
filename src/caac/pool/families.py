@@ -43,6 +43,7 @@ from caac.pool.policies import (PolicyOutcome, _greedy_call, _samples_call, _vot
 from caac.pool.adaptive import adaptive_consistency, esc
 from caac.pool.protocol import Family, split_cost
 from caac.pool.schema import PoolRecord
+from caac.pool.voting import serve_with_greedy
 
 __all__ = ["CONF_GRID", "TAU_GRID", "SHARE_GRID", "lam_cost", "small_abstain", "big_abstain",
            "cascade_abstain", "sc_abstain", "adaptive_abstain", "conformal_cascade",
@@ -124,9 +125,10 @@ def _share(labels: list) -> tuple[str | None, float]:
     return top, n / len(labels)
 
 
-def sc_abstain(ks=(1, 2, 4, 8, 16), grid=SHARE_GRID) -> Family:
+def sc_abstain(ks=(1, 2, 4, 8, 16), grid=SHARE_GRID, greedy_vote: bool = False) -> Family:
     """Fixed-k self-consistency; serve the vote iff its share of the k draws
-    clears t. One path per k."""
+    clears t. One path per k. ``greedy_vote`` gives it CAAC's selector (greedy
+    counts as a vote) so the comparison does not hinge on the voter."""
     configs = [(k, t) for k in ks for t in grid]
     paths = [[i * len(grid) + j for j in range(len(grid))] for i in range(len(ks))]
 
@@ -138,11 +140,14 @@ def sc_abstain(ks=(1, 2, 4, 8, 16), grid=SHARE_GRID) -> Family:
             calls = [_samples_call(s, idxs, 0)]
             canon = s.canonical_sample_answers()
             top, share = _share([canon[i] for i in idxs])
+            if greedy_vote:
+                top = serve_with_greedy(s, idxs)
+                share = (sum(canon[i] == top for i in idxs) + (s.greedy_label() == top)) / (k + 1)
             if len(idxs) == k and top is not None and share >= t:
                 return PolicyOutcome(True, top, s.label_correct(top), calls, "sample_more")
             return _abstain(calls)
         return fn
-    return Family("sc_abstain", configs, make, paths)
+    return Family("sc_abstain_greedy" if greedy_vote else "sc_abstain", configs, make, paths)
 
 
 def conformal_cascade(n_small: int = 16, n_big: int = 16, grid=SHARE_GRID,

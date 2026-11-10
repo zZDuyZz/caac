@@ -20,7 +20,8 @@ rather than after. The value of an action is therefore net,
     Delta_a = P(correct after a) - P(correct now) = P(gain_a) - P(harm_a),
 
 because escalating or re-voting can also lose an answer the small model had
-right. `recovery_table.py` measures where failures sit (four rescue groups, and
+right. The vote CAAC serves counts the greedy answer as one vote and never counts
+a sample cut off by the token cap (`voting.py`); baselines keep the plain majority. `recovery_table.py` measures where failures sit (four rescue groups, and
 three cost-dependent regions: repairable cheaply, only expensively, or not at
 all within this action set and sample budget), and `certify.py` runs the
 net-value gate and the confidence gate as two arms of the same policy so the
@@ -127,7 +128,7 @@ test, the oracle, and which method is cheapest where (the phase map).
 | `chow_frontier.py`, `train_estimator.py`, `run_baselines.py` | the Chow ceiling, a stand-alone estimator fit, the always-answer sweep |
 | `verify_params.py` | parameter counts (config formula, or exact from safetensors headers) checked against the cost registry |
 | `session2_*.sh` | one-command GPU session |
-| `src/caac/pool/` | pool schema with label-free answer classes, policies, method families, the certification protocol, estimators (pre-action, net value, after sampling, after escalation), recoverability measurement, LTT, Chow frontier, adaptive-sampling baselines, cost ledger |
+| `src/caac/pool/` | pool schema with label-free answer classes, policies, method families, the certification protocol, estimators (pre-action, net value, after sampling, after escalation), recoverability measurement, the served vote, LTT, Chow frontier, adaptive-sampling baselines, cost ledger |
 | `src/caac/data/`, `src/caac/eval/` | benchmark loaders (incl. clean sets), the single chat prompt, answer matching, Math-Verify grading, calibration metrics |
 | `outputs/a2/` | pilot pools (Qwen2.5), kept for the appendix |
 

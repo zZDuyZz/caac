@@ -91,7 +91,13 @@ class PoolRecord:
         from caac.eval.grade import answer_clusters
 
         comps = [self.greedy] + list(self.samples)
-        raw = [(c.answer_raw or c.answer) if c.answer is not None else None for c in comps]
+        # A sample cut off by the token cap has an answer parsed from half a
+        # derivation; it is not a vote. finish_reason is visible at deployment,
+        # so this uses no label. The greedy answer is kept: it is what the
+        # small model would serve if asked now.
+        usable = [True] + [s.finish_reason != "length" for s in self.samples]
+        raw = [(c.answer_raw or c.answer) if c.answer is not None and u else None
+               for c, u in zip(comps, usable)]
         ids = answer_clusters(raw)
         labels = [None if i is None else f"A{i}" for i in ids]
         votes: dict[str, list[bool]] = {}
@@ -107,7 +113,7 @@ class PoolRecord:
         return self._answer_labels()[0][0]
 
     def canonical_sample_answers(self) -> list[str | None]:
-        """Per-sample answer class (label-free); None for an unparsable answer."""
+        """Per-sample answer class (label-free); None for an unparsable or truncated answer."""
         return self._answer_labels()[0][1:]
 
     def label_correct(self, label: str | None) -> bool:

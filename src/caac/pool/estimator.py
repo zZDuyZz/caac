@@ -49,6 +49,7 @@ from functools import lru_cache
 import numpy as np
 
 from caac.pool.schema import PoolRecord
+from caac.pool.voting import greedy_vote_correct, greedy_vote_prob
 
 __all__ = [
     "SERVING_ACTIONS", "FEATURE_GROUPS", "RECOVERY_PARTS", "CORRECTING_ACTIONS",
@@ -121,7 +122,7 @@ def action_targets(small: PoolRecord, big: PoolRecord | None, k: int = 8) -> dic
     """FITTING targets. ``sample_more`` is the exact maj@k probability."""
     t = {"answer_now": float(small.greedy.correct)}
     if small.n_samples:
-        t["sample_more"] = small.maj_at_k(k)
+        t["sample_more"] = greedy_vote_prob(small, k)
     if big is not None:
         t["escalate"] = float(big.greedy.correct)
     return t
@@ -138,9 +139,7 @@ def realised_targets(small: PoolRecord, big: PoolRecord | None, order: list[int]
     t = {"answer_now": float(small.greedy.correct)}
     if small.n_samples:
         idxs = [i for i in order if i < small.n_samples][:k]
-        votes = [small.canonical_sample_answers()[i] for i in idxs]
-        votes = [v for v in votes if v is not None]
-        t["sample_more"] = float(bool(votes) and small.label_correct(Counter(votes).most_common(1)[0][0]))
+        t["sample_more"] = greedy_vote_correct(small, idxs)
     if big is not None:
         t["escalate"] = float(big.greedy.correct)
     return t
@@ -624,9 +623,7 @@ class SecondStageEstimator:
                     if not idxs:
                         continue
                     X.append(post_sample_features(rec, idxs, p1))
-                    votes = [canon[i] for i in idxs if canon[i] is not None]
-                    top = Counter(votes).most_common(1)
-                    y.append(float(bool(top) and rec.label_correct(top[0][0])))
+                    y.append(greedy_vote_correct(rec, idxs))
                     group.append(gi)
         if len(set(group)) < 2 * self.n_folds:
             return self
