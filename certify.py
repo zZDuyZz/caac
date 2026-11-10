@@ -27,7 +27,8 @@ import json
 from pathlib import Path
 
 from caac.pool import families as F
-from caac.pool.estimator import EscalateGate, PerActionEstimator, SecondStageEstimator
+from caac.pool.estimator import (EscalateGate, PerActionEstimator, RecoveryEstimator,
+                                 SecondStageEstimator)
 from caac.pool.ltt import min_served_certifiable
 from caac.pool.protocol import (build_table, certified_frontier, certify, pick_max_coverage,
                                 pick_min_cost, plugin_select, prune, summarize)
@@ -36,8 +37,17 @@ from caac.pool.schema import load_pool
 
 DEFAULT_LAMS = "0.5,1,1.5,2,3,5,8,12,20,35,60"
 BASELINES = ("small_abstain", "big_abstain", "cascade_abstain", "sc_abstain", "esc_abstain",
-             "adaptive_consistency_abstain", "pricecheck")
-CAAC = ("caac", "caac_staged", "caac_staged_no_sample", "caac_staged_no_escalate")
+             "adaptive_consistency_abstain", "pricecheck", "conformal_cascade",
+             "conformal_cascade_abstain")
+# "caac_staged_value" is the recoverability arm: it buys a correcting action
+# only when the action's estimated NET value clears rho, so a question nothing
+# can repair is abstained on before the big model is billed. "caac_staged" is
+# the same policy gating on P(correct | action) -- the confidence-shaped arm
+# the new one has to beat. Both run; neither is assumed to win.
+CAAC = ("caac", "caac_staged", "caac_staged_value", "caac_staged_no_sample",
+        "caac_staged_no_escalate")
+# A net-value gate lives on the [-1, 1] scale, not on a probability.
+VALUE_RHOS = (-1.0, 0.0, 0.02, 0.05, 0.1)
 
 
 def hash_split(pool: dict, frac: float, seed: str = "caac-split-v2"):
@@ -53,30 +63,39 @@ def baseline_family(name: str, n_big: int):
             "cascade_abstain": F.cascade_abstain, "sc_abstain": F.sc_abstain,
             "esc_abstain": lambda: F.adaptive_abstain("esc"),
             "adaptive_consistency_abstain": lambda: F.adaptive_abstain("adaptive_consistency"),
-            "pricecheck": lambda: F.pricecheck(n_big)}[name]()
+            "pricecheck": lambda: F.pricecheck(n_big),
+            "conformal_cascade": F.conformal_cascade,
+            "conformal_cascade_abstain": lambda: F.conformal_cascade(abstain_last=True),
+            }[name]()
 
 
 def fit_estimators(tr_s, tr_b, k_steps):
     """Stage 1 (pre-action), stage 2 (after samples), stage 3 (after escalation),
-    all on the TRAIN split only."""
+    and the net-value estimator the allocator gates on -- all on TRAIN only."""
     q = sorted(tr_s)
     est = F.Memo(PerActionEstimator(k=8).fit(q, tr_s, tr_b))
     est2 = SecondStageEstimator(k=max(k_steps), ks=k_steps).fit(
         q, tr_s, make_orders(min(r.n_samples for r in tr_s.values()), 4, seed=11),
         stage1=lambda r: est(r))
     est3 = EscalateGate().fit(q, tr_s, tr_b, stage1=lambda r: est(r)) if tr_b else None
-    return est, est2, est3
+    rec = F.Memo(RecoveryEstimator(k=max(k_steps)).fit(q, tr_s, tr_b))
+    return est, est2, est3, rec
 
 
 def caac_family(name: str, ests, lam: float, big_model, k_steps):
-    est, est2, est3 = ests
+    est, est2, est3, rec = ests
     full = ("answer_now", "sample_more", "escalate")
     if name == "caac":
         return F.caac(est, lam, big_model)
-    acts = {"caac_staged": full, "caac_staged_no_sample": ("answer_now", "escalate"),
+    acts = {"caac_staged": full, "caac_staged_value": full,
+            "caac_staged_no_sample": ("answer_now", "escalate"),
             "caac_staged_no_escalate": ("answer_now", "sample_more")}[name]
-    return F.caac_staged_family(est, est2, lam, big_model, actions=acts, k_steps=k_steps,
-                                name=name, est3=est3)
+    value_gate = name == "caac_staged_value"
+    return F.caac_staged_family(
+        est, est2, lam, big_model, actions=acts, k_steps=k_steps, name=name, est3=est3,
+        rho_mode="value" if value_gate else "phat",
+        recovery=rec if value_gate else None,
+        rhos=VALUE_RHOS if value_gate else F.RHO_GRID)
 
 
 def evaluate(fam, train, calib, test, a, orders, lams, coverages):
@@ -135,7 +154,10 @@ def main():
     ap.add_argument("--lams", default=DEFAULT_LAMS)
     ap.add_argument("--coverages", default="0.5,0.6,0.7,0.8,0.9")
     ap.add_argument("--families", default=",".join(BASELINES + CAAC))
-    ap.add_argument("--k-steps", default="4,8,16")
+    # 2 is in the ladder because at a realistic price ratio a 4-sample vote can
+    # already cost as much as one escalation, and then the cheap repair has to
+    # be cheaper than that to exist at all.
+    ap.add_argument("--k-steps", default="2,4,8,16")
     ap.add_argument("--perms", type=int, default=10, help="draw orders averaged on test")
     ap.add_argument("--json", default=None)
     a = ap.parse_args()

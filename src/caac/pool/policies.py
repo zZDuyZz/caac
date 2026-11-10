@@ -46,11 +46,18 @@ __all__ = [
     "caac_staged",
     "pricecheck",
     "agreement_with_greedy",
+    "calls_for_action",
     "CHECKS",
     "ACTIONS",
+    "RHO_MODES",
 ]
 
 ACTIONS = ("answer_now", "sample_more", "escalate", "abstain")
+
+# What scale ``caac_staged``'s rho gate lives on. "phat" is the original rule;
+# the other two gate on the estimated net value of the action, which is what
+# lets the policy abstain before buying compute that cannot help.
+RHO_MODES = ("phat", "delta", "value")
 
 
 @dataclass
@@ -245,7 +252,8 @@ def _action_cost_scalar(small: PoolRecord, big: PoolRecord, action: str, k: int,
     return cost_profiles(calls)[profile_fn]
 
 
-def _calls_for_action(small, big, action, k, order):
+def calls_for_action(small, big, action, k, order):
+    """What one action would pay for, so every module prices it the same way."""
     if action == "answer_now":
         return [_greedy_call(small)]
     if action == "sample_more":
@@ -258,6 +266,9 @@ def _calls_for_action(small, big, action, k, order):
     if action == "abstain":
         return [_greedy_call(small)]  # paid for the greedy before abstaining
     raise ValueError(action)
+
+
+_calls_for_action = calls_for_action   # internal alias, kept for older callers
 
 
 def caac(
@@ -379,6 +390,9 @@ def caac_staged(
     cost_fn=None,
     escalate_gate=None,
     rho: float | None = None,
+    rho_mode: str = "phat",
+    recovery=None,
+    lam: float = 0.0,
 ) -> PolicyOutcome:
     """CAAC: pay for the cheapest promising step, re-decide on what it showed.
 
@@ -394,14 +408,32 @@ def caac_staged(
                        model's answers -- compared with each other, not gold)
         otherwise   -- abstain, having paid for everything it tried
 
-    ``rho`` decides what is worth trying: a correcting action is paid for only
-    if its stage-1 estimate reaches rho. Tried actions go cheapest first-step
-    first under ``cost_fn``, which is where the price ratio enters; it never
-    enters the guarantee. Without ``escalate_gate`` (or ``rho``) the older rule
-    applies: escalate only when the stage-1 estimate already clears tau.
+    ``rho`` decides what is worth trying, and ``rho_mode`` decides on what
+    scale, which is the difference between stopping on low confidence and
+    stopping because nothing left can help:
+
+      "phat"  -- the stage-1 estimate P(correct | a) reaches rho (the original
+                 rule, kept as the ablation arm)
+      "delta" -- the estimated NET gain over answering now reaches rho, so an
+                 action whose expected damage cancels its repairs is not bought
+      "value" -- the net gain minus ``lam`` times the extra cost reaches rho,
+                 the economic form: a repair has to be worth its price
+
+    The last two read ``recovery(small, big) -> {action: Delta_hat}``; with no
+    estimator they score 0, so only a non-positive rho buys anything, which is
+    the safe direction. When every correcting action fails the gate the policy
+    abstains having paid for the greedy turn alone -- abstention BEFORE the
+    expensive tier, not after it.
+
+    Tried actions go cheapest first-step first under ``cost_fn``, which is
+    where the price ratio enters; it never enters the guarantee. Without
+    ``escalate_gate`` (or ``rho``) the older rule applies: escalate only when
+    the stage-1 estimate already clears tau.
     """
     from caac.pool.ledger import cost_profiles
 
+    if rho_mode not in RHO_MODES:
+        raise ValueError(f"rho_mode must be one of {RHO_MODES}")
     price = cost_fn or (lambda calls: cost_profiles(calls)[cost_profile])
     steps = tuple(sorted(set(k_steps))) or (k,)
     phat = scorer(small, big)
@@ -410,17 +442,28 @@ def caac_staged(
     drawn: list[int] = []
 
     def done(out, gate, **extra):
-        out.meta.update({"phat": phat, "tau": tau, "rho": rho, "tried": tried, "gate": gate,
-                         "n_drawn": len(drawn), **extra})
+        out.meta.update({"phat": phat, "tau": tau, "rho": rho, "rho_mode": rho_mode,
+                         "tried": tried, "gate": gate, "n_drawn": len(drawn), **extra})
         return out
 
     if "answer_now" in actions and phat.get("answer_now", 0.0) >= tau:
         return done(PolicyOutcome(True, small.greedy.answer, small.greedy.correct, calls,
                                   "answer_now"), "stage1")
 
-    correcting = [a for a in actions if a != "answer_now"
-                  and (rho is None or phat.get(a, 0.0) >= rho)]
-    first_cost = {a: price(_calls_for_action(small, big, a, steps[0], order)) for a in correcting}
+    candidates = [a for a in actions if a != "answer_now"]
+    first_cost = {a: price(calls_for_action(small, big, a, steps[0], order))
+                  for a in candidates}
+    if rho is None:
+        correcting = candidates
+    elif rho_mode == "phat":
+        correcting = [a for a in candidates if phat.get(a, 0.0) >= rho]
+    else:
+        delta = recovery(small, big) if recovery is not None else {}
+        now_cost = price(calls_for_action(small, big, "answer_now", steps[0], order))
+        def gate_score(a: str) -> float:
+            d = delta.get(a, 0.0)
+            return d if rho_mode == "delta" else d - lam * (first_cost[a] - now_cost)
+        correcting = [a for a in candidates if gate_score(a) >= rho]
     rnd = 1
     for action in sorted(correcting, key=lambda a: (first_cost[a], a)):
         if action == "sample_more":

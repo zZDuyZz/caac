@@ -51,8 +51,9 @@ import numpy as np
 from caac.pool.schema import PoolRecord
 
 __all__ = [
-    "SERVING_ACTIONS", "FEATURE_GROUPS",
+    "SERVING_ACTIONS", "FEATURE_GROUPS", "RECOVERY_PARTS", "CORRECTING_ACTIONS",
     "features", "feature_names", "action_targets", "realised_targets",
+    "recovery_targets", "RecoveryEstimator",
     "LogisticHead", "Isotonic", "PerActionEstimator",
     "POST_FEATURES", "post_sample_features", "SecondStageEstimator",
     "ESC_FEATURES", "post_escalate_features", "EscalateGate",
@@ -61,6 +62,10 @@ __all__ = [
 # ``abstain`` is not estimated: it serves nothing, so its correctness is not
 # defined and its risk contribution is zero by construction.
 SERVING_ACTIONS = ("answer_now", "sample_more", "escalate")
+
+# Actions that can change the answer, and the two halves of their net value.
+CORRECTING_ACTIONS = ("sample_more", "escalate")
+RECOVERY_PARTS = ("gain", "harm")
 
 # Which features each group contributes. "qonly" is the ABLATION demanded by
 # Bulut (2609.03436): if prefix-based difficulty prediction is near chance on
@@ -139,6 +144,34 @@ def realised_targets(small: PoolRecord, big: PoolRecord | None, order: list[int]
     if big is not None:
         t["escalate"] = float(big.greedy.correct)
     return t
+
+
+def recovery_targets(small: PoolRecord, big: PoolRecord | None,
+                     k: int = 8) -> dict[str, dict[str, float]]:
+    """Gain and harm targets per correcting action, exact for this question.
+
+    ``gain`` is P(the greedy answer is wrong AND action a is right) and
+    ``harm`` is P(greedy right AND a wrong). They are JOINT, not conditional,
+    so one is zero for any given question -- the greedy outcome is already
+    known -- and
+
+        Delta_a = P(correct after a) - P(correct now) = P(gain_a) - P(harm_a)
+
+    holds exactly. Fitting the two halves separately keeps both targets inside
+    [0, 1], where the logistic head and the isotonic calibrator are valid; a
+    single head on the signed difference would be neither.
+    """
+    from caac.pool.recovery import sample_correct_prob
+
+    now = bool(small.greedy.correct)
+    ps = sample_correct_prob(small, k) if small.n_samples else None
+    pe = None if big is None else float(big.greedy.correct)
+    out: dict[str, dict[str, float]] = {}
+    for a, p in (("sample_more", ps), ("escalate", pe)):
+        if p is None:
+            continue
+        out[a] = {"gain": 0.0 if now else p, "harm": (1.0 - p) if now else 0.0}
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -395,6 +428,117 @@ class PerActionEstimator:
         e.base_rate = dict(d.get("base_rate", {}))
         e.heads = {a: LogisticHead.from_dict(v) for a, v in d["heads"].items()}
         e.cals = {a: Isotonic.from_dict(v) for a, v in d["cals"].items()}
+        return e
+
+
+# --------------------------------------------------------------------------- #
+# What the allocator thresholds: the NET value of buying an action.
+#
+# A confidence gate asks whether the current answer is trustworthy. This asks
+# the question the compute budget turns on -- whether the next action would
+# repair a wrong answer, and whether it might break a right one -- so a
+# question nothing can repair is abstained on BEFORE the expensive tier is
+# paid for, rather than after.
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class RecoveryEstimator:
+    """Delta_hat(a) = P_hat(gain_a) - P_hat(harm_a) from pre-action features only.
+
+    Two calibrated heads per correcting action, fitted on every question (the
+    targets are joint, so the impossible half is a genuine zero rather than a
+    missing row). Features come from ``features()``, which reads the question
+    and the greedy turn and nothing the action itself produced -- a head that
+    saw the samples would score ``sample_more`` perfectly and be useless in
+    deployment.
+
+    Callable as the ``recovery`` argument of ``policies.caac_staged``.
+    """
+
+    groups: tuple[str, ...] = ("qonly", "greedy")
+    k: int = 8
+    l2: float = 1.0
+    n_folds: int = 5
+    seed: int = 0
+    calibrate: bool = True
+    heads: dict[str, LogisticHead] = field(default_factory=dict)
+    cals: dict[str, Isotonic] = field(default_factory=dict)
+    extra_dim: int = 0
+    base_rate: dict[str, float] = field(default_factory=dict)
+
+    @staticmethod
+    def _key(action: str, part: str) -> str:
+        return f"{action}.{part}"
+
+    def fit(self, qids, small, big=None, extras=None) -> "RecoveryEstimator":
+        qids = list(qids)
+        X = np.asarray([features(small[q], self.groups, (extras or {}).get(q))
+                        for q in qids], dtype=float)
+        self.extra_dim = X.shape[1] - len(feature_names(self.groups))
+        targets = [recovery_targets(small[q], (big or {}).get(q), self.k) for q in qids]
+        for a in CORRECTING_ACTIONS:
+            rows = [i for i, t in enumerate(targets) if a in t]
+            if len(rows) < 2 * self.n_folds:
+                continue
+            idx = np.asarray(rows, dtype=int)
+            Xa = X[idx]
+            for part in RECOVERY_PARTS:
+                ya = np.asarray([targets[i][a][part] for i in rows], dtype=float)
+                key = self._key(a, part)
+                self.base_rate[key] = float(ya.mean())
+                oof = np.zeros(len(rows))
+                for fold in _folds(len(rows), self.n_folds, self.seed):
+                    mask = np.ones(len(rows), dtype=bool)
+                    mask[fold] = False
+                    if mask.sum() < 2:
+                        oof[fold] = ya.mean()
+                        continue
+                    oof[fold] = LogisticHead(self.l2).fit(Xa[mask], ya[mask]).predict(Xa[fold])
+                self.heads[key] = LogisticHead(self.l2).fit(Xa, ya)
+                self.cals[key] = Isotonic().fit(oof, ya) if self.calibrate else Isotonic()
+        return self
+
+    def parts_one(self, small: PoolRecord, extra=None) -> dict[str, float]:
+        """The fitted gain/harm probabilities, keyed ``action.part``."""
+        x = np.asarray([features(small, self.groups, extra)], dtype=float)
+        out = {}
+        for key, head in self.heads.items():
+            raw = float(head.predict(x)[0])
+            out[key] = float(self.cals[key].predict([raw])[0]) if self.calibrate else raw
+        return out
+
+    def delta_one(self, small: PoolRecord, extra=None) -> dict[str, float]:
+        p = self.parts_one(small, extra)
+        out = {}
+        for a in CORRECTING_ACTIONS:
+            g, h = self._key(a, "gain"), self._key(a, "harm")
+            if g in p or h in p:
+                out[a] = p.get(g, 0.0) - p.get(h, 0.0)
+        return out
+
+    def __call__(self, small: PoolRecord, big: PoolRecord | None = None) -> dict[str, float]:
+        """``big`` is accepted and ignored: in deployment it has not run yet."""
+        return self.delta_one(small)
+
+    def to_json(self) -> str:
+        return json.dumps({
+            "groups": list(self.groups), "k": self.k, "l2": self.l2,
+            "n_folds": self.n_folds, "seed": self.seed, "calibrate": self.calibrate,
+            "extra_dim": self.extra_dim, "base_rate": self.base_rate,
+            "feature_names": feature_names(self.groups, self.extra_dim),
+            "heads": {key: h.to_dict() for key, h in self.heads.items()},
+            "cals": {key: c.to_dict() for key, c in self.cals.items()},
+        }, indent=2)
+
+    @classmethod
+    def from_json(cls, s: str) -> "RecoveryEstimator":
+        d = json.loads(s)
+        e = cls(groups=tuple(d["groups"]), k=d["k"], l2=d["l2"], n_folds=d["n_folds"],
+                seed=d["seed"], calibrate=d["calibrate"], extra_dim=d["extra_dim"])
+        e.base_rate = dict(d.get("base_rate", {}))
+        e.heads = {key: LogisticHead.from_dict(v) for key, v in d["heads"].items()}
+        e.cals = {key: Isotonic.from_dict(v) for key, v in d["cals"].items()}
         return e
 
 

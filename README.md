@@ -10,6 +10,22 @@ objective, so the price ratio between the models can be swept at evaluation time
 without touching the guarantee. Every baseline goes through the same
 certification protocol.
 
+What the controller estimates is **recoverability**, not confidence. A
+selective cascade asks whether its current answer is trustworthy; this asks
+whether the next action would actually repair a wrong answer, which of the
+available repairs is cheapest, and when no repair is worth its price -- so a
+question nothing can fix is abstained on *before* the expensive tier is billed
+rather than after. The value of an action is therefore net,
+
+    Delta_a = P(correct after a) - P(correct now) = P(gain_a) - P(harm_a),
+
+because escalating or re-voting can also lose an answer the small model had
+right. `recovery_table.py` measures where failures sit (four rescue groups, and
+three cost-dependent regions: repairable cheaply, only expensively, or not at
+all within this action set and sample budget), and `certify.py` runs the
+net-value gate and the confidence gate as two arms of the same policy so the
+comparison is in the results rather than in the design.
+
 The repository follows one rule: **the GPU generates a sample pool once;
 everything else runs offline on CPU** by replaying that pool (policies,
 baselines, calibration, certification, cost accounting).
@@ -75,6 +91,9 @@ All pools of one tag share one protocol, and the scripts enforce it rather than 
 ## Offline analysis (CPU)
 
 ```bash
+# where do the failures sit? four rescue groups and three regions, per price ratio
+python recovery_table.py --small P/math500_qs.jsonl.gz --big P/math500_qb.jsonl.gz \
+    --k 16 --lams 1,1.5,4.5 --json out/recovery_math500.json
 # every method certified under one protocol; train / calib / test share no question
 python certify.py --train-small P/a3_math_train_qs.jsonl.gz --train-big P/a3_math_train_qb.jsonl.gz \
     --calib-small P/a3_math_test_ex500_qs.jsonl.gz --calib-big P/a3_math_test_ex500_qb.jsonl.gz \
@@ -104,10 +123,11 @@ test, the oracle, and which method is cheapest where (the phase map).
 | `regrade_pool.py`, `compare_pools.py`, `smoke_check.py`, `s2_summary.py` | re-grading, determinism check, smoke gate, session summary |
 | `make_qids.py`, `qids/` | stratified question ids for the calibration/train splits |
 | `certify.py`, `resplit.py` | the main comparison under one certification protocol, and its validity check |
+| `recovery_table.py` | which action repairs a wrong answer, and at what price: the rescue groups and regions the allocation claim rests on |
 | `chow_frontier.py`, `train_estimator.py`, `run_baselines.py` | the Chow ceiling, a stand-alone estimator fit, the always-answer sweep |
 | `verify_params.py` | parameter counts (config formula, or exact from safetensors headers) checked against the cost registry |
 | `session2_*.sh` | one-command GPU session |
-| `src/caac/pool/` | pool schema with label-free answer classes, policies, method families, the certification protocol, estimators (pre-action, after sampling, after escalation), LTT, Chow frontier, adaptive-sampling baselines, cost ledger |
+| `src/caac/pool/` | pool schema with label-free answer classes, policies, method families, the certification protocol, estimators (pre-action, net value, after sampling, after escalation), recoverability measurement, LTT, Chow frontier, adaptive-sampling baselines, cost ledger |
 | `src/caac/data/`, `src/caac/eval/` | benchmark loaders (incl. clean sets), the single chat prompt, answer matching, Math-Verify grading, calibration metrics |
 | `outputs/a2/` | pilot pools (Qwen2.5), kept for the appendix |
 

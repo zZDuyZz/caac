@@ -5,8 +5,19 @@ conservative to liberal so a one-dimensional grid is one fixed-sequence path.
 
   small_abstain     small greedy, serve iff its confidence clears t
   big_abstain       big greedy only, serve iff its confidence clears t
-  cascade_abstain   Trust-or-Escalate style: serve small if confident, else ask
-                    the big model and serve it if confident, else abstain
+  cascade_abstain   serve small if confident, else ask the big model and serve
+                    it if confident, else abstain. Three published methods have
+                    this shape and differ in the signal and the calibration,
+                    not in the actions: Trust-or-Escalate (2407.18370, judges,
+                    fixed-sequence testing), LEC (2512.01556, two thresholds
+                    under an FDR constraint) and Fanconi & van der Schaar
+                    (2506.11887, confidence then a human tier). Replayed on one
+                    pool they collapse onto this family, which is why the
+                    comparison varies the signal rather than adding three
+                    near-identical policies.
+  conformal_cascade Conformal Cascade (2607.25018): a tier commits when its
+                    sampled answer set is a singleton; fixed sample count, and
+                    no abstention unless asked for
   sc_abstain        k small samples, serve the vote iff its share clears t
   adaptive_abstain  ESC / Adaptive-Consistency, then the same vote-share gate
   pricecheck        PriceCheck's schedule family (2609.37493): re-solve checks
@@ -34,8 +45,8 @@ from caac.pool.protocol import Family, split_cost
 from caac.pool.schema import PoolRecord
 
 __all__ = ["CONF_GRID", "TAU_GRID", "SHARE_GRID", "lam_cost", "small_abstain", "big_abstain",
-           "cascade_abstain", "sc_abstain", "adaptive_abstain", "pricecheck", "caac",
-           "caac_staged_family", "RHO_GRID", "oracle", "Memo"]
+           "cascade_abstain", "sc_abstain", "adaptive_abstain", "conformal_cascade",
+           "pricecheck", "caac", "caac_staged_family", "RHO_GRID", "oracle", "Memo"]
 
 CONF_GRID = [0.999, 0.995, 0.99, 0.98, 0.97, 0.96, 0.95, 0.93, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.0]
 TAU_GRID = [0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.9, 0.88, 0.85, 0.8, 0.75, 0.7,
@@ -132,6 +143,50 @@ def sc_abstain(ks=(1, 2, 4, 8, 16), grid=SHARE_GRID) -> Family:
             return _abstain(calls)
         return fn
     return Family("sc_abstain", configs, make, paths)
+
+
+def conformal_cascade(n_small: int = 16, n_big: int = 16, grid=SHARE_GRID,
+                      abstain_last: bool = False) -> Family:
+    """Conformal Cascade (2607.25018): a tier is trusted when its answer set is
+    a singleton.
+
+    Each tier draws a FIXED number of samples and scores an answer class by
+    1 - its frequency; the prediction set keeps the classes scoring at or below
+    the calibrated threshold, which here is the grid over the frequency cut.
+    One class in the set means the tier commits; otherwise the query moves up.
+
+    Two differences from CAAC are the comparison, so they are kept exactly:
+    the sample count never adapts, and the last tier has no abstention -- it
+    answers whatever it has. That caps how small an alpha the family can be
+    certified at, which is the point of putting it on the same axes.
+    ``abstain_last`` enables the natural extension (abstain when the big tier
+    is not a singleton either) so the family also has a risk-coverage curve;
+    the faithful version is the default.
+    """
+    def make(cut):
+        def fn(s: PoolRecord, b, order):
+            si = [i for i in order if i < s.n_samples][:n_small]
+            calls = [_samples_call(s, si, 0)]
+            canon = s.canonical_sample_answers()
+            top, share = _share([canon[i] for i in si])
+            if top is not None and share >= cut:
+                return PolicyOutcome(True, top, s.label_correct(top), calls, "sample_more",
+                                     {"tier": "small", "share": share})
+            bi = [i for i in (order or []) if i < b.n_samples][:n_big]
+            # the big tier falls back to its greedy turn when the pool holds no
+            # samples for it, so the baseline is runnable on either pool shape
+            calls.append(_samples_call(b, bi, 1) if bi else _greedy_call(b, 1))
+            if bi:
+                btop, bshare = _share([b.canonical_sample_answers()[i] for i in bi])
+            else:
+                btop, bshare = b.greedy_label(), 1.0
+            if abstain_last and not (btop is not None and bshare >= cut):
+                return _abstain(calls, tier="big", share=bshare)
+            return PolicyOutcome(True, btop, b.label_correct(btop), calls, "escalate",
+                                 {"tier": "big", "share": bshare})
+        return fn
+    name = "conformal_cascade_abstain" if abstain_last else "conformal_cascade"
+    return Family(name, list(grid), make, needs_big=True)
 
 
 def adaptive_abstain(kind: str = "esc", grid=SHARE_GRID, max_k: int = 16) -> Family:
@@ -285,13 +340,22 @@ RHO_GRID = (0.0, 0.2, 0.4, 0.6)
 
 def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GRID,
                        actions=("answer_now", "sample_more", "escalate"),
-                       k_steps=(4, 8, 16), name: str = "caac_staged", est3=None,
-                       rhos=RHO_GRID) -> Family:
+                       k_steps=(2, 4, 8, 16), name: str = "caac_staged", est3=None,
+                       rhos=RHO_GRID, rho_mode: str = "phat", recovery=None) -> Family:
     """Configurations (rho, tau): one fixed-sequence path over tau per rho, so
-    delta is split over the few rho values only."""
+    delta is split over the few rho values only.
+
+    ``rho_mode`` selects what the rho gate means (see ``policies.RHO_MODES``).
+    "delta" and "value" need ``recovery``, a RecoveryEstimator, and are the arm
+    that abstains before buying compute that cannot repair the answer; "phat"
+    is the confidence-shaped arm it is compared against. ``rhos`` is read on
+    the gate's own scale, so a net-value gate wants a grid around zero.
+    """
     price = lam_cost(lam, big_model)
     scorer = est if isinstance(est, Memo) else Memo(est)
-    rhos = tuple(rhos) if est3 is not None else (None,)
+    rec = recovery if recovery is None or isinstance(recovery, Memo) else Memo(recovery)
+    gated = est3 is not None or (rho_mode != "phat" and rec is not None)
+    rhos = tuple(rhos) if gated else (None,)
     configs = [(r, t) for r in rhos for t in grid]
     paths = [[i * len(grid) + j for j in range(len(grid))] for i in range(len(rhos))]
 
@@ -301,7 +365,8 @@ def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GR
         def fn(s, b, order):
             return caac_staged(s, b, scorer, est2, tau=tau, order=order, k=max(k_steps),
                                actions=actions, k_steps=tuple(k_steps), cost_fn=price,
-                               escalate_gate=est3, rho=rho)
+                               escalate_gate=est3, rho=rho, rho_mode=rho_mode,
+                               recovery=rec, lam=lam)
         return fn
     return Family(name, configs, make, paths, needs_big="escalate" in actions)
 
