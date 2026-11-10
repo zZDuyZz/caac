@@ -177,3 +177,68 @@ def test_sample_seeds_are_consecutive_from_the_base():
     import build_pool
     assert build_pool.sample_seeds(2048, 3) == [2048, 2049, 2050]
     assert build_pool.sample_seeds(0, 0) == []
+
+
+def test_resume_refuses_a_changed_protocol(monkeypatch, tmp_path):
+    """A pool resumed at another token cap would mix two protocols under one manifest."""
+    _install_fakes(monkeypatch, [])
+    out = tmp_path / "g.jsonl.gz"
+    _run(monkeypatch, out, ["--max-tokens", "512"])
+    with pytest.raises(SystemExit) as e:
+        _run(monkeypatch, out, ["--max-tokens", "2048"])
+    assert "max_tokens" in str(e.value)
+    man = json.loads((tmp_path / "g.jsonl.gz.manifest.json").read_text())
+    assert man["max_tokens"] == 512                    # the refused run did not overwrite it
+    _run(monkeypatch, out, ["--max-tokens", "2048", "--allow-config-change"])
+    man = json.loads((tmp_path / "g.jsonl.gz.manifest.json").read_text())
+    assert man["max_tokens"] == 2048 and man["config_changes"]
+
+
+def test_manifest_conflicts_skips_keys_an_old_manifest_lacks():
+    import build_pool
+    old = {"model": "m", "max_tokens": 512}
+    assert build_pool.manifest_conflicts(old, {"model": "m", "max_tokens": 512, "env_flags": {}}) == []
+    assert len(build_pool.manifest_conflicts(old, {"model": "m", "max_tokens": 1024})) == 1
+
+
+def test_a_killed_append_is_repaired_before_resuming(monkeypatch, tmp_path):
+    """Cut the last gzip member of all three files, as a kill mid-write would; the resume
+    must keep the complete batches, redo the damaged one and leave every file readable."""
+    calls = []
+    _install_fakes(monkeypatch, calls)
+    out = tmp_path / "k.jsonl.gz"
+    _run(monkeypatch, out)                              # batches of 2 -> members of 2, 2, 1 lines
+    files = [out, tmp_path / "k.text.jsonl.gz", tmp_path / "k.tok.jsonl.gz"]
+    for f in files:
+        raw = f.read_bytes()
+        f.write_bytes(raw[:raw.rfind(b"\x1f\x8b\x08") + 14])   # header + 4 bytes of the last member
+    with pytest.raises(Exception):
+        _read(out)
+    calls.clear()
+    _run(monkeypatch, out)
+    assert sum(c[0] == "gen" for c in calls) == 2       # one greedy + one sample call: one batch
+    ids = [r["query_id"] for r in _read(out)]
+    assert len(ids) == 5 and len(set(ids)) == 5
+    for f in files[1:]:
+        assert {t["query_id"] for t in _read(f)} == set(ids)
+
+
+def test_repair_leaves_a_healthy_file_untouched(tmp_path):
+    from caac.pool.schema import append_texts, repair_jsonl
+    f = tmp_path / "s.jsonl.gz"
+    append_texts(f, [{"query_id": "a"}]); append_texts(f, [{"query_id": "b"}])
+    before = f.read_bytes()
+    assert repair_jsonl(f) == (2, False) and f.read_bytes() == before
+    assert repair_jsonl(tmp_path / "missing.jsonl.gz") == (0, False)
+
+
+def test_throughput_is_recorded_for_run_time_forecasts(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, [])
+    out = tmp_path / "th.jsonl.gz"
+    _run(monkeypatch, out)
+    thr = json.loads((tmp_path / "th.jsonl.gz.manifest.json").read_text())["throughput"]
+    # 5 questions: greedy 40 tokens + samples of 10, 11, 12, 13
+    assert thr["decode_tokens"] == 5 * (40 + 10 + 11 + 12 + 13) and thr["gen_seconds"] >= 0
+    _run(monkeypatch, out)                              # nothing to do: the totals survive
+    again = json.loads((tmp_path / "th.jsonl.gz.manifest.json").read_text())["throughput"]
+    assert again["decode_tokens"] == thr["decode_tokens"]

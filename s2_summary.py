@@ -97,15 +97,19 @@ def main():
     lines += ["", "## Determinism (re-generated GSM8K slices vs the main pool, same seeds)", ""]
     det_main = P / "gsm8k_qs.jsonl.gz"
     for nm, label, want in (("det_same_gsm8k_qs", "same batch composition", 0.98),
-                            ("det_gsm8k_qs", "different batch composition", None)):
+                            ("det_gsm8k_qs", "different batch composition", None),
+                            ("det_cross_gsm8k_qs", "same batch composition, other machine", None)):
         det_new = P / f"{nm}.jsonl.gz"
         if not (det_main.exists() and det_new.exists()):
             lines.append(f"- {label}: not run")
             continue
         from compare_pools import compare
         r = compare(load_pool(det_main), load_pool(det_new))
-        # Only the same-batch arm must match: V1 is not batch-invariant by design.
-        flag = ("  **<98%: INVESTIGATE (our pipeline, not vLLM)**"
+        # Only the same-batch arm is expected to match: V1 is not batch-invariant by design.
+        # A miss there is run-to-run variation on identical requests; it does not say whether
+        # the engine's scheduling or this pipeline causes it, so it is flagged, not attributed.
+        flag = ("  **<98%: identical requests gave different outputs -- CHECK before quoting a "
+                "reproducibility figure**"
                 if want is not None and r["greedy_answer_match"] < want else "")
         lines.append(f"- {label}: common={r['n_common']}  greedy={r['greedy_answer_match']:.3f}  "
                      f"length={r['greedy_len_match']:.3f}  samples={r['sample_match']:.3f}{flag}")

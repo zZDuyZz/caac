@@ -35,6 +35,16 @@ set +u; source "$VENV/bin/activate"; set -u   # +u: script activate có thể đ
 uv pip install "vllm==$VLLM_VERSION" --torch-backend=auto || uv pip install "vllm==$VLLM_VERSION"
 uv pip install datasets math-verify==0.9.0 pytest "huggingface_hub"
 uv pip install -e .
+echo "=== 2b. Cùng môi trường với các pool đã sinh (env_reference.txt) ==="
+# vLLM pins torch but lets transformers and others float, so two rental days can differ
+# without any error. Compare with the first GPU day and re-pin what moved.
+if ! python check_env.py env_reference.txt; then
+  PINS=$(python check_env.py env_reference.txt --pins)
+  if [ -n "$PINS" ]; then echo "ghim lại: $PINS"; uv pip install $PINS; fi
+  python check_env.py env_reference.txt || {
+    echo "!!!!!! Môi trường KHÁC với các pool đã sinh (xem trên). Gửi mình đoạn này trước khi chạy tiếp."
+    [ "${ALLOW_ENV_DRIFT:-0}" = 1 ] || exit 1; }
+fi
 python - <<PY
 import sys, vllm, transformers, torch
 print("python", sys.version.split()[0], "vllm", vllm.__version__, "tf", transformers.__version__,
@@ -96,4 +106,5 @@ for (name, split), f, n in [(("gsm8k","train"),"qids/a3_gsm8k_train.txt",1500),
 PY
 { python --version; uv pip freeze | grep -iE "^(vllm|torch|transformers|datasets|math-verify|huggingface|flashinfer|triton)"; } > /workspace/env_s2.txt
 nvidia-smi --query-gpu=name,driver_version --format=csv >> /workspace/env_s2.txt
+uv pip freeze > /workspace/env_s2_full.txt     # the whole environment, for the record
 echo "=== SETUP XONG -> bash session2_run.sh ==="

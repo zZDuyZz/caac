@@ -63,6 +63,7 @@ import argparse
 import hashlib
 import json
 import math
+import time
 from pathlib import Path
 
 
@@ -124,6 +125,22 @@ ENV_FLAGS = ("VLLM_USE_FLASHINFER_SAMPLER", "VLLM_ATTENTION_BACKEND", "CUDA_VISI
 def env_flags() -> dict:
     import os
     return {k: os.environ.get(k) for k in ENV_FLAGS}
+
+
+# What defines a pool. A pool resumed with any of these changed would silently mix two
+# protocols under one manifest (e.g. half the questions at one token cap, half at another).
+PROTOCOL_KEYS = ("model", "dataset", "split", "n_samples", "temperature", "max_tokens",
+                 "top_logprobs", "logprobs_mode", "thinking", "max_num_seqs", "max_model_len",
+                 "grader", "qids_file", "batch_size", "env_flags", "versions")
+
+
+def manifest_conflicts(old: dict, new: dict) -> list[str]:
+    """Protocol fields whose value differs between a pool's manifest and this run.
+
+    Keys absent from the old manifest (pools written before the key existed) are skipped.
+    """
+    return [f"{k}: pool has {old[k]!r}, this run has {new.get(k)!r}"
+            for k in PROTOCOL_KEYS if k in old and old[k] != new.get(k)]
 
 
 def mean_token_prob(logprobs: list[float]) -> float:
@@ -223,6 +240,8 @@ def main():
     p.add_argument("--logprobs-mode", default="raw_logprobs",
                    choices=["raw_logprobs", "processed_logprobs"],
                    help="vLLM V1 logprobs_mode; recorded in every record")
+    p.add_argument("--allow-config-change", action="store_true",
+                   help="resume a pool although its manifest disagrees with this run (not recommended)")
     args = p.parse_args()
 
     from vllm import LLM, SamplingParams
@@ -232,7 +251,8 @@ def main():
     from caac.data.benchmarks import load_benchmark
     from caac.eval.answer_match import extract_answer, normalize_answer, answers_match
     from caac.eval.grade import mathverify_available
-    from caac.pool.schema import text_sidecar_path, token_sidecar_path, append_texts
+    from caac.pool.schema import (text_sidecar_path, token_sidecar_path, append_texts,
+                                  repair_jsonl)
     from caac.data.prompts import build_chat_prompt
 
     if args.grader == "mathverify" and not mathverify_available():
@@ -274,6 +294,12 @@ def main():
     conf_sem = f"vllm_v1_{args.logprobs_mode}"
 
     # --- resume: which qids already have a complete record on disk ---
+    for pth in (outp, sidecar, toksidecar):
+        if pth is not None:
+            kept, fixed = repair_jsonl(pth)
+            if fixed:
+                print(f"REPAIRED {pth}: kept {kept} complete lines (the tail was cut by a kill)",
+                      flush=True)
     done = set()
     if outp.exists():
         import gzip
@@ -304,7 +330,22 @@ def main():
         "qids_file": args.qids_file,
         "batch_size": args.batch_size,
     }
-    Path(str(outp) + ".manifest.json").write_text(json.dumps(manifest, indent=2))
+    mpath = Path(str(outp) + ".manifest.json")
+    old = json.loads(mpath.read_text()) if mpath.exists() else {}
+    if done and old:
+        bad = manifest_conflicts(old, manifest)
+        if bad and not args.allow_config_change:
+            raise SystemExit(f"REFUSING to resume {outp}: it already holds {len(done)} questions "
+                             "generated under a different configuration:\n  " + "\n  ".join(bad) +
+                             "\nUse a new --out (or delete the pool and its sidecars) to start over.")
+        if bad:
+            print("WARNING: resuming across a configuration change:\n  " + "\n  ".join(bad), flush=True)
+            manifest["config_changes"] = old.get("config_changes", []) + [bad]
+    # generation time and tokens of this pool so far, for run-time forecasts (cap_curve.py)
+    thr = dict(old.get("throughput") or {"gen_seconds": 0.0, "decode_tokens": 0}) if done else \
+        {"gen_seconds": 0.0, "decode_tokens": 0}
+    manifest["throughput"] = thr
+    mpath.write_text(json.dumps(manifest, indent=2))
 
     import gzip
     def append(records: list[str]):
@@ -318,6 +359,7 @@ def main():
         prompts = [build_prompt(pr["question"]) for pr in batch]
         prefill = [len(tok(pr_text).input_ids) for pr_text in prompts]
 
+        t_gen = time.time()
         greedy_sp = SamplingParams(temperature=0.0, max_tokens=args.max_tokens,
                                    logprobs=args.top_logprobs)
         greedy_out = llm.generate(prompts, greedy_sp)
@@ -334,6 +376,9 @@ def main():
         flat = llm.generate(s_prompts, sps) if n > 0 else []
         sample_outs = [[o.outputs[0] for o in flat[i * n:(i + 1) * n]]
                        for i in range(len(batch))]
+        dt_gen = time.time() - t_gen
+        n_tok = sum(len(g.outputs[0].token_ids) for g in greedy_out) + \
+            sum(len(o.token_ids) for so in sample_outs for o in so)
 
         records, texts, toks = [], [], []
         for pr, pf, g, so in zip(batch, prefill, greedy_out, sample_outs):
@@ -375,7 +420,12 @@ def main():
         if toksidecar is not None:
             append_texts(toksidecar, toks)
         append(records)
-        print(f"wrote {start + len(batch)}/{len(todo)}", flush=True)
+        thr["gen_seconds"] = round(thr["gen_seconds"] + dt_gen, 1)
+        thr["decode_tokens"] += n_tok
+        thr["tok_per_s"] = round(thr["decode_tokens"] / max(thr["gen_seconds"], 1e-9), 1)
+        mpath.write_text(json.dumps(manifest, indent=2))
+        print(f"wrote {start + len(batch)}/{len(todo)}  ({n_tok} tokens in {dt_gen:.0f}s = "
+              f"{n_tok / max(dt_gen, 1e-9):.0f} tok/s)", flush=True)
 
     print("done", flush=True)
 

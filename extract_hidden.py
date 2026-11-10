@@ -116,6 +116,7 @@ def main():
     ap.add_argument("--dataset", required=True)
     ap.add_argument("--split", default="test")
     ap.add_argument("--qids-file", default=None)
+    ap.add_argument("--n-questions", type=int, default=None, help="first N only (smoke test)")
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--out", required=True)
     ap.add_argument("--dtype", default="bfloat16")
@@ -126,7 +127,7 @@ def main():
     from caac.data.benchmarks import load_benchmark
     from caac.data.prompts import build_chat_prompt, SUFFIX
 
-    items = load_benchmark(a.dataset, split=a.split)
+    items = load_benchmark(a.dataset, split=a.split, n=a.n_questions)
     if a.qids_file:
         keep = [l.strip() for l in open(a.qids_file) if l.strip()]
         by_id = {it["id"]: it for it in items}

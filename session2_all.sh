@@ -5,7 +5,7 @@
 #   cd /workspace && git clone https://github.com/zZDuyZz/caac.git && cd caac
 #   tmux new -s caac 'bash session2_all.sh 2>&1 | tee /workspace/s2.log'
 #
-# (tùy chọn) tự push kết quả lên GitHub ở cuối:  export GH_TOKEN=<PAT>  trước lệnh tmux.
+# Kết quả rời máy bằng tarball (scp). KHÔNG đặt GH_TOKEN/PAT trên máy thuê.
 # Thoát tmux giữ job chạy: Ctrl+b rồi d.  Vào lại: tmux attach -t caac.
 # Chạy lại lệnh y hệt sau khi bị ngắt -> tự bỏ qua chặng đã xong, resume pool dở.
 # =============================================================================

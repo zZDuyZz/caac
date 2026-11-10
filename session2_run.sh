@@ -38,9 +38,27 @@ if [ "${STOP_AFTER:-}" != capprobe ] && [ -z "${MML:-}" ]; then
   MML=$(python preflight_prompts.py --model $QS --model $QB $SETS) || { echo "preflight lỗi"; exit 1; }
 fi
 MML=${MML:-2048}
+# One protocol per TAG: every pool of a tag shares the caps, the context length and the GPU
+# type. The lock sits in $OUT, which travels in the outputs tarball, so a second machine is
+# checked against the first -- calibration pools at other caps than the test pools would
+# break the exchangeability the certificate rests on, and nothing downstream would notice.
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+LOCK="$OUT/protocol.lock"; NOW="MT_M=$MT_M MT_G=$MT_G MML=$MML GPU=$GPU_NAME"
+if [ "${STOP_AFTER:-}" != capprobe ]; then
+  if [ -f "$LOCK" ] && [ "$(cat "$LOCK")" != "$NOW" ]; then
+    echo "!!!!!! GIAO THỨC KHÁC với các pool đã có của TAG=$TAG:"
+    echo "   đã khóa : $(cat "$LOCK")"
+    echo "   lần này : $NOW"
+    echo "   Chạy lại với ĐÚNG MT_M/MT_G và cùng loại GPU như lần trước. Muốn đổi cap: dùng TAG mới."
+    [ "${ALLOW_PROTOCOL_CHANGE:-0}" = 1 ] || exit 1
+  fi
+  [ -f "$LOCK" ] || echo "$NOW" > "$LOCK"
+fi
 if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap 4096, max_model_len 6144)  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
 else echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; fi
 T0=$(date +%s)
+FREE_GB=$(df -BG --output=avail "$M" 2>/dev/null | tail -1 | tr -dc '0-9')
+echo "Dung lượng trống tại $M: ${FREE_GB:-?} GB$([ "${FREE_GB:-99}" -lt 10 ] && echo '   !!!!!! DƯỚI 10 GB — pool + tarball có thể không đủ chỗ')"
 BP="python build_pool.py --max-model-len $MML"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
 
 tick() { local e=$(( $(date +%s) - T0 )); printf '[%02dh%02dm | ~%d VND] ' $((e/3600)) $(((e%3600)/60)) $((e*${RATE:-52516}/3600)); }
@@ -82,6 +100,16 @@ s0_smoke() {
   python smoke_check.py "$P/smoke_gsm8k.jsonl.gz"    --min-correct 3 || return 1
   python smoke_check.py "$P/smoke_math.jsonl.gz"     --min-correct 1 || return 1
   python smoke_check.py "$P/smoke_gsm8k_qb.jsonl.gz" --min-correct 2 || return 1
+  # A4 reads hidden states through transformers, a different code path from vLLM. Try it on
+  # 5 questions now so that a failure is known hours before s5_hidden. Never fatal.
+  if timeout 900 python extract_hidden.py --model $QS --dataset gsm8k --n-questions 5 \
+       --out "$H/smoke_hidden.npz" > "$M/smoke_hidden_$TAG.log" 2>&1; then
+    echo "HIDDEN SMOKE OK"
+  else
+    echo "!!!!!! HIDDEN SMOKE FAIL — các pool KHÔNG bị ảnh hưởng và vẫn chạy tiếp. Gửi mình $M/smoke_hidden_$TAG.log:"
+    tail -8 "$M/smoke_hidden_$TAG.log"
+  fi
+  rm -f "$H"/smoke_hidden.npz*
   rm -f "$P"/smoke_*
 }
 s0_params() {
@@ -104,8 +132,8 @@ s2_compare() {
   # V1 không bất biến theo batch, nên có thể lệch nhẹ: CHỈ BÁO CÁO, không chặn.
   rm -f "$P"/det_gsm8k_qs*
   # (a) SAME batch composition as the main pool's first batch (150 questions, 16 samples,
-  #     batch-size 150). Nothing about the generate() call differs, so a mismatch here means
-  #     OUR pipeline is non-deterministic, not vLLM. Expect ~100%.
+  #     batch-size 150). Nothing about the generate() call differs, so this is the run-to-run
+  #     variation of identical requests (engine scheduling or this pipeline). Expect ~100%.
   $BP --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
       --max-tokens $MT_G --out "$P/det_same_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_same_gsm8k_qs.jsonl.gz" \
@@ -115,6 +143,18 @@ s2_compare() {
   #     Limitations section instead of leaving one alarming number.
   $BP --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens $MT_G --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
+  return 0
+}
+s3_cross() {
+  # Arm (a) of s2_compare again -- same slice, seeds and batch composition -- on THIS machine,
+  # when the test pools were generated on another one (session2_restore.sh leaves the flag).
+  # It measures whether two machines of the same GPU type produce the same pool. Report only.
+  [ -f "$M/.s2_restored_$TAG" ] && [ -f "$P/gsm8k_qs.jsonl.gz" ] || { echo "pool test sinh tại máy này — không cần so chéo máy"; return 0; }
+  rm -f "$P"/det_cross_gsm8k_qs*
+  $BP --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
+      --max-tokens $MT_G --out "$P/det_cross_gsm8k_qs.jsonl.gz" || return 0
+  python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_cross_gsm8k_qs.jsonl.gz" \
+      | tee "$OUT/determinism_cross_machine.txt"
   return 0
 }
 # A3 = train + calibration. Calibration must run the SAME policies as test, so it needs as many
@@ -140,10 +180,15 @@ s6_collect() {
   cp "$P"/*.jsonl.gz.manifest.json "$OUT"/ 2>/dev/null
   for f in "$P"/*.jsonl.gz; do case "$f" in *.text.*|*.tok.*) ;; *) cp "$f" "$OUT"/;; esac; done
   cp qids/*.txt qids/*.summary.json "$OUT"/ 2>/dev/null
-  cp "$M/env_s2.txt" "$OUT"/ 2>/dev/null
+  # one record per machine: a tag's pools may come from two rentals (2a, 2b)
+  HN=$(hostname)
+  cp "$M/env_s2.txt" "$OUT/env_s2.txt" 2>/dev/null; cp "$M/env_s2.txt" "$OUT/env_s2.$HN.txt" 2>/dev/null
+  cp "$M/env_s2_full.txt" "$OUT/env_s2_full.$HN.txt" 2>/dev/null
+  cp "$M/smoke_hidden_$TAG.log" "$OUT/smoke_hidden.$HN.log" 2>/dev/null
   ls -1 "$M"/"$MK"* 2>/dev/null | xargs -r -n1 basename > "$OUT/markers.txt"   # for session2_restore.sh
-  { echo "tag=$TAG max_tokens_math=$MT_M max_tokens_gsm8k=$MT_G max_model_len=$MML"
-    echo "VLLM_USE_FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; nvidia-smi --query-gpu=name,driver_version --format=csv,noheader; hostname; } > "$OUT/protocol.txt"
+  { echo "--- $(date -u +%FT%TZ) host=$HN stop_after=${STOP_AFTER:-none}"
+    echo "tag=$TAG max_tokens_math=$MT_M max_tokens_gsm8k=$MT_G max_model_len=$MML"
+    echo "VLLM_USE_FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; nvidia-smi --query-gpu=name,driver_version --format=csv,noheader; } >> "$OUT/protocol.txt"
   cp "$H"/*.manifest.json "$OUT"/ 2>/dev/null
   for f in "$P"/*.jsonl.gz; do   # bảng bất đồng grader (ghi vào log, không giữ file)
     case "$f" in *.text.*|*.tok.*|*.regraded.*|*/det_*) continue;; esac
@@ -151,6 +196,7 @@ s6_collect() {
   done > "$OUT/grader_disagreement.log" 2>&1
   rm -f /tmp/rg.jsonl.gz
   python s2_summary.py --pools "$P" --out "$OUT/s2_summary.md" > /dev/null
+  echo "Hidden-state files: $(ls "$H"/*.npz 2>/dev/null | wc -l) (5 after a full run; 0 after part 2a)" >> "$OUT/s2_summary.md"
   tar -cf "$BULK" -C "$M" "pools_$TAG" hidden                # sidecar + hidden: KHÔNG vào git
 }
 
@@ -171,8 +217,14 @@ if [ "${STOP_AFTER:-}" = "test_pools" ]; then
   stage s6_part1 s6_collect  || die "gom kết quả lỗi"
   echo "$(tick)>>> PHẦN 2a XONG (đã dừng sau pool test theo STOP_AFTER). Chưa chạy A3/A4."
 else
+  stage s3_cross s3_cross
   stage s4_a3 s4_a3            || die "A3 lỗi"
-  stage s5_hidden s5_hidden    || die "A4 hidden state lỗi"
+  # Hidden states feed one optional ablation; the pools are the deliverable. A failure here
+  # must not stop the run before the pools are collected and packed.
+  HID_BEFORE=0; [ -f "$M/${MK}s5_hidden" ] && HID_BEFORE=1
+  stage s5_hidden s5_hidden    || echo "$(tick)!!!!!! A4 hidden state LỖI — BỎ QUA, các pool không bị ảnh hưởng. Gửi mình đoạn log ở trên. Tiếp tục gom kết quả."
+  # hidden states that arrive on a later attempt must still reach the tarball
+  [ "$HID_BEFORE" = 0 ] && [ -f "$M/${MK}s5_hidden" ] && rm -f "$M/${MK}s6_collect"
   stage s6_collect s6_collect  || die "gom kết quả lỗi"
 fi
 cp "$M"/s2*.log "$OUT"/ 2>/dev/null || true

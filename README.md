@@ -49,17 +49,28 @@ the engine); do not install the `gpu` extra into a CPU environment.
 ```bash
 cd /workspace && git clone https://github.com/zZDuyZz/caac.git && cd caac
 # 0) token caps: probe train questions at a high cap, read cap_curve.txt
-tmux new -s caac 'TAG=v3 STOP_AFTER=capprobe bash session2_all.sh 2>&1 | tee /workspace/s2.log'
+tmux new -s caac 'TAG=v3 STOP_AFTER=capprobe bash session2_all.sh 2>&1 | tee -a /workspace/s2.log'
 # 1) setup, smoke (small AND big model), parameter count, test pools, determinism
-tmux new -s caac 'TAG=v3 MT_M=<cap> MT_G=<cap> STOP_AFTER=test_pools bash session2_all.sh 2>&1 | tee /workspace/s2.log'
+tmux new -s caac 'TAG=v3 MT_M=<cap> MT_G=<cap> STOP_AFTER=test_pools bash session2_all.sh 2>&1 | tee -a /workspace/s2.log'
 # 2) same command without STOP_AFTER -> train/calibration pools (A3) and hidden states (A4);
-#    on a fresh machine run `bash session2_restore.sh v3` first
-tmux new -s caac 'TAG=v3 MT_M=<cap> MT_G=<cap> bash session2_all.sh 2>&1 | tee /workspace/s2.log'
+#    on a fresh machine copy the two tarballs to /workspace and run `bash session2_restore.sh v3` first
+tmux new -s caac 'TAG=v3 MT_M=<cap> MT_G=<cap> bash session2_all.sh 2>&1 | tee -a /workspace/s2.log'
 ```
 
 Each stage leaves a marker file, so re-running the same command resumes. The run
 ends with `outputs/s2_<TAG>/s2_summary.md` and `/workspace/s2_bulk_<TAG>.tar` (text and
 per-token sidecars, hidden states — these are **not** committed to git).
+
+All pools of one tag share one protocol, and the scripts enforce it rather than trust it:
+
+- `env_reference.txt` lists the package versions of the first GPU day; `session2_setup.sh`
+  compares every new machine with it (`check_env.py`) and re-pins what moved.
+- `outputs/s2_<TAG>/protocol.lock` records the token caps, the context length and the GPU
+  type of the tag's first run; a later run with other values stops before generating.
+- `build_pool.py` refuses to resume a pool whose manifest disagrees with the current
+  arguments, and repairs a file whose tail was cut by a kill before appending to it.
+- The smoke test runs again on every machine, and when the test pools came from another
+  machine a 150-question slice is regenerated and compared with them.
 
 ## Offline analysis (CPU)
 

@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
+import zlib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterator
@@ -180,7 +182,6 @@ def write_records(path: str | Path, records: list[PoolRecord]) -> None:
     with opener() as f:
         for rec in records:
             f.write(record_to_json(rec) + "\n")
-    import os
     os.replace(tmp, path)
 
 
@@ -241,6 +242,43 @@ def append_texts(path: str | Path, items: list[dict]) -> None:
     with f:
         for it in items:
             f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+
+def repair_jsonl(path: str | Path) -> tuple[int, bool]:
+    """Drop the damaged tail of an append-only jsonl(.gz) file; return (lines kept, rewritten).
+
+    A process killed in the middle of an append leaves a truncated gzip member. Appending
+    after it makes every later member unreadable, so the text of all later batches would be
+    lost without any error at write time. Called before resuming a pool.
+    """
+    path = Path(path)
+    if not path.exists():
+        return 0, False
+    kept, broken = 0, False
+    try:
+        with _open(path, "r") as f:
+            for line in f:
+                if not line.endswith("\n"):
+                    broken = True
+                    break
+                try:
+                    json.loads(line)
+                except ValueError:
+                    broken = True
+                    break
+                kept += 1
+    except (EOFError, OSError, zlib.error, UnicodeDecodeError):
+        broken = True
+    if not broken:
+        return kept, False
+    tmp = path.with_name(path.name + ".repair")
+    out = gzip.open(tmp, "wt", encoding="utf-8") if str(path).endswith(".gz") \
+        else open(tmp, "w", encoding="utf-8")
+    with out, _open(path, "r") as f:
+        for _ in range(kept):
+            out.write(f.readline())
+    os.replace(tmp, path)
+    return kept, True
 
 
 def load_texts(path: str | Path) -> dict[str, dict]:
