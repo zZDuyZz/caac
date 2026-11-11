@@ -77,10 +77,20 @@ class Table:
     rounds: np.ndarray          # (Q, C) sequential rounds (latency proxy)
     actions: list = field(default_factory=list)   # per config: {action: share of questions}
     action_q: np.ndarray | None = None            # (Q, C) action taken (one-order tables only)
+    waste_small: np.ndarray | None = None         # (Q, C) small-model tokens spent beyond the greedy turn on an unserved question
+    waste_big: np.ndarray | None = None           # (Q, C) big-model tokens spent on an unserved question
 
     def cost(self, lam: float) -> np.ndarray:
         """Cost in small-model tokens when one big-model token costs ``lam`` of them."""
         return self.tok_small + lam * self.tok_big
+
+    def waste(self, lam: float) -> np.ndarray | None:
+        """Cost that bought nothing: everything beyond the greedy turn, on questions
+        the policy then declined to answer. The greedy turn itself is the price of
+        finding out, so it is not counted."""
+        if self.waste_small is None:
+            return None
+        return self.waste_small + lam * self.waste_big
 
 
 def _flops(calls) -> float:
@@ -108,6 +118,7 @@ def build_table(family: Family, qids, small: dict[str, PoolRecord],
     shape = (Q, C)
     served, wrong = np.zeros(shape), np.zeros(shape)
     ts, tb, fl, rd = np.zeros(shape), np.zeros(shape), np.zeros(shape), np.zeros(shape)
+    ws, wb = np.zeros(shape), np.zeros(shape)
     action_q = np.empty(shape, dtype=object) if R == 1 else None
     mix = [dict() for _ in range(C)]
     fns = [family.make(cfg) for cfg in family.configs]
@@ -125,13 +136,20 @@ def build_table(family: Family, qids, small: dict[str, PoolRecord],
                 ss, bb = split_cost(out.calls, bm)
                 ts[qi, ci] += ss / R
                 tb[qi, ci] += bb / R
+                if not out.served:
+                    first = out.calls[0] if out.calls else None
+                    floor = (first.prefill_tokens + sum(first.decode_tokens)
+                             if first is not None and first.model == s.model
+                             and first.decode_tokens == [s.greedy.decode_tokens] else 0)
+                    ws[qi, ci] += max(0.0, ss - floor) / R
+                    wb[qi, ci] += bb / R
                 fl[qi, ci] += _flops(out.calls) / R
                 rd[qi, ci] += len({c.round_index for c in out.calls}) / R
                 mix[ci][out.action] = mix[ci].get(out.action, 0.0) + 1.0 / (R * Q)
                 if action_q is not None:
                     action_q[qi, ci] = out.action
     return Table(family.name, qids, list(family.configs), family.testing_paths(),
-                 served, wrong, ts, tb, fl, rd, mix, action_q)
+                 served, wrong, ts, tb, fl, rd, mix, action_q, ws, wb)
 
 
 def prune(family: Family, train: Table, n_calib: int, alpha: float, delta: float,
@@ -200,11 +218,18 @@ def summarize(table: Table, rows, j: int, lam: float = 1.0) -> dict:
         "selective_risk": wrong / served if served else 0.0,
         "accuracy": (served - wrong) / n if n else 0.0,
         "cost": float(table.cost(lam)[r, j].mean()) if n else 0.0,
+        "waste_share": _waste_share(table, r, j, lam),
         "tok_small": float(table.tok_small[r, j].mean()) if n else 0.0,
         "tok_big": float(table.tok_big[r, j].mean()) if n else 0.0,
         "flops": float(table.flops[r, j].mean()) if n else 0.0,
         "rounds": float(table.rounds[r, j].mean()) if n else 0.0,
     }
+
+
+def _waste_share(table: Table, r, j: int, lam: float) -> float:
+    w = table.waste(lam)
+    total = float(table.cost(lam)[r, j].sum())
+    return float(w[r, j].sum() / total) if w is not None and total > 0 else 0.0
 
 
 def pick_max_coverage(table: Table, rows, ok: np.ndarray) -> int | None:

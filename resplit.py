@@ -61,7 +61,7 @@ def main():
     ap.add_argument("--train-big", default=None)
     ap.add_argument("--pool-small", required=True)
     ap.add_argument("--pool-big", default=None)
-    ap.add_argument("--families", default="pricecheck,cascade_abstain,sc_abstain,caac_staged,caac_staged_value")
+    ap.add_argument("--families", default="pricecheck,cascade_abstain,sc_abstain,caac_staged,caac_staged_value,caac_staged_state")
     ap.add_argument("--splits", type=int, default=500)
     ap.add_argument("--calib-frac", type=float, default=0.5)
     ap.add_argument("--alpha", type=float, default=0.10)

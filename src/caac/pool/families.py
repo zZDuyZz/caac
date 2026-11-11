@@ -330,14 +330,14 @@ class Memo:
 
 def caac(est, lam: float, big_model: str | None, grid=TAU_GRID,
          actions=("answer_now", "sample_more", "escalate"), k: int = 8,
-         name: str = "caac") -> Family:
+         name: str = "caac", cost_model=None) -> Family:
     price = lam_cost(lam, big_model)
     scorer = est if isinstance(est, Memo) else Memo(est)
 
     def make(tau):
         def fn(s, b, order):
             return caac_certified(s, b, scorer, tau=tau, order=order, k=k,
-                                  actions=actions, cost_fn=price)
+                                  actions=actions, cost_fn=price, cost_model=cost_model)
         return fn
     return Family(name, list(grid), make, needs_big="escalate" in actions)
 
@@ -349,19 +349,23 @@ RHO_GRID = (0.0, 0.3, 0.6, 0.8, 0.9, 1.01)
 def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GRID,
                        actions=("answer_now", "sample_more", "escalate"),
                        k_steps=(2, 4, 8, 16), name: str = "caac_staged", est3=None,
-                       rhos=RHO_GRID, rho_mode: str = "phat", recovery=None) -> Family:
+                       rhos=RHO_GRID, rho_mode: str = "phat", recovery=None,
+                       cost_model=None) -> Family:
     """Configurations (rho, tau): one fixed-sequence path over tau per rho, so
     delta is split over the few rho values only.
 
     ``rho_mode`` selects what the rho gate means (see ``policies.RHO_MODES``).
     "delta" and "value" need ``recovery``, a RecoveryEstimator, and are the arm
-    that abstains before buying compute that cannot repair the answer; "phat"
-    is the confidence-shaped arm it is compared against. ``rhos`` is read on
+    that abstains before buying compute that cannot repair the answer; "state"
+    needs a StateValueEstimator and asks the same question again at every state;
+    "phat" is the confidence-shaped arm they are compared against. ``rhos`` is read on
     the gate's own scale, so a net-value gate wants a grid around zero.
     """
     price = lam_cost(lam, big_model)
     scorer = est if isinstance(est, Memo) else Memo(est)
-    rec = recovery if recovery is None or isinstance(recovery, Memo) else Memo(recovery)
+    # a state estimator keeps its own cache and is asked with the state, not the record
+    rec = (recovery if recovery is None or isinstance(recovery, Memo) or hasattr(recovery, "delta")
+           else Memo(recovery))
     gated = est3 is not None or (rho_mode != "phat" and rec is not None)
     rhos = tuple(rhos) if gated else (None,)
     configs = [(r, t) for r in rhos for t in grid]
@@ -374,7 +378,7 @@ def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GR
             return caac_staged(s, b, scorer, est2, tau=tau, order=order, k=max(k_steps),
                                actions=actions, k_steps=tuple(k_steps), cost_fn=price,
                                escalate_gate=est3, rho=rho, rho_mode=rho_mode,
-                               recovery=rec)
+                               recovery=rec, cost_model=cost_model)
         return fn
     return Family(name, configs, make, paths, needs_big="escalate" in actions)
 

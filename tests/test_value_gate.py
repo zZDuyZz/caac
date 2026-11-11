@@ -45,7 +45,7 @@ def test_rho_mode_must_be_known():
     with pytest.raises(ValueError):
         caac_staged(s, b, _scorer(), None, tau=0.9, order=[0, 1, 2, 3], rho=0.0,
                     rho_mode="confidence", cost_fn=_tokens)
-    assert set(RHO_MODES) == {"phat", "delta", "value"}
+    assert set(RHO_MODES) == {"phat", "delta", "value", "state"}
 
 
 def test_value_gate_refuses_an_action_that_cannot_repair():
@@ -167,7 +167,7 @@ def test_driver_builds_both_arms_with_different_gates():
     small, big = make_pools(240, n_small=16, n_big=4, seed=47)
     q = sorted(small)
     ests = certify.fit_estimators(small, big, (2, 4, 8))
-    assert len(ests) == 4
+    assert ests.state is not None and ests.cost.big_ratio > 0
     phat = certify.caac_family("caac_staged", ests, 1.5, "big", (2, 4, 8))
     value = certify.caac_family("caac_staged_value", ests, 1.5, "big", (2, 4, 8))
     rhos = lambda fam: sorted({c[0] for c in fam.configs})
@@ -227,4 +227,125 @@ def test_value_arm_buys_compute_on_a_real_shaped_pool():
     t = build_table(fam, q, small, big)
     bought = [m for m in t.actions if m.get("sample_more", 0) + m.get("escalate", 0) > 0]
     assert bought, "no configuration of the value arm ever buys a correcting action"
+    assert t.actions[-1].get("sample_more", 0) + t.actions[-1].get("escalate", 0) == 0
+
+
+# --------------------------------------------------------------------------- #
+# the state-conditioned gate
+# --------------------------------------------------------------------------- #
+
+class _State:
+    """A stand-in StateValueEstimator that records the states it was asked about."""
+
+    def __init__(self, fn):
+        self.fn, self.asked = fn, []
+
+    def delta(self, small, big, drawn, escalated, action, horizon=0, stage1=None):
+        self.asked.append((len(drawn), escalated, action, horizon))
+        return self.fn(len(drawn), escalated, action, horizon)
+
+
+def _state_args(rec, rho=0.05, **kw):
+    return dict(stage2=lambda ss, drawn, p1: 1.0 if len(drawn) >= 4 else 0.0,
+                escalate_gate=lambda *a, **k: 0.0, tau=0.5, order=list(range(16)), k=16,
+                k_steps=(2, 4, 8, 16), cost_fn=_tokens, rho=rho, rho_mode="state",
+                recovery=rec, **kw)
+
+
+def test_state_gate_is_asked_again_after_each_batch_of_samples():
+    s, b = _rec(False, [True] * 16), _rec(True, [True], model="big")
+    rec = _State(lambda n, e, a, h: 0.5 if a == "sample_more" else -1.0)
+    out = caac_staged(s, b, _scorer(answer_now=0.1), **_state_args(rec))
+    assert out.action == "sample_more" and out.meta["n_drawn"] == 4
+    assert [x[0] for x in rec.asked if x[2] == "sample_more"][0] == 0
+    assert any(x[0] == 2 for x in rec.asked), "the gate was not re-asked from the 2-draw state"
+
+
+def test_state_gate_stops_sampling_when_the_evidence_says_it_is_futile():
+    """The behaviour the arm exists for: the first batch looks hopeless, so the
+    controller abstains instead of paying for the rest of the ladder."""
+    s, b = _rec(False, [False] * 16), _rec(False, [False], model="big")
+    rec = _State(lambda n, e, a, h: 0.4 if (a == "sample_more" and n == 0) else -0.5)
+    out = caac_staged(s, b, _scorer(answer_now=0.1), **_state_args(rec))
+    assert out.action == "abstain" and out.meta["n_drawn"] == 2
+    assert all(c.model == "small" for c in out.calls)
+
+
+def test_state_gate_does_not_resample_after_a_rejected_escalation():
+    s, b = _rec(False, [True] * 16), _rec(False, [False], model="big")
+    rec = _State(lambda n, e, a, h: 0.5 if a == "escalate" else (-1.0 if e else 0.5))
+    out = caac_staged(s, b, _scorer(answer_now=0.1), **_state_args(rec, rho=0.4))
+    assert out.meta["tried"][-1] == "escalate" or out.action == "sample_more"
+    after_escalation = [x for x in rec.asked if x[1]]
+    assert after_escalation and all(x[2] == "sample_more" for x in after_escalation)
+    assert len([c for c in out.calls if c.model == "big"]) == 1
+
+
+def test_state_gate_starts_a_plan_that_only_pays_off_at_the_long_horizon():
+    s, b = _rec(False, [True] * 16), _rec(True, [True], model="big")
+    rec = _State(lambda n, e, a, h: 0.8 if (a == "sample_more" and h == 16) else 0.0)
+    out = caac_staged(s, b, _scorer(answer_now=0.1), **_state_args(rec, rho=0.02))
+    assert out.meta["n_drawn"] >= 2
+
+
+def test_state_mode_needs_a_gate_for_the_big_answer():
+    s, b = _rec(False, [True] * 4), _rec(True, [True], model="big")
+    with pytest.raises(ValueError):
+        caac_staged(s, b, _scorer(answer_now=0.1), None, tau=0.5, order=[0, 1, 2, 3], k=4,
+                    k_steps=(2, 4), rho=0.0, rho_mode="state", recovery=_State(lambda *a: 0.0),
+                    cost_fn=_tokens)
+
+
+def test_decisions_do_not_read_the_length_of_an_answer_not_yet_bought():
+    """Same question, same recorded lengths except the unbought big answer: the
+    choice of first step must not change."""
+    from caac.pool.costmodel import CostModel
+    s = _rec(False, [True] * 8)
+    short, long_ = _rec(True, [True], model="big"), _rec(True, [True], model="big")
+    long_.greedy.decode_tokens = 100_000
+    args = dict(stage2=lambda *a, **k: 0.0, tau=0.9, order=list(range(8)), k=8, k_steps=(8,),
+                escalate_gate=lambda *a, **k: 0.0, rho=-1.0, rho_mode="phat", cost_fn=_tokens,
+                cost_model=CostModel())
+    a = caac_staged(s, short, _scorer(answer_now=0.1, sample_more=0.5, escalate=0.5), **args)
+    b = caac_staged(s, long_, _scorer(answer_now=0.1, sample_more=0.5, escalate=0.5), **args)
+    assert a.meta["tried"] == b.meta["tried"]
+
+
+def test_state_estimator_fits_on_train_and_round_trips():
+    from caac.pool.replay import make_orders
+    from caac.pool.state_value import StateValueEstimator, state_feature_names, state_features
+    small, big = make_pools(150, n_small=16, n_big=4, seed=59)
+    q = sorted(small)
+    est = StateValueEstimator().fit(q, small, big, make_orders(16, 2, seed=1))
+    assert set(est.heads) == {f"{a}.{p}" for a in ("sample_more", "escalate") for p in ("gain", "harm")}
+    s, b = small[q[0]], big[q[0]]
+    assert len(state_features(s, b, [0, 1], True, 4)) == len(state_feature_names())
+    d = est.delta(s, b, [0, 1], False, "sample_more", 8)
+    assert -1.0 <= d <= 1.0
+    back = StateValueEstimator.from_json(est.to_json())
+    assert back.delta(s, b, [0, 1], False, "sample_more", 8) == pytest.approx(d)
+
+
+def test_state_estimator_only_reads_what_has_been_paid_for():
+    """Features at the greedy state must be identical whatever the unpaid samples
+    and the unbought big answer say."""
+    from caac.pool.state_value import state_features
+    a = _rec(False, [True] * 8)
+    b = _rec(False, [False] * 8)
+    big1, big2 = _rec(True, [True], model="big"), _rec(False, [False], model="big")
+    assert state_features(a, big1, [], False, 8) == state_features(b, big2, [], False, 8)
+    assert state_features(a, big1, [0, 1], False, 8) != state_features(b, big2, [0, 1], False, 8)
+
+
+def test_the_state_arm_is_certifiable_end_to_end_and_reports_waste():
+    import certify
+    from caac.pool.protocol import build_table, summarize
+
+    small, big = make_pools(300, n_small=16, n_big=4, seed=61)
+    q = sorted(small)
+    ests = certify.fit_estimators(small, big, (2, 4, 8))
+    fam = certify.caac_family("caac_staged_state", ests, 1.5, "big", (2, 4, 8))
+    t = build_table(fam, q, small, big)
+    assert t.waste_small is not None and (t.waste(1.5) >= 0).all()
+    assert 0.0 <= summarize(t, None, 0, 1.5)["waste_share"] <= 1.0
     assert t.actions[-1].get("sample_more", 0) + t.actions[-1].get("escalate", 0) == 0

@@ -32,6 +32,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Callable
 
+from caac.pool.costmodel import CostModel
 from caac.pool.ledger import Call
 from caac.pool.schema import Completion, PoolRecord
 from caac.pool.voting import serve_with_greedy
@@ -58,7 +59,7 @@ ACTIONS = ("answer_now", "sample_more", "escalate", "abstain")
 # What scale ``caac_staged``'s rho gate lives on. "phat" is the original rule;
 # the other two gate on the estimated net value of the action, which is what
 # lets the policy abstain before buying compute that cannot help.
-RHO_MODES = ("phat", "delta", "value")
+RHO_MODES = ("phat", "delta", "value", "state")
 
 
 @dataclass
@@ -280,6 +281,23 @@ def calls_for_action(small, big, action, k, order):
 _calls_for_action = calls_for_action   # internal alias, kept for older callers
 
 
+def expected_calls_for_action(small, big, action, k, cost_model: CostModel | None = None):
+    """What a controller can EXPECT an action to cost before paying for it.
+
+    Decisions (which step first, is it worth its price) use this; billing uses
+    the recorded completions. See ``costmodel`` for why the two must differ.
+    """
+    cm = cost_model or CostModel()
+    now = [_greedy_call(small, 0)]
+    if action in ("answer_now", "abstain"):
+        return now
+    if action == "sample_more":
+        return now + [cm.sample_call(small, [], min(k, small.n_samples))]
+    if action == "escalate":
+        return now + [cm.escalate_call(small, big, [])]
+    raise ValueError(action)
+
+
 def caac(
     small: PoolRecord,
     big: PoolRecord,
@@ -290,6 +308,7 @@ def caac(
     utility: float = 1.0,
     cost_profile: str = "tokens",
     abstain_penalty: float = 0.0,
+    cost_model: CostModel | None = None,
 ) -> PolicyOutcome:
     """Value-of-computation controller.
 
@@ -302,7 +321,7 @@ def caac(
     phat = scorer(small, big)
     voc = {}
     for a in ACTIONS:
-        calls = _calls_for_action(small, big, a, k, order)
+        calls = expected_calls_for_action(small, big, a, k, cost_model)
         cost = cost_profiles(calls)[cost_profile]
         if a == "abstain":
             voc[a] = -abstain_penalty - lam * cost
@@ -334,6 +353,7 @@ def caac_certified(
     cost_profile: str = "flops",
     actions: tuple[str, ...] = ("answer_now", "sample_more", "escalate"),
     cost_fn=None,
+    cost_model: CostModel | None = None,
 ) -> PolicyOutcome:
     """CAAC proper: **cheapest action predicted safe enough, else abstain.**
 
@@ -363,7 +383,7 @@ def caac_certified(
 
     price = cost_fn or (lambda calls: cost_profiles(calls)[cost_profile])
     phat = scorer(small, big)
-    costs = {a: price(_calls_for_action(small, big, a, k, order)) for a in actions}
+    costs = {a: price(expected_calls_for_action(small, big, a, k, cost_model)) for a in actions}
     eligible = [a for a in actions if phat.get(a, 0.0) >= tau]
     action = min(eligible, key=lambda a: (costs[a], a)) if eligible else "abstain"
 
@@ -399,6 +419,7 @@ def caac_staged(
     rho: float | None = None,
     rho_mode: str = "phat",
     recovery=None,
+    cost_model: CostModel | None = None,
 ) -> PolicyOutcome:
     """CAAC: pay for the cheapest promising step, re-decide on what it showed.
 
@@ -422,6 +443,12 @@ def caac_staged(
                  rule, kept as the ablation arm)
       "delta" -- the estimated NET gain over answering now reaches rho, so an
                  action whose expected damage cancels its repairs is not bought
+      "state" -- the value gate asked again at EVERY state with the evidence
+                 paid for so far (``recovery`` is a StateValueEstimator): after
+                 the greedy turn, after each batch of samples, after a rejected
+                 escalation. A step is tried when the best net gain per unit of
+                 cost over its horizons reaches rho; when none is, the policy
+                 abstains. Nothing is hand-set about when to stop sampling.
       "value" -- the net gain PER UNIT OF EXTRA COST reaches rho, the economic
                  form: a repair has to be worth its price. Extra cost is counted
                  in greedy turns of this question (first step of the action
@@ -460,7 +487,11 @@ def caac_staged(
                                   "answer_now"), "stage1")
 
     candidates = [a for a in actions if a != "answer_now"]
-    first_cost = {a: price(calls_for_action(small, big, a, steps[0], order))
+    if rho_mode == "state":
+        return _staged_state(small, big, phat, stage2, tau, order, steps, actions, price,
+                             escalate_gate, rho, recovery, cost_model, calls, drawn, tried,
+                             done)
+    first_cost = {a: price(expected_calls_for_action(small, big, a, steps[0], cost_model))
                   for a in candidates}
     if rho is None:
         correcting = candidates
@@ -468,7 +499,7 @@ def caac_staged(
         correcting = [a for a in candidates if phat.get(a, 0.0) >= rho]
     else:
         delta = recovery(small, big) if recovery is not None else {}
-        now_cost = price(calls_for_action(small, big, "answer_now", steps[0], order))
+        now_cost = price(expected_calls_for_action(small, big, "answer_now", steps[0], cost_model))
 
         def gate_score(a: str) -> float:
             d = delta.get(a, 0.0)
@@ -512,6 +543,72 @@ def caac_staged(
                 return done(PolicyOutcome(True, big.greedy.answer, big.greedy.correct, calls,
                                           "escalate"), "escalate_gate", p_escalate=p3)
 
+    return done(PolicyOutcome(False, None, False, calls, "abstain"), "abstain")
+
+
+def _staged_state(small, big, phat, stage2, tau, order, steps, actions, price, escalate_gate,
+                  rho, recovery, cost_model, calls, drawn, tried, done):
+    """The state-conditioned controller behind ``rho_mode="state"``.
+
+    At each state every untried step is scored by the estimated net gain per
+    greedy turn of cost, sampling over all of its remaining horizons (the best
+    ratio counts, so a plan that only pays off at sixteen draws still starts);
+    the cheapest step that clears ``rho`` is taken, its own serve gate is
+    applied, and the loop asks again from the new state.
+    """
+    if rho is None:
+        raise ValueError("rho_mode='state' needs a rho")
+    if escalate_gate is None and "escalate" in actions and big is not None:
+        raise ValueError("rho_mode='state' needs an escalate_gate to judge the big model's answer")
+    cm = cost_model or CostModel()
+    avail = [i for i in order if i < small.n_samples]
+    escalated = False
+    rnd = 1
+    unit = max(price([_greedy_call(small, 0)]), 1e-9)
+
+    def value(action, horizon=0):
+        if recovery is None:
+            return 0.0
+        return recovery.delta(small, big, list(drawn), escalated, action, horizon, phat)
+
+    while True:
+        options = {}
+        if "sample_more" in actions:
+            hs = sorted({min(h, len(avail)) for h in steps if min(h, len(avail)) > len(drawn)})
+            if hs:
+                ratio = max(value("sample_more", h)
+                            / max(price([cm.sample_call(small, drawn, h - len(drawn))]) / unit, 1e-9)
+                            for h in hs)
+                options["sample_more"] = (price([cm.sample_call(small, drawn, hs[0] - len(drawn))]),
+                                          ratio, hs[0])
+        if "escalate" in actions and big is not None and not escalated:
+            cost = price([cm.escalate_call(small, big, drawn)])
+            options["escalate"] = (cost, value("escalate") / max(cost / unit, 1e-9), 0)
+        go = sorted((c, a) for a, (c, r, _) in options.items() if r >= rho)
+        if not go:
+            break
+        action = go[0][1]
+        if action == "sample_more":
+            new = avail[len(drawn):options["sample_more"][2]]
+            calls.append(_samples_call(small, new, rnd))
+            rnd += 1
+            drawn += new
+            if "sample_more" not in tried:
+                tried.append("sample_more")
+            p2 = stage2(small, drawn, phat) if stage2 is not None else 0.0
+            if p2 >= tau:
+                voted = serve_with_greedy(small, drawn)
+                return done(PolicyOutcome(True, voted, small.label_correct(voted), calls,
+                                          "sample_more"), "stage2", p_stage2=p2)
+        else:
+            escalated = True
+            tried.append("escalate")
+            calls.append(_greedy_call(big, rnd))
+            rnd += 1
+            p3 = escalate_gate(small, big, list(drawn), phat)
+            if p3 >= tau:
+                return done(PolicyOutcome(True, big.greedy.answer, big.greedy.correct, calls,
+                                          "escalate"), "escalate_gate", p_escalate=p3)
     return done(PolicyOutcome(False, None, False, calls, "abstain"), "abstain")
 
 
