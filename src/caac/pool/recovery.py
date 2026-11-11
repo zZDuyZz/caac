@@ -68,12 +68,14 @@ def sample_correct_realised(small: PoolRecord, order: list[int], k: int) -> floa
 
 
 def oracle_rescue(small: PoolRecord, k: int) -> float:
-    """Upper bound: P(at least one of k draws is correct), selector ignored.
+    """Upper bound: P(greedy or at least one of k draws is correct), selector ignored.
 
     Reported next to the deployable number, never instead of it. A large gap
     says the samples contain the answer but the voter cannot find it, which is
     a statement about the selector, not about recoverability.
     """
+    if small.greedy.correct:
+        return 1.0          # the greedy answer is a vote, so a perfect selector keeps it
     n = small.n_samples
     if not n:
         return 0.0

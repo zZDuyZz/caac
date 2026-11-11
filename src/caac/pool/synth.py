@@ -13,6 +13,7 @@ data too (e.g. escalate raises pi_pop; maj@k >= greedy accuracy).
 from __future__ import annotations
 
 import random
+import zlib
 
 from caac.pool.schema import Completion, PoolRecord
 
@@ -34,7 +35,9 @@ def make_pair(
     seed: int = 0,
 ) -> tuple[PoolRecord, PoolRecord]:
     """One question's pool records for (small, big)."""
-    rng = random.Random(hash((query_id, seed)) & 0xFFFFFFFF)
+    # crc32, not hash(): str hashing is salted per process, which made every
+    # synthetic pool (and so every test built on one) differ from run to run
+    rng = random.Random(zlib.crc32(f"{query_id}|{seed}".encode()))
     gold = "G"
     difficulty = rng.random()  # 0 easy .. 1 hard
 
