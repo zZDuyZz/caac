@@ -128,6 +128,8 @@ def adaptive_consistency(rec: PoolRecord, order: list[int], threshold: float = 0
             continue
         counts = Counter(a for a in (canon[j] for j in drawn) if a is not None)
         top = counts.most_common(2)
+        if not top:                             # nothing usable drawn yet: keep drawing
+            continue
         n1 = top[0][1]
         n2 = top[1][1] if len(top) > 1 else 0
         if beta_win_probability(n1, n2) >= threshold:

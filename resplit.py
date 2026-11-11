@@ -61,7 +61,7 @@ def main():
     ap.add_argument("--train-big", default=None)
     ap.add_argument("--pool-small", required=True)
     ap.add_argument("--pool-big", default=None)
-    ap.add_argument("--families", default="pricecheck,cascade_abstain,sc_abstain,caac_staged")
+    ap.add_argument("--families", default="pricecheck,cascade_abstain,sc_abstain,caac_staged,caac_staged_value")
     ap.add_argument("--splits", type=int, default=500)
     ap.add_argument("--calib-frac", type=float, default=0.5)
     ap.add_argument("--alpha", type=float, default=0.10)
@@ -69,7 +69,7 @@ def main():
     ap.add_argument("--lam", type=float, default=5.0)
     ap.add_argument("--rule", default="max_coverage", choices=["max_coverage", "min_cost"])
     ap.add_argument("--min-coverage", type=float, default=0.6)
-    ap.add_argument("--k-steps", default="4,8,16")
+    ap.add_argument("--k-steps", default="2,4,8,16")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--json", default=None)
     a = ap.parse_args()
@@ -83,7 +83,8 @@ def main():
     k_steps = tuple(int(x) for x in a.k_steps.split(","))
     names = [x.strip() for x in a.families.split(",") if x.strip()]
     big_model = next(iter(po_b.values())).model if po_b else None
-    n_big = min((r.n_samples for r in (po_b or {}).values()), default=0)
+    n_big = min((r.n_samples for p in (tr_b, po_b) for r in (p or {}).values()), default=0)
+    n_small = min(r.n_samples for p in (tr_s, po_s) for r in p.values())
 
     ests = fit_estimators(tr_s, tr_b, k_steps) if any(n in CAAC for n in names) else None
 
@@ -93,7 +94,7 @@ def main():
            "n_calib": n_cal, "rule": a.rule, "lam": a.lam, "families": {}}
     for nm in names:
         fam = (caac_family(nm, ests, a.lam, big_model, k_steps) if nm in CAAC
-               else baseline_family(nm, n_big))
+               else baseline_family(nm, n_big, n_small))
         fam = prune(fam, build_table(fam, sorted(tr_s), tr_s, tr_b), n_cal, a.alpha, a.delta)
         table = build_table(fam, qids, po_s, po_b)
         res["families"][nm] = run(table, len(qids), a.alpha, a.delta, a.splits, a.calib_frac,

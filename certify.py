@@ -44,10 +44,13 @@ BASELINES = ("small_abstain", "big_abstain", "cascade_abstain", "sc_abstain", "s
 # can repair is abstained on before the big model is billed. "caac_staged" is
 # the same policy gating on P(correct | action) -- the confidence-shaped arm
 # the new one has to beat. Both run; neither is assumed to win.
-CAAC = ("caac", "caac_staged", "caac_staged_value", "caac_staged_no_sample",
-        "caac_staged_no_escalate")
-# A net-value gate lives on the [-1, 1] scale, not on a probability.
-VALUE_RHOS = (-1.0, 0.0, 0.02, 0.05, 0.1)
+CAAC = ("caac", "caac_staged", "caac_staged_value", "caac_staged_delta",
+        "caac_staged_no_sample", "caac_staged_no_escalate")
+# Gates on net value do not live on a probability scale. "delta" thresholds the
+# estimated net gain in [-1, 1]; "value" thresholds net gain per greedy turn of
+# extra cost. The last entry of each grid buys nothing.
+DELTA_RHOS = (-1.0, 0.0, 0.02, 0.05, 0.1, 0.2, 1.01)
+VALUE_RHOS = (-1.0, 0.0, 0.01, 0.03, 0.1, 0.3, 10.0)
 
 
 def hash_split(pool: dict, frac: float, seed: str = "caac-split-v2"):
@@ -58,15 +61,18 @@ def hash_split(pool: dict, frac: float, seed: str = "caac-split-v2"):
     return a, b
 
 
-def baseline_family(name: str, n_big: int):
+def baseline_family(name: str, n_big: int, n_small: int = 16):
+    """``n_small`` / ``n_big`` are the draws every split holds, so a rule that
+    counts draws is the same rule at calibration and at test time."""
+    cc = dict(n_small=min(16, n_small), n_big=min(16, n_big))
     return {"small_abstain": F.small_abstain, "big_abstain": F.big_abstain,
             "cascade_abstain": F.cascade_abstain, "sc_abstain": F.sc_abstain,
             "sc_abstain_greedy": lambda: F.sc_abstain(greedy_vote=True),
             "esc_abstain": lambda: F.adaptive_abstain("esc"),
             "adaptive_consistency_abstain": lambda: F.adaptive_abstain("adaptive_consistency"),
             "pricecheck": lambda: F.pricecheck(n_big),
-            "conformal_cascade": F.conformal_cascade,
-            "conformal_cascade_abstain": lambda: F.conformal_cascade(abstain_last=True),
+            "conformal_cascade": lambda: F.conformal_cascade(**cc),
+            "conformal_cascade_abstain": lambda: F.conformal_cascade(abstain_last=True, **cc),
             }[name]()
 
 
@@ -88,15 +94,14 @@ def caac_family(name: str, ests, lam: float, big_model, k_steps):
     full = ("answer_now", "sample_more", "escalate")
     if name == "caac":
         return F.caac(est, lam, big_model)
-    acts = {"caac_staged": full, "caac_staged_value": full,
+    acts = {"caac_staged": full, "caac_staged_value": full, "caac_staged_delta": full,
             "caac_staged_no_sample": ("answer_now", "escalate"),
             "caac_staged_no_escalate": ("answer_now", "sample_more")}[name]
-    value_gate = name == "caac_staged_value"
+    mode = {"caac_staged_value": "value", "caac_staged_delta": "delta"}.get(name, "phat")
+    rhos = {"value": VALUE_RHOS, "delta": DELTA_RHOS, "phat": F.RHO_GRID}[mode]
     return F.caac_staged_family(
         est, est2, lam, big_model, actions=acts, k_steps=k_steps, name=name, est3=est3,
-        rho_mode="value" if value_gate else "phat",
-        recovery=rec if value_gate else None,
-        rhos=VALUE_RHOS if value_gate else F.RHO_GRID)
+        rho_mode=mode, recovery=rec if mode != "phat" else None, rhos=rhos)
 
 
 def evaluate(fam, train, calib, test, a, orders, lams, coverages):
@@ -185,7 +190,9 @@ def main():
     coverages = [float(x) for x in a.coverages.split(",")]
     k_steps = tuple(int(x) for x in a.k_steps.split(","))
     names = [x.strip() for x in a.families.split(",") if x.strip()]
-    n_big = min((r.n_samples for r in (ca_b or {}).values()), default=0)
+    # draws available in EVERY split: train prunes, calib certifies, test reports
+    n_big = min((r.n_samples for p in (tr_b, ca_b, te_b) for r in (p or {}).values()), default=0)
+    n_small = min(r.n_samples for p in (tr_s, ca_s, te_s) for r in p.values())
     big_model = next(iter(te_b.values())).model if te_b else None
     width = min(r.n_samples for r in te_s.values())
     orders = make_orders(width, a.perms, seed=1)
@@ -206,7 +213,7 @@ def main():
                 res["families"][nm]["by_lam"].update(r["by_lam"])
                 res["families"][nm].setdefault("n_certified", {})[f"{lam:g}"] = r.get("n_certified", 0)
         else:
-            res["families"][nm] = evaluate(baseline_family(nm, n_big), train, calib, test, a,
+            res["families"][nm] = evaluate(baseline_family(nm, n_big, n_small), train, calib, test, a,
                                            orders, lams, coverages)
         print(f"  done: {nm}", flush=True)
     for lam in lams:

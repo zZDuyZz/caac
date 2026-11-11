@@ -5,10 +5,11 @@ greedy), **sampling more** (small model, majority vote), **escalating** to a
 larger model that writes a new answer, or **abstaining**. The goal is the
 lowest expected cost per question subject to a **certified** bound on the error
 rate of the answers it serves: the whole multi-stage policy is one configuration,
-certified in a single Learn-then-Test (LTT) pass, and cost enters only the
-objective, so the price ratio between the models can be swept at evaluation time
-without touching the guarantee. Every baseline goes through the same
-certification protocol.
+certified in a single Learn-then-Test (LTT) pass. Cost never enters the test:
+it orders the actions a policy tries and picks among certified configurations,
+so the guarantee holds at each price ratio between the models, and a family
+that never reads the price is certified once for all of them. Every baseline
+goes through the same certification protocol.
 
 What the controller estimates is **recoverability**, not confidence. A
 selective cascade asks whether its current answer is trustworthy; this asks
@@ -24,7 +25,8 @@ right. The vote CAAC serves counts the greedy answer as one vote and never count
 a sample cut off by the token cap (`voting.py`); baselines keep the plain majority. `recovery_table.py` measures where failures sit (four rescue groups, and
 three cost-dependent regions: repairable cheaply, only expensively, or not at
 all within this action set and sample budget), and `certify.py` runs the
-net-value gate and the confidence gate as two arms of the same policy so the
+net-value gates (net gain, and net gain per unit of extra cost) and the
+confidence gate as arms of the same policy so the
 comparison is in the results rather than in the design.
 
 The repository follows one rule: **the GPU generates a sample pool once;

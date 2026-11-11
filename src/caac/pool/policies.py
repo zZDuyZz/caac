@@ -253,6 +253,14 @@ def _action_cost_scalar(small: PoolRecord, big: PoolRecord, action: str, k: int,
     return cost_profiles(calls)[profile_fn]
 
 
+def sample_more_outcome(small: PoolRecord, k: int, order: list[int]) -> "PolicyOutcome":
+    """CAAC's sample_more: k draws after the greedy turn, greedy counts as a vote."""
+    idxs = [i for i in order if i < small.n_samples][:k]
+    voted = serve_with_greedy(small, idxs)
+    return PolicyOutcome(True, voted, small.label_correct(voted),
+                         [_greedy_call(small, 0), _samples_call(small, idxs, 1)], "sample_more")
+
+
 def calls_for_action(small, big, action, k, order):
     """What one action would pay for, so every module prices it the same way."""
     if action == "answer_now":
@@ -306,8 +314,7 @@ def caac(
     if action == "answer_now":
         out = greedy_only(small)
     elif action == "sample_more":
-        out = self_consistency(small, k, order)
-        out.calls = [_greedy_call(small, 0), _samples_call(small, order[:k], 1)]
+        out = sample_more_outcome(small, k, order)
     elif action == "escalate":
         out = cascade_force_escalate(small, big)
     else:  # abstain
@@ -363,8 +370,7 @@ def caac_certified(
     if action == "answer_now":
         out = greedy_only(small)
     elif action == "sample_more":
-        out = self_consistency(small, k, order)
-        out.calls = [_greedy_call(small, 0), _samples_call(small, order[:k], 1)]
+        out = sample_more_outcome(small, k, order)
     elif action == "escalate":
         out = cascade_force_escalate(small, big)
     else:
@@ -393,7 +399,6 @@ def caac_staged(
     rho: float | None = None,
     rho_mode: str = "phat",
     recovery=None,
-    lam: float = 0.0,
 ) -> PolicyOutcome:
     """CAAC: pay for the cheapest promising step, re-decide on what it showed.
 
@@ -417,8 +422,11 @@ def caac_staged(
                  rule, kept as the ablation arm)
       "delta" -- the estimated NET gain over answering now reaches rho, so an
                  action whose expected damage cancels its repairs is not bought
-      "value" -- the net gain minus ``lam`` times the extra cost reaches rho,
-                 the economic form: a repair has to be worth its price
+      "value" -- the net gain PER UNIT OF EXTRA COST reaches rho, the economic
+                 form: a repair has to be worth its price. Extra cost is counted
+                 in greedy turns of this question (first step of the action
+                 over what is already paid), so rho is an exchange rate that
+                 means the same thing at every price ratio.
 
     The last two read ``recovery(small, big) -> {action: Delta_hat}``; with no
     estimator they score 0, so only a non-positive rho buys anything, which is
@@ -461,9 +469,13 @@ def caac_staged(
     else:
         delta = recovery(small, big) if recovery is not None else {}
         now_cost = price(calls_for_action(small, big, "answer_now", steps[0], order))
+
         def gate_score(a: str) -> float:
             d = delta.get(a, 0.0)
-            return d if rho_mode == "delta" else d - lam * (first_cost[a] - now_cost)
+            if rho_mode == "delta":
+                return d
+            extra = (first_cost[a] - now_cost) / max(now_cost, 1e-9)
+            return d / max(extra, 1e-9)
         correcting = [a for a in candidates if gate_score(a) >= rho]
     rnd = 1
     for action in sorted(correcting, key=lambda a: (first_cost[a], a)):

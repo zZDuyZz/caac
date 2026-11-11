@@ -190,3 +190,14 @@ def test_math_verify_merges_latex_forms_label_free():
                      [comp("\\frac{\\sqrt{2}}{2}", True), comp("\\frac{1}{2}", False)])
     labels = rec.canonical_sample_answers()
     assert labels[0] == rec.greedy_label() != labels[1]
+
+
+def test_binom_cdf_matches_the_exact_sum_and_survives_large_calibration_sets():
+    from math import comb
+    for n, e, p in ((10, 3, 0.1), (200, 15, 0.1), (500, 60, 0.1), (391, 20, 0.05)):
+        exact = sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(e + 1))
+        assert binom_cdf(e, n, p) == pytest.approx(exact, rel=1e-9)
+    # the old product form raised OverflowError here
+    assert binom_cdf(425, 1319, 0.1) == pytest.approx(1.0)
+    assert 0.0 < binom_cdf(100, 1319, 0.1) < 0.01
+    assert binom_cdf(-1, 10, 0.1) == 0.0 and binom_cdf(10, 10, 0.1) == 1.0

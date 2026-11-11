@@ -38,7 +38,7 @@ from __future__ import annotations
 from collections import Counter
 
 from caac.pool.ledger import Call
-from caac.pool.policies import (PolicyOutcome, _greedy_call, _samples_call, _vote,
+from caac.pool.policies import (PolicyOutcome, _greedy_call, _samples_call,
                                 caac_certified, caac_staged)
 from caac.pool.adaptive import adaptive_consistency, esc
 from caac.pool.protocol import Family, split_cost
@@ -141,6 +141,8 @@ def sc_abstain(ks=(1, 2, 4, 8, 16), grid=SHARE_GRID, greedy_vote: bool = False) 
             canon = s.canonical_sample_answers()
             top, share = _share([canon[i] for i in idxs])
             if greedy_vote:
+                # the greedy answer is a vote, so its turn is billed
+                calls = [_greedy_call(s, 0), _samples_call(s, idxs, 1)]
                 top = serve_with_greedy(s, idxs)
                 share = (sum(canon[i] == top for i in idxs) + (s.greedy_label() == top)) / (k + 1)
             if len(idxs) == k and top is not None and share >= t:
@@ -340,7 +342,8 @@ def caac(est, lam: float, big_model: str | None, grid=TAU_GRID,
     return Family(name, list(grid), make, needs_big="escalate" in actions)
 
 
-RHO_GRID = (0.0, 0.2, 0.4, 0.6)
+# 1.01 buys nothing, so the family contains plain answer-or-abstain as a special case
+RHO_GRID = (0.0, 0.3, 0.6, 0.8, 0.9, 1.01)
 
 
 def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GRID,
@@ -371,7 +374,7 @@ def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GR
             return caac_staged(s, b, scorer, est2, tau=tau, order=order, k=max(k_steps),
                                actions=actions, k_steps=tuple(k_steps), cost_fn=price,
                                escalate_gate=est3, rho=rho, rho_mode=rho_mode,
-                               recovery=rec, lam=lam)
+                               recovery=rec)
         return fn
     return Family(name, configs, make, paths, needs_big="escalate" in actions)
 
@@ -380,10 +383,12 @@ def caac_staged_family(est, est2, lam: float, big_model: str | None, grid=TAU_GR
 # oracle: an upper bound, not a method (it reads the labels)
 # --------------------------------------------------------------------------- #
 
-def oracle(qids, small, big, lam: float, k_steps=(4, 8, 16)) -> dict:
-    """Cheapest action that would have been right, else abstain (paying the
-    greedy turn). It may use every draw count CAAC may use, so it is a ceiling
-    every certified method sits under."""
+def oracle(qids, small, big, lam: float, k_steps=(2, 4, 8, 16)) -> dict:
+    """Cheapest action that could have been right, else abstain (paying the
+    greedy turn). Sampling counts as right when ANY usable draw among the first
+    k is right -- a perfect selector -- so coverage is a ceiling for every
+    method, whatever its voter. Cost is for the generation order and is a
+    reference, not a bound on a permuted replay."""
     served = cost = 0.0
     for q in qids:
         s, b = small[q], (big or {}).get(q)
@@ -394,12 +399,14 @@ def oracle(qids, small, big, lam: float, k_steps=(4, 8, 16)) -> dict:
             opts.append(price(g))
         for k in k_steps:
             idxs = list(range(min(k, s.n_samples)))
-            if idxs:
-                voted = _vote([s.canonical_sample_answers()[i] for i in idxs])
-                if s.label_correct(voted):
-                    opts.append(price(g + [_samples_call(s, idxs, 1)]))
+            canon = s.canonical_sample_answers()
+            if any(s.label_correct(canon[i]) for i in idxs):
+                opts.append(price(g + [_samples_call(s, idxs, 1)]))
         if b is not None and b.greedy.correct:
             opts.append(price(g + [_greedy_call(b, 1)]))
+        elif b is not None and any(b.label_correct(a) for a in b.canonical_sample_answers()):
+            # a cascade that votes over big-model draws can be right where its greedy is not
+            opts.append(price(g + [_samples_call(b, list(range(b.n_samples)), 1)]))
         if opts:
             served += 1
             cost += min(opts)

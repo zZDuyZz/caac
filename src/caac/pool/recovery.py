@@ -35,8 +35,6 @@ an exact identity here because the greedy outcome is a constant per question.
 
 from __future__ import annotations
 
-from collections import Counter
-
 from caac.pool.schema import PoolRecord
 from caac.pool.voting import greedy_vote_correct, greedy_vote_prob
 

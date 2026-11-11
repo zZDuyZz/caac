@@ -79,19 +79,35 @@ def test_refusing_to_buy_never_bills_the_big_model():
     assert out.meta["rho_mode"] == "delta"
 
 
+def _value_args(rho, cost_fn=_tokens):
+    return dict(stage2=lambda *a, **k: 1.0, tau=0.5, order=[0, 1, 2, 3], k=4, k_steps=(4,),
+                escalate_gate=lambda *a, **k: 1.0, rho=rho, rho_mode="value", cost_fn=cost_fn,
+                recovery=lambda ss, bb: {"sample_more": 0.3, "escalate": 0.3})
+
+
 def test_value_mode_prices_the_action_it_is_considering():
-    """With lam large enough, a repair worth 0.3 is not worth its price."""
+    """A repair worth 0.3 is bought at a low exchange rate and refused at a high
+    one. Escalation costs one extra greedy turn here (ratio 0.3), four samples
+    cost four (ratio 0.075), so a rate between the two buys only escalation."""
     s = _rec(False, [True] * 4)
     b = _rec(True, [True], model="big")
-    order = [0, 1, 2, 3]
-    args = dict(stage2=lambda *a, **k: 1.0, tau=0.5, order=order, k=4, k_steps=(4,),
-                escalate_gate=lambda *a, **k: 1.0, rho=0.0, rho_mode="value",
-                cost_fn=_tokens,
-                recovery=lambda ss, bb: {"sample_more": 0.3, "escalate": 0.3})
-    free = caac_staged(s, b, _scorer(answer_now=0.1), lam=0.0, **args)
-    assert free.served
-    costly = caac_staged(s, b, _scorer(answer_now=0.1), lam=1.0, **args)
-    assert costly.action == "abstain"
+    cheap = caac_staged(s, b, _scorer(answer_now=0.1), **_value_args(0.01))
+    assert cheap.served
+    mid = caac_staged(s, b, _scorer(answer_now=0.1), **_value_args(0.2))
+    assert mid.action == "escalate" and mid.meta["tried"] == ["escalate"]
+    dear = caac_staged(s, b, _scorer(answer_now=0.1), **_value_args(0.5))
+    assert dear.action == "abstain" and [c.model for c in dear.calls] == ["small"]
+
+
+def test_value_gate_does_not_depend_on_the_cost_unit():
+    """The regression this guards: with cost in raw tokens the old gate
+    subtracted hundreds from a number in [-1, 1] and never bought anything."""
+    s = _rec(False, [True] * 4)
+    b = _rec(True, [True], model="big")
+    for scale in (1.0, 1000.0):
+        out = caac_staged(s, b, _scorer(answer_now=0.1),
+                          **_value_args(0.2, cost_fn=lambda calls, k=scale: k * _tokens(calls)))
+        assert out.action == "escalate"
 
 
 def test_phat_mode_is_unchanged_by_the_new_arguments():
@@ -103,7 +119,7 @@ def test_phat_mode_is_unchanged_by_the_new_arguments():
                   k_steps=(4, 8), escalate_gate=lambda *a, **k: 0.99, rho=0.2)
         a = caac_staged(s, b, _scorer(answer_now=0.5, sample_more=0.5, escalate=0.5), **kw)
         bb = caac_staged(s, b, _scorer(answer_now=0.5, sample_more=0.5, escalate=0.5),
-                         rho_mode="phat", recovery=None, lam=0.0, **kw)
+                         rho_mode="phat", recovery=None, **kw)
         assert (a.action, a.served, a.correct) == (bb.action, bb.served, bb.correct)
 
 
@@ -115,7 +131,7 @@ def test_a_fitted_recovery_estimator_drops_into_the_gate():
     out = caac_staged(small[q[0]], big[q[0]], _scorer(answer_now=0.2), lambda *a, **k: 0.99,
                       tau=0.9, order=list(range(16)), k=8, k_steps=(2, 4, 8),
                       escalate_gate=lambda *a, **k: 0.99, rho=-1.0, rho_mode="value",
-                      recovery=rec, lam=1.0)
+                      recovery=rec)
     assert out.action in ("sample_more", "escalate", "abstain")
 
 
@@ -157,6 +173,8 @@ def test_driver_builds_both_arms_with_different_gates():
     rhos = lambda fam: sorted({c[0] for c in fam.configs})
     assert rhos(phat) != rhos(value)
     assert min(rhos(value)) < 0, "a net-value gate needs a grid that reaches below zero"
+    delta = certify.caac_family("caac_staged_delta", ests, 1.5, "big", (2, 4, 8))
+    assert delta.make(delta.configs[0])(small[q[0]], big[q[0]], list(range(16))).meta["rho_mode"] == "delta"
     out = value.make(value.configs[0])(small[q[0]], big[q[0]], list(range(16)))
     assert out.meta["rho_mode"] == "value"
 
@@ -194,3 +212,19 @@ def test_conformal_cascade_draws_a_fixed_number_of_samples():
         out = fam.make(cut)(_rec(False, [True] * 8), _rec(True, [True] * 4, model="big"),
                             list(range(8)))
         assert len(out.calls[0].decode_tokens) == 4
+
+
+def test_value_arm_buys_compute_on_a_real_shaped_pool():
+    """End to end at token-scale costs: some configuration of the value arm must
+    spend more than the greedy turn, or the arm is dead."""
+    import certify
+    from caac.pool.protocol import build_table
+
+    small, big = make_pools(300, n_small=16, n_big=4, seed=53)
+    q = sorted(small)
+    ests = certify.fit_estimators(small, big, (2, 4, 8))
+    fam = certify.caac_family("caac_staged_value", ests, 1.5, "big", (2, 4, 8))
+    t = build_table(fam, q, small, big)
+    bought = [m for m in t.actions if m.get("sample_more", 0) + m.get("escalate", 0) > 0]
+    assert bought, "no configuration of the value arm ever buys a correcting action"
+    assert t.actions[-1].get("sample_more", 0) + t.actions[-1].get("escalate", 0) == 0

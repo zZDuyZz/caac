@@ -19,7 +19,7 @@ This module is pure stats -- a "policy at a given lambda" is summarized as
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import ceil, comb, log
+from math import ceil, exp, lgamma, log
 
 __all__ = [
     "binom_cdf",
@@ -33,11 +33,26 @@ __all__ = [
 
 
 def binom_cdf(e: int, n: int, p: float) -> float:
-    """P(X <= e) for X ~ Binomial(n, p). Exact; n is small (calibration size)."""
-    if n == 0:
+    """P(X <= e) for X ~ Binomial(n, p).
+
+    Summed in log space: the binomial coefficient of a calibration set of a
+    thousand questions no longer fits in a float, and the product form raised
+    OverflowError there instead of returning a p-value.
+    """
+    if n == 0 or e >= n:
         return 1.0
+    if e < 0:
+        return 0.0
     p = min(max(p, 0.0), 1.0)
-    return sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(0, e + 1))
+    if p == 0.0:
+        return 1.0
+    if p == 1.0:
+        return 0.0
+    lp, lq = log(p), log(1.0 - p)
+    logs = [lgamma(n + 1) - lgamma(i + 1) - lgamma(n - i + 1) + i * lp + (n - i) * lq
+            for i in range(0, e + 1)]
+    m = max(logs)
+    return min(1.0, exp(m) * sum(exp(v - m) for v in logs))
 
 
 def min_served_certifiable(alpha: float, delta: float) -> int:

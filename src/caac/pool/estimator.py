@@ -49,7 +49,7 @@ from functools import lru_cache
 import numpy as np
 
 from caac.pool.schema import PoolRecord
-from caac.pool.voting import greedy_vote_correct, greedy_vote_prob
+from caac.pool.voting import greedy_vote_correct, greedy_vote_prob, serve_with_greedy
 
 __all__ = [
     "SERVING_ACTIONS", "FEATURE_GROUPS", "RECOVERY_PARTS", "CORRECTING_ACTIONS",
@@ -135,7 +135,6 @@ def realised_targets(small: PoolRecord, big: PoolRecord | None, order: list[int]
     Reported numbers must be achievable by a policy that draws k samples once,
     so held-out metrics use this, not the soft target.
     """
-    from collections import Counter
     t = {"answer_now": float(small.greedy.correct)}
     if small.n_samples:
         idxs = [i for i in order if i < small.n_samples][:k]
@@ -553,7 +552,8 @@ class RecoveryEstimator:
 # --------------------------------------------------------------------------- #
 
 POST_FEATURES = ("top_share", "margin", "agree_greedy", "mean_sample_conf",
-                 "parse_rate", "stage1_answer_now", "log_k", "bias_post")
+                 "parse_rate", "stage1_answer_now", "log_k", "served_share",
+                 "served_is_greedy", "bias_post")
 
 
 def post_sample_features(small: PoolRecord, idxs: list[int],
@@ -564,8 +564,6 @@ def post_sample_features(small: PoolRecord, idxs: list[int],
     and ``agree_greedy`` compare answers with each other, as a deployed system
     would.
     """
-    from collections import Counter
-
     from caac.pool.policies import agreement_with_greedy
 
     canon = small.canonical_sample_answers()
@@ -577,6 +575,12 @@ def post_sample_features(small: PoolRecord, idxs: list[int],
     n2 = counts[1][1] if len(counts) > 1 else 0
     confs = [small.samples[i].confidence for i in idxs
              if i < small.n_samples and small.samples[i].confidence is not None]
+    # the answer that would actually be served (greedy counts as a vote), and
+    # how much of the k + 1 votes it holds
+    inpool = [i for i in idxs if i < len(canon)]
+    served = serve_with_greedy(small, inpool)
+    g = small.greedy_label()
+    n_served = sum(canon[i] == served for i in inpool) + (g == served) if served is not None else 0
     return [
         n1 / len(valid) if valid else 0.0,
         (n1 - n2) / k,
@@ -585,13 +589,15 @@ def post_sample_features(small: PoolRecord, idxs: list[int],
         len(valid) / k,
         float((stage1 or {}).get("answer_now", 0.0)),
         np.log2(k) / 4.0,          # the same margin means more after more draws
+        n_served / (k + 1),
+        float(served is not None and served == g),
         1.0,
     ]
 
 
 @dataclass
 class SecondStageEstimator:
-    """P(the majority of the drawn samples is correct | post-sample evidence).
+    """P(the vote that would be served is correct | post-sample evidence).
 
     Fitted on REALISED votes over several draw orders per question, because the
     quantity being predicted is the outcome of one concrete draw, not an
@@ -611,12 +617,10 @@ class SecondStageEstimator:
     base_rate: float = 0.0
 
     def fit(self, qids, small, orders, stage1=None) -> "SecondStageEstimator":
-        from collections import Counter
         X, y, group = [], [], []
         for gi, q in enumerate(qids):
             rec = small[q]
             p1 = stage1(rec) if stage1 is not None else None
-            canon = rec.canonical_sample_answers()
             for kk in (self.ks or (self.k,)):
                 for o in orders:
                     idxs = [i for i in o if i < rec.n_samples][:kk]
