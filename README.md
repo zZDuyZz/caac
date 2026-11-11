@@ -128,6 +128,7 @@ test, the oracle, and which method is cheapest where (the phase map).
 | `make_qids.py`, `qids/` | stratified question ids for the calibration/train splits |
 | `certify.py`, `resplit.py` | the main comparison under one certification protocol, and its validity check |
 | `recovery_table.py` | which action repairs a wrong answer, and at what price: the rescue groups and regions the allocation claim rests on |
+| `diagnose.py` | where the compute goes before any controller is tuned: action costs, perfect-stop ceiling, what two samples can predict, width of the cheap-repair region, loop-or-long truncation (run on train/calib only; explains each number in words) |
 | `chow_frontier.py`, `train_estimator.py`, `run_baselines.py` | the Chow ceiling, a stand-alone estimator fit, the always-answer sweep |
 | `verify_params.py` | parameter counts (config formula, or exact from safetensors headers) checked against the cost registry |
 | `session2_*.sh` | one-command GPU session |
