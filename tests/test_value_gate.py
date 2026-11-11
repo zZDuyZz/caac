@@ -349,3 +349,12 @@ def test_the_state_arm_is_certifiable_end_to_end_and_reports_waste():
     assert t.waste_small is not None and (t.waste(1.5) >= 0).all()
     assert 0.0 <= summarize(t, None, 0, 1.5)["waste_share"] <= 1.0
     assert t.actions[-1].get("sample_more", 0) + t.actions[-1].get("escalate", 0) == 0
+
+
+def test_state_gate_picks_the_best_ratio_not_the_cheapest_step():
+    """Sampling is cheaper than escalating, but when the evidence says only the
+    big model can repair this question, paying for samples first is waste."""
+    s, b = _rec(False, [False] * 16), _rec(True, [True], model="big")
+    rec = _State(lambda n, e, a, h: 0.05 if a == "sample_more" else 0.6)
+    out = caac_staged(s, b, _scorer(answer_now=0.1), **_state_args(rec, rho=0.01))
+    assert out.meta["tried"][0] == "escalate" and out.calls[1].model == "big"

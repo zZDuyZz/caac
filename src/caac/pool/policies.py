@@ -547,14 +547,15 @@ def caac_staged(
 
 
 def _staged_state(small, big, phat, stage2, tau, order, steps, actions, price, escalate_gate,
-                  rho, recovery, cost_model, calls, drawn, tried, done):
+                  rho, recovery, cost_model, calls, drawn, tried, done, pick="ratio"):
     """The state-conditioned controller behind ``rho_mode="state"``.
 
     At each state every untried step is scored by the estimated net gain per
     greedy turn of cost, sampling over all of its remaining horizons (the best
     ratio counts, so a plan that only pays off at sixteen draws still starts);
-    the cheapest step that clears ``rho`` is taken, its own serve gate is
-    applied, and the loop asks again from the new state.
+    the step with the best ratio among those clearing ``rho`` is taken (``pick=
+    "cheapest"`` takes the cheapest instead, kept as an ablation), its own serve
+    gate is applied, and the loop asks again from the new state.
     """
     if rho is None:
         raise ValueError("rho_mode='state' needs a rho")
@@ -584,10 +585,13 @@ def _staged_state(small, big, phat, stage2, tau, order, steps, actions, price, e
         if "escalate" in actions and big is not None and not escalated:
             cost = price([cm.escalate_call(small, big, drawn)])
             options["escalate"] = (cost, value("escalate") / max(cost / unit, 1e-9), 0)
-        go = sorted((c, a) for a, (c, r, _) in options.items() if r >= rho)
+        go = [(c, r, a) for a, (c, r, _) in options.items() if r >= rho]
         if not go:
             break
-        action = go[0][1]
+        # the step with the best net gain per unit of cost. Cheapest-first would
+        # sample before escalating on a question that needs the big model anyway,
+        # paying for both; the ratio is what says which step is the right one
+        action = max(go, key=lambda x: (x[1], -x[0]))[2] if pick == "ratio" else min(go)[2]
         if action == "sample_more":
             new = avail[len(drawn):options["sample_more"][2]]
             calls.append(_samples_call(small, new, rnd))
