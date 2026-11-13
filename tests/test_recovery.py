@@ -218,3 +218,16 @@ def test_unfitted_recovery_estimator_scores_nothing():
     """An unfitted head must not produce a guess the gate could act on."""
     s, _ = make_pair("q0", "synth", "small", "big", n_small=16, n_big=4, seed=3)
     assert RecoveryEstimator()(s) == {}
+
+
+def test_oracle_counts_a_greedy_class_graded_correct_even_if_the_completion_was_not():
+    """Real case (Day 1, gsm8k_393): greedy '0.2' graded wrong against gold '20', but
+    the matcher puts it in the class of '20%', graded correct. The vote serves that
+    class, so the oracle ceiling must not fall below it."""
+    small, big = make_pools(1, n_small=16, n_big=4, seed=5)
+    s = next(iter(small.values()))
+    s.greedy.correct = False
+    labels = ["A0"] + ["A0"] * 8 + ["A1"] * 8
+    s.__dict__["_label_cache"] = (labels, {"A0": True, "A1": False})
+    assert oracle_rescue(s, 2) == 1.0
+    assert oracle_rescue(s, 2) >= sample_correct_prob(s, 2)

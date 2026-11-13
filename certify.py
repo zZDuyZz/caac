@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import random
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,7 +34,7 @@ from caac.pool.estimator import (EscalateGate, PerActionEstimator, RecoveryEstim
 from caac.pool.costmodel import CostModel
 from caac.pool.ltt import min_served_certifiable
 from caac.pool.state_value import StateValueEstimator
-from caac.pool.protocol import (build_table, certified_frontier, certify, pick_max_coverage,
+from caac.pool.protocol import (build_table, concat_tables, certified_frontier, certify, pick_max_coverage,
                                 pick_min_cost, plugin_select, prune, summarize)
 from caac.pool.replay import make_orders
 from caac.pool.schema import load_pool
@@ -103,6 +104,35 @@ def fit_estimators(tr_s, tr_b, k_steps):
     return Fitted(est, est2, est3, rec, state, CostModel().fit(tr_s, tr_b))
 
 
+def fit_fold_estimators(tr_s, tr_b, k_steps, folds: int = 5, seed: int = 0):
+    """K-fold estimators on TRAIN: [(held-out qids, estimators fit without them)].
+
+    The training table decides which configurations are tested and in what order.
+    Scored in-sample it is badly optimistic -- estimators fit on train look nearly
+    perfect there (Day 1 MATH-500: risk 0.000 on train vs ~0.06 on calibration) --
+    so every training question is scored by estimators that never saw it.
+    """
+    qids = sorted(tr_s)
+    random.Random(seed).shuffle(qids)
+    out = []
+    for f in range(folds):
+        held = set(qids[f::folds])
+        fs = {q: r for q, r in tr_s.items() if q not in held}
+        fb = {q: r for q, r in tr_b.items() if q not in held} if tr_b else None
+        out.append((sorted(held), fit_estimators(fs, fb, k_steps)))
+    return out
+
+
+def train_table(nm, fam, train, fold_ests, lam, big_model, k_steps):
+    """The table ``prune`` reads: cross-fitted for CAAC families, plain for
+    baselines (they fit nothing on train, so in-sample is already out-of-sample)."""
+    tr_s, tr_b = train
+    if nm not in CAAC or not fold_ests:
+        return build_table(fam, sorted(tr_s), tr_s, tr_b)
+    return concat_tables([build_table(caac_family(nm, e, lam, big_model, k_steps), held, tr_s, tr_b)
+                          for held, e in fold_ests])
+
+
 def caac_family(name: str, ests, lam: float, big_model, k_steps):
     est, est2, est3, rec = ests.stage1, ests.stage2, ests.gate, ests.recovery
     full = ("answer_now", "sample_more", "escalate")
@@ -120,9 +150,11 @@ def caac_family(name: str, ests, lam: float, big_model, k_steps):
         rho_mode=mode, recovery=gate, rhos=rhos, cost_model=ests.cost)
 
 
-def evaluate(fam, train, calib, test, a, orders, lams, coverages):
-    """Certify one family on calib, report on test, for every lam in ``lams``."""
-    t_train = build_table(fam, sorted(train[0]), *train)
+def evaluate(fam, train, calib, test, a, orders, lams, coverages, t_train=None):
+    """Certify one family on calib, report on test, for every lam in ``lams``.
+    ``t_train`` (the table ``prune`` reads) defaults to an in-sample replay."""
+    if t_train is None:
+        t_train = build_table(fam, sorted(train[0]), *train)
     fam = prune(fam, t_train, len(calib[0]), a.alpha, a.delta)
     if not fam.configs:
         return {"n_configs": 0, "by_lam": {}}
@@ -214,6 +246,7 @@ def main():
     orders = make_orders(width, a.perms, seed=1)
 
     ests = fit_estimators(tr_s, tr_b, k_steps) if any(n in CAAC for n in names) else None
+    fold_ests = fit_fold_estimators(tr_s, tr_b, k_steps) if ests else []
 
     train, calib, test = (tr_s, tr_b), (ca_s, ca_b), (te_s, te_b)
     res = {"alpha": a.alpha, "delta": a.delta, "n_train": len(tr_s), "n_calib": len(ca_s),
@@ -225,7 +258,8 @@ def main():
             res["families"][nm] = {"by_lam": {}}
             for lam in lams:
                 fam = caac_family(nm, ests, lam, big_model, k_steps)
-                r = evaluate(fam, train, calib, test, a, orders, [lam], coverages)
+                tt = train_table(nm, fam, train, fold_ests, lam, big_model, k_steps)
+                r = evaluate(fam, train, calib, test, a, orders, [lam], coverages, t_train=tt)
                 res["families"][nm]["by_lam"].update(r["by_lam"])
                 res["families"][nm].setdefault("n_certified", {})[f"{lam:g}"] = r.get("n_certified", 0)
         else:

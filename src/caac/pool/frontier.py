@@ -40,6 +40,7 @@ from math import sqrt
 from caac.pool.estimators import chow_coverage_bound
 from caac.pool.ledger import Call, cost_profiles
 from caac.pool.schema import PoolRecord
+from caac.pool.voting import greedy_vote_prob
 
 __all__ = [
     "RecoveryRate", "recovery_rate", "pi_after", "cap_serve", "cap_correct",
@@ -85,15 +86,17 @@ class RecoveryRate:
 
 
 def _maj_correct(rec: PoolRecord, k: int, threshold: float = 0.5) -> bool:
-    """Does majority voting over k samples land on the gold answer?
+    """Does the DEPLOYED vote over k samples land on the gold answer?
 
-    Uses the exact maj@k estimator over all C(n,k) subsets and counts the
-    question as recovered when gold wins more often than not. Deterministic;
+    The vote is the one the controller serves (``voting.serve_with_greedy``: the
+    greedy answer is one vote and wins ties, a sample cut off by the token cap
+    never votes), averaged exactly over the k-sample subsets. Counting the plain
+    sample majority here would measure a selector nothing deploys. Deterministic;
     no permutation sampling, so it cannot be tuned by a lucky seed.
     """
     if rec.n_samples == 0:
         return False
-    return rec.maj_at_k(k) > threshold
+    return greedy_vote_prob(rec, k) > threshold
 
 
 def recovery_rate(small: dict[str, PoolRecord], big: dict[str, PoolRecord] | None = None,
@@ -101,7 +104,7 @@ def recovery_rate(small: dict[str, PoolRecord], big: dict[str, PoolRecord] | Non
     """Measure r on a pool: of the questions the small model's greedy gets
     wrong, how many does SOME correcting action get right?
 
-    Correcting actions considered: ``sample_more`` (maj@k of the small model)
+    Correcting actions considered: ``sample_more`` (the deployed k-sample vote)
     and, when ``big`` is given, ``escalate`` (the big model's greedy).
     """
     qids = sorted(small if big is None else set(small) & set(big))

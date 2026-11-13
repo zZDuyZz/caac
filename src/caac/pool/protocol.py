@@ -34,7 +34,7 @@ from caac.pool.ledger import cost_profiles
 from caac.pool.ltt import min_served_certifiable, pvalue_selective_risk
 from caac.pool.schema import PoolRecord
 
-__all__ = ["Family", "Table", "build_table", "prune", "certify", "plugin_select", "pick_max_coverage",
+__all__ = ["Family", "Table", "build_table", "concat_tables", "prune", "certify", "plugin_select", "pick_max_coverage",
            "pick_min_cost", "summarize", "certified_frontier", "split_cost"]
 
 
@@ -152,18 +152,63 @@ def build_table(family: Family, qids, small: dict[str, PoolRecord],
                  served, wrong, ts, tb, fl, rd, mix, action_q, ws, wb)
 
 
+def concat_tables(tables: list[Table]) -> Table:
+    """Stack tables of the SAME family and configurations over disjoint questions
+    (used to assemble a cross-fitted training table fold by fold)."""
+    if not tables:
+        raise ValueError("no tables")
+    t0 = tables[0]
+    for t in tables[1:]:
+        if t.configs != t0.configs:
+            raise ValueError("tables must share their configurations")
+    qids = [q for t in tables for q in t.qids]
+    if len(set(qids)) != len(qids):
+        raise ValueError("tables must cover disjoint questions")
+    cat = lambda name: (None if getattr(t0, name) is None
+                        else np.concatenate([getattr(t, name) for t in tables], axis=0))
+    w = np.array([len(t.qids) for t in tables], float)
+    acts = []
+    for j in range(len(t0.configs)):
+        keys = {k for t in tables for k in (t.actions[j] if j < len(t.actions) else {})}
+        acts.append({k: float(sum(wi * (t.actions[j].get(k, 0.0) if j < len(t.actions) else 0.0)
+                                  for wi, t in zip(w, tables)) / w.sum()) for k in keys})
+    return Table(t0.family, qids, list(t0.configs), t0.paths, cat("served"), cat("wrong"),
+                 cat("tok_small"), cat("tok_big"), cat("flops"), cat("rounds"), acts,
+                 cat("action_q"), cat("waste_small"), cat("waste_big"))
+
+
 def prune(family: Family, train: Table, n_calib: int, alpha: float, delta: float,
-          slack: float = 1.5) -> Family:
-    """Drop configurations whose coverage on the TRAINING split says they would
-    serve too few calibration questions to ever be certified. Uses no
-    calibration data, so the pruned family is still fixed in advance."""
-    paths = family.testing_paths()
+          slack: float = 1.5, order: str = "train_pvalue") -> Family:
+    """Fix, from the TRAINING split alone, which configurations are tested and in
+    what order. Uses no calibration data, so the result is still fixed in advance.
+
+    1. Drop configurations whose training coverage says they would serve too few
+       calibration questions to ever be certified.
+    2. ``order="train_pvalue"`` (default): test the survivors as ONE fixed sequence
+       at the full ``delta``, in increasing order of their p-value on the training
+       split. The family's own order ("most conservative first") assumes risk falls
+       monotonically along it; when it does not -- on MATH-500 the most conservative
+       threshold made more errors than the next one -- a fixed sequence stops at its
+       first step and never reaches the configurations that would pass. Ordering by
+       a held-out estimate is the standard Learn-then-Test choice and needs no split
+       of ``delta`` across paths. ``order="family"`` keeps the family's paths, each
+       tested at ``delta / #paths`` (kept for comparison).
+    """
+    if order not in ("train_pvalue", "family"):
+        raise ValueError(f"unknown order {order!r}")
+    paths = family.testing_paths() if order == "family" else [list(range(len(family.configs)))]
     need = slack * min_served_certifiable(alpha, delta / max(1, len(paths))) / max(1, n_calib)
     cov = train.served.mean(0)
     keep = [j for j in range(len(family.configs)) if cov[j] >= need]
-    remap = {j: i for i, j in enumerate(keep)}
-    new_paths = [[remap[j] for j in path if j in remap] for path in paths]
-    new_paths = [pth for pth in new_paths if pth]
+    if order == "train_pvalue":
+        n, e = train.served.sum(0), train.wrong.sum(0)
+        p = {j: pvalue_selective_risk(int(round(n[j])), int(round(e[j])), alpha) for j in keep}
+        # stable sort: equal p-values keep the family order (conservative first)
+        new_paths = [sorted(range(len(keep)), key=lambda i: p[keep[i]])] if keep else []
+    else:
+        remap = {j: i for i, j in enumerate(keep)}
+        new_paths = [[remap[j] for j in path if j in remap] for path in paths]
+        new_paths = [pth for pth in new_paths if pth]
     return Family(family.name, [family.configs[j] for j in keep], family.make,
                   new_paths, family.needs_big, family.uses_order)
 
@@ -175,7 +220,8 @@ def _rows(table: Table, rows) -> np.ndarray:
 def certify(table: Table, rows, alpha: float, delta: float) -> tuple[np.ndarray, np.ndarray]:
     """Certified mask and p-values over the configurations, from ``rows`` only.
 
-    Each path is a fixed sequence (conservative first) tested at delta / #paths.
+    Each path is a fixed sequence tested at delta / #paths, in the order ``prune``
+    fixed from the training split (one path by default, so the full delta).
     Counts must be integers: certify a one-order table, never an averaged one.
     """
     r = _rows(table, rows)

@@ -706,12 +706,16 @@ def post_escalate_features(small: PoolRecord, big: PoolRecord, drawn: list[int],
     bg, sg = big.greedy, small.greedy
     maj = 0.0
     if drawn:
+        # agreement with the answer the small model would SERVE after sampling
+        # (greedy counts as a vote), not with a plain sample majority
         canon = small.canonical_sample_answers()
-        votes = [canon[i] for i in drawn if canon[i] is not None]
-        if votes:
-            top = Counter(votes).most_common(1)[0][0]
-            rep = next(i for i in drawn if canon[i] == top)
-            maj = float(_same(_raw(bg), _raw(small.samples[rep])))
+        top = serve_with_greedy(small, drawn)
+        if top is not None:
+            if top == small.greedy_label():
+                maj = float(_same(_raw(bg), _raw(sg)))
+            else:
+                rep = next(i for i in drawn if canon[i] == top)
+                maj = float(_same(_raw(bg), _raw(small.samples[rep])))
     return [
         bg.confidence if bg.confidence is not None else 0.0,
         float(bg.finish_reason == "length"),

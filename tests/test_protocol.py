@@ -80,6 +80,43 @@ def test_prune_uses_training_coverage_only():
     assert out.configs == [2] and out.paths == [[0]]
 
 
+def _non_monotone():
+    """Config 0 is the 'most conservative' one but makes errors; 1 and 2 serve
+    more and are clean. Same pattern on train and on calibration."""
+    served = [[1, 1, 1]] * 120 + [[0, 1, 1]] * 30 + [[0, 0, 1]] * 30
+    wrong = [[1, 0, 0]] * 12 + [[0, 0, 0]] * 168
+    return served, wrong
+
+
+def test_family_order_stalls_when_the_conservative_end_is_not_the_safest():
+    served, wrong = _non_monotone()
+    fam = Family("f", [0, 1, 2], make=lambda c: None, paths=[[0, 1, 2]])
+    out = prune(fam, _table(served, wrong), n_calib=180, alpha=0.1, delta=0.1, order="family")
+    cal = _table(served, wrong, paths=out.paths)
+    ok, _ = certify(cal, None, 0.1, 0.1)
+    assert not ok.any()          # stops at config 0 and never reaches the clean ones
+
+
+def test_train_pvalue_order_reaches_the_clean_configurations():
+    served, wrong = _non_monotone()
+    fam = Family("f", [0, 1, 2], make=lambda c: None, paths=[[0], [1], [2]])
+    out = prune(fam, _table(served, wrong), n_calib=180, alpha=0.1, delta=0.1)
+    assert len(out.paths) == 1 and out.paths[0][-1] == 0     # one path, the risky config last
+    cal = _table(served, wrong, paths=out.paths)
+    ok, _ = certify(cal, None, 0.1, 0.1)
+    assert ok[1] and ok[2] and not ok[0]
+
+
+def test_prune_order_reads_only_the_training_table():
+    served, wrong = _non_monotone()
+    fam = Family("f", [0, 1, 2], make=lambda c: None)
+    a = prune(fam, _table(served, wrong), n_calib=180, alpha=0.1, delta=0.1)
+    b = prune(fam, _table(served, wrong), n_calib=180, alpha=0.1, delta=0.1)
+    assert a.paths == b.paths and a.configs == b.configs
+    with pytest.raises(ValueError):
+        prune(fam, _table(served, wrong), n_calib=180, alpha=0.1, delta=0.1, order="calib")
+
+
 # --------------------------------------------------------------------------- #
 # costs and tables
 # --------------------------------------------------------------------------- #

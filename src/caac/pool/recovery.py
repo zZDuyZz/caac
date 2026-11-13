@@ -74,8 +74,12 @@ def oracle_rescue(small: PoolRecord, k: int) -> float:
     says the samples contain the answer but the voter cannot find it, which is
     a statement about the selector, not about recoverability.
     """
-    if small.greedy.correct:
-        return 1.0          # the greedy answer is a vote, so a perfect selector keeps it
+    # The greedy answer is a vote, so a perfect selector keeps it. Its CLASS can be
+    # graded correct while the completion itself was not (the matcher can merge
+    # "0.2" with "20%", which the gold grader keeps apart): the vote then serves
+    # a correct class, so the ceiling must count it too or it stops being one.
+    if small.greedy.correct or small.label_correct(small.greedy_label()):
+        return 1.0
     n = small.n_samples
     if not n:
         return 0.0
@@ -90,7 +94,7 @@ def oracle_rescue(small: PoolRecord, k: int) -> float:
         if num <= 0:
             return 1.0
         p_none *= num / (n - i)
-    return 1.0 - p_none
+    return 1.0 if p_none < 1e-12 else 1.0 - p_none
 
 
 def _escalate_correct(big: PoolRecord | None) -> float | None:

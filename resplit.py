@@ -23,7 +23,7 @@ import numpy as np
 from caac.pool.protocol import (build_table, certify, pick_max_coverage, pick_min_cost,
                                 plugin_select, prune, summarize)
 from caac.pool.schema import load_pool
-from certify import CAAC, baseline_family, caac_family, fit_estimators
+from certify import CAAC, baseline_family, caac_family, fit_estimators, fit_fold_estimators, train_table
 
 
 def run(table, n, alpha, delta, splits, frac, rule, lam, min_cov, seed):
@@ -87,6 +87,7 @@ def main():
     n_small = min(r.n_samples for p in (tr_s, po_s) for r in p.values())
 
     ests = fit_estimators(tr_s, tr_b, k_steps) if any(n in CAAC for n in names) else None
+    fold_ests = fit_fold_estimators(tr_s, tr_b, k_steps) if ests else []
 
     qids = sorted(po_s)
     n_cal = int(a.calib_frac * len(qids))
@@ -95,7 +96,8 @@ def main():
     for nm in names:
         fam = (caac_family(nm, ests, a.lam, big_model, k_steps) if nm in CAAC
                else baseline_family(nm, n_big, n_small))
-        fam = prune(fam, build_table(fam, sorted(tr_s), tr_s, tr_b), n_cal, a.alpha, a.delta)
+        tt = train_table(nm, fam, (tr_s, tr_b), fold_ests, a.lam, big_model, k_steps)
+        fam = prune(fam, tt, n_cal, a.alpha, a.delta)
         table = build_table(fam, qids, po_s, po_b)
         res["families"][nm] = run(table, len(qids), a.alpha, a.delta, a.splits, a.calib_frac,
                                   a.rule, a.lam, a.min_coverage, a.seed)
