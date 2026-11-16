@@ -105,6 +105,39 @@ def rescue_table(small: dict, big: dict, cap: int) -> dict[str, float]:
             "small_right_big_wrong": sum(x and (not y) for x, y in zip(s, b)) / n}
 
 
+def read_graded(path: str) -> tuple[list, list]:
+    """(greedy, samples) as lists of (correct, decode tokens; CUT if it hit the probe cap)."""
+    g, s = [], []
+    op = gzip.open if path.endswith(".gz") else open
+    with op(path, "rt") as f:
+        for line in f:
+            r = json.loads(line)
+            for dst, comps in ((g, [r["greedy"]]), (s, r.get("samples", []))):
+                for c in comps:
+                    if "correct" not in c:
+                        return [], []
+                    dst.append((bool(c["correct"]),
+                                CUT if c.get("finish_reason") == "length" else c["decode_tokens"]))
+    return g, s
+
+
+def acc_at(comps: list, cap: int) -> float:
+    """Accuracy when every answer longer than ``cap`` counts wrong (what a run at ``cap`` does)."""
+    return sum(ok and t <= cap for ok, t in comps) / len(comps) if comps else float("nan")
+
+
+def accuracy_cap(g: list, s: list, grid: tuple, tol: float) -> int:
+    """Smallest grid cap whose greedy AND sampled accuracy are within ``tol`` of the accuracy at
+    the largest grid cap (the probe cap). Accuracy can only grow with the cap, so this is the
+    point past which a larger budget buys less than ``tol``. Equal to the largest cap means the
+    probe was not long enough to see the curve flatten."""
+    top = grid[-1]
+    for c in grid:
+        if all(acc_at(x, top) - acc_at(x, c) <= tol + 1e-12 for x in (g, s) if x):
+            return c
+    return top
+
+
 def throughput(path: str) -> float | None:
     try:
         with open(path + ".manifest.json") as f:
@@ -120,6 +153,9 @@ def round_up(x: int, m: int = 512) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("pools", nargs="+")
+    ap.add_argument("--acc-tol", type=float, default=0.015,
+                    help="accuracy rule (2026-11-16, chosen before any test pool): smallest cap "
+                         "whose greedy and sampled accuracy are within this of the probe cap")
     ap.add_argument("--target", type=float, default=0.02)  # 2026-11-09: 5%->2%, 5% leaves enough
     # truncated-and-scored-wrong answers for a reviewer to object; the token cost of the
     # tighter tail is small next to the credibility it buys (see CAAC_MASTER 3.12).
@@ -150,13 +186,31 @@ def main() -> None:
             rec[key] = max(rec.get(key, 0), cap)
         else:
             rec[key] = max(rec.get(key, 0), 10**9)      # marks "not reached"
-        stats[p] = (name, key, toks)
+        stats[p] = (name, key, toks, grid)
+    acc_rec: dict[str, int] = {}
+    acc_lines = []
+    for p in pools:
+        g, s = read_graded(p)
+        if not g:
+            continue
+        name, key, _, grid = stats[p]
+        cap = accuracy_cap(g, s, grid, args.acc_tol)
+        acc_rec[key] = max(acc_rec.get(key, 0), cap)
+        cells = " | ".join(f"{c}: g {acc_at(g, c):.3f} s {acc_at(s, c):.3f}" for c in grid if c >= 1024)
+        flag = "   << AT THE PROBE CAP: curve not flat yet, probe longer" if cap == grid[-1] and len(grid) > 1 else ""
+        acc_lines.append(f"  {name}: {cells}\n    -> smallest cap within {args.acc_tol * 100:.1f} points "
+                         f"(greedy {len(g)}, samples {len(s)}): {cap}{flag}")
+    if acc_lines:
+        print("\nACCURACY BY CAP (TRAIN; answers longer than the cap count wrong; g = greedy, s = samples):")
+        print("\n".join(acc_lines))
+        print(f"ACCURACY RULE: MT_M={acc_rec.get('MT_M', 'n/a')} MT_G={acc_rec.get('MT_G', 'n/a')}   "
+              "(the cap rule of 16/11: both models, greedy and sampled; truncation is reported, not targeted)")
     print()
     failed = any(v >= 10**9 for v in rec.values())
     chosen = plateau if failed else rec
 
     print("FORECAST INPUTS (mean decode tokens per completion at the cap below; measured speed):")
-    for p, (name, key, toks) in stats.items():
+    for p, (name, key, toks, _) in stats.items():
         tps = throughput(p)
         print(f"  {name}: cap {chosen[key]} -> mean {mean_tokens_at(toks, chosen[key]):.0f} tokens"
               + (f", {tps:.0f} tok/s" if tps else ", speed not recorded"))
@@ -168,7 +222,7 @@ def main() -> None:
         pb = p.replace("_qs.", "_qb.")
         if pb not in pools:
             continue
-        name, key, _ = stats[p]
+        name, key, _, _ = stats[p]
         t = rescue_table(read_greedy(p), read_greedy(pb), chosen[key])
         print(f"  {name.split('_q')[0]}: n={t['n']}  small acc {t['acc_small']:.3f}  big acc {t['acc_big']:.3f}  "
               f"| small wrong & big right {t['small_wrong_big_right']:.3f}  both wrong {t['both_wrong']:.3f}  "

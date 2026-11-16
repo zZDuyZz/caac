@@ -28,8 +28,9 @@ def _install_fakes(monkeypatch, calls):
     vllm = types.ModuleType("vllm")
 
     class SamplingParams:
-        def __init__(self, n=1, temperature=0.0, max_tokens=16, logprobs=None, seed=None):
-            self.n, self.temperature, self.seed = n, temperature, seed
+        def __init__(self, n=1, temperature=0.0, max_tokens=16, logprobs=None, seed=None, **kw):
+            self.n, self.temperature, self.seed, self.kw = n, temperature, seed, kw
+            calls.append(("sp", temperature, dict(kw)))
 
     class LLM:
         def __init__(self, **kw):
@@ -242,3 +243,41 @@ def test_throughput_is_recorded_for_run_time_forecasts(monkeypatch, tmp_path):
     _run(monkeypatch, out)                              # nothing to do: the totals survive
     again = json.loads((tmp_path / "th.jsonl.gz.manifest.json").read_text())["throughput"]
     assert again["decode_tokens"] == thr["decode_tokens"]
+
+
+def test_default_decoding_sends_exactly_the_old_requests(monkeypatch, tmp_path):
+    """No new keyword reaches vLLM unless asked for: old protocols are reproduced bit for bit."""
+    calls = []
+    _install_fakes(monkeypatch, calls)
+    _run(monkeypatch, tmp_path / "d.jsonl.gz")
+    assert all(c[2] == {} for c in calls if c[0] == "sp")
+    man = json.loads((tmp_path / "d.jsonl.gz.manifest.json").read_text())
+    assert (man["top_p"], man["top_k"], man["min_p"], man["presence_penalty"]) == (1.0, 0, 0.0, 0.0)
+
+
+def test_vendor_decoding_reaches_samples_and_greedy(monkeypatch, tmp_path):
+    calls = []
+    _install_fakes(monkeypatch, calls)
+    out = tmp_path / "c.jsonl.gz"
+    _run(monkeypatch, out, ["--temperature", "1.0", "--top-p", "0.95", "--top-k", "20",
+                            "--presence-penalty", "1.5"])
+    greedy = [c[2] for c in calls if c[0] == "sp" and c[1] == 0.0]
+    samples = [c[2] for c in calls if c[0] == "sp" and c[1] == 1.0]
+    assert greedy and all(g == {"presence_penalty": 1.5} for g in greedy)
+    assert samples and all(x == {"top_p": 0.95, "top_k": 20, "presence_penalty": 1.5} for x in samples)
+    r = _read(out)[0]
+    assert r["decoding"] == {"top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 1.5}
+    # a pool cannot be resumed under another decoding
+    with pytest.raises(SystemExit) as e:
+        _run(monkeypatch, out, ["--temperature", "1.0", "--top-p", "0.95", "--top-k", "20"])
+    assert "presence_penalty" in str(e.value)
+
+
+def test_a_pool_with_decoding_loads_with_the_replay_schema(monkeypatch, tmp_path):
+    """Regression (dry run 16/11): the new 'decoding' field must not break load_pool."""
+    from caac.pool.schema import load_pool
+    _install_fakes(monkeypatch, [])
+    out = tmp_path / "s.jsonl.gz"
+    _run(monkeypatch, out, ["--top-k", "20", "--presence-penalty", "1.5"])
+    pool = load_pool(out)
+    assert len(pool) == 5 and next(iter(pool.values())).decoding["top_k"] == 20

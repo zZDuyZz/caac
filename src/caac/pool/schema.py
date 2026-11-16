@@ -62,6 +62,9 @@ class PoolRecord:
     greedy: Completion
     samples: list[Completion] = field(default_factory=list)
     temperature: float = 0.7
+    # top_p / top_k / min_p / presence_penalty of the samples (presence_penalty also of the
+    # greedy answer); None for pools built before 2026-11-16, which used temperature only
+    decoding: dict | None = None
     confidence_semantics: str = "vllm_v0_post_temperature"  # see PLAN_V2 section 3
     schema_version: str = SCHEMA_VERSION
     meta: dict = field(default_factory=dict)

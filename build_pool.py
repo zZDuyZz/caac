@@ -130,6 +130,7 @@ def env_flags() -> dict:
 # What defines a pool. A pool resumed with any of these changed would silently mix two
 # protocols under one manifest (e.g. half the questions at one token cap, half at another).
 PROTOCOL_KEYS = ("model", "dataset", "split", "n_samples", "temperature", "max_tokens",
+                 "top_p", "top_k", "min_p", "presence_penalty",
                  "top_logprobs", "logprobs_mode", "thinking", "max_num_seqs", "max_model_len",
                  "grader", "qids_file", "batch_size", "env_flags", "versions")
 
@@ -141,6 +142,26 @@ def manifest_conflicts(old: dict, new: dict) -> list[str]:
     """
     return [f"{k}: pool has {old[k]!r}, this run has {new.get(k)!r}"
             for k in PROTOCOL_KEYS if k in old and old[k] != new.get(k)]
+
+
+def decoding_kwargs(args) -> tuple[dict, dict]:
+    """Extra SamplingParams keywords for the greedy request and for the samples.
+
+    Only values that differ from the defaults are passed, so a pool built without these
+    options sends vLLM exactly the requests it sent before they existed.
+    """
+    sample_kw: dict = {}
+    if args.top_p != 1.0:
+        sample_kw["top_p"] = args.top_p
+    if args.top_k > 0:
+        sample_kw["top_k"] = args.top_k
+    if args.min_p > 0.0:
+        sample_kw["min_p"] = args.min_p
+    greedy_kw: dict = {}
+    if args.presence_penalty != 0.0:
+        sample_kw["presence_penalty"] = args.presence_penalty
+        greedy_kw["presence_penalty"] = args.presence_penalty
+    return greedy_kw, sample_kw
 
 
 def mean_token_prob(logprobs: list[float]) -> float:
@@ -219,6 +240,15 @@ def main():
     p.add_argument("--n-samples", type=int, default=32)
     p.add_argument("--n-questions", type=int, default=None, help="cap for pilot")
     p.add_argument("--temperature", type=float, default=0.7)
+    # Decoding beyond temperature (2026-11-16). Defaults reproduce every earlier pool exactly:
+    # nothing is passed to vLLM unless set. The vendor-recommended Qwen3.5 profiles use
+    # top_k=20 and a presence penalty against endless repetition (model card, "Best Practices").
+    p.add_argument("--top-p", type=float, default=1.0)
+    p.add_argument("--top-k", type=int, default=0, help="0 = off")
+    p.add_argument("--min-p", type=float, default=0.0)
+    p.add_argument("--presence-penalty", type=float, default=0.0,
+                   help="applied to the samples AND the greedy answer (argmax of the same "
+                        "penalised logits), so both follow one decoding protocol")
     p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--top-logprobs", type=int, default=5, help="top-k logprobs to store")
     p.add_argument("--batch-size", type=int, default=150, help="questions per generate() call")
@@ -316,6 +346,8 @@ def main():
     manifest = {
         "model": args.model, "dataset": args.dataset, "split": args.split,
         "n_samples": args.n_samples, "temperature": args.temperature,
+        "top_p": args.top_p, "top_k": args.top_k, "min_p": args.min_p,
+        "presence_penalty": args.presence_penalty,
         "max_tokens": args.max_tokens, "top_logprobs": args.top_logprobs,
         "engine": "vllm_v1", "logprobs_mode": args.logprobs_mode,
         "confidence_semantics": conf_sem,
@@ -354,6 +386,7 @@ def main():
             for r in records:
                 f.write(r + "\n")
 
+    greedy_kw, sample_kw = decoding_kwargs(args)
     for start in range(0, len(todo), args.batch_size):
         batch = todo[start:start + args.batch_size]
         prompts = [build_prompt(pr["question"]) for pr in batch]
@@ -361,7 +394,7 @@ def main():
 
         t_gen = time.time()
         greedy_sp = SamplingParams(temperature=0.0, max_tokens=args.max_tokens,
-                                   logprobs=args.top_logprobs)
+                                   logprobs=args.top_logprobs, **greedy_kw)
         greedy_out = llm.generate(prompts, greedy_sp)
 
         # one request per sample (n=1, explicit seed); regrouped per question below
@@ -372,7 +405,7 @@ def main():
                 s_prompts.append(text)
                 sps.append(SamplingParams(n=1, temperature=args.temperature,
                                           max_tokens=args.max_tokens,
-                                          logprobs=args.top_logprobs, seed=sd))
+                                          logprobs=args.top_logprobs, seed=sd, **sample_kw))
         flat = llm.generate(s_prompts, sps) if n > 0 else []
         sample_outs = [[o.outputs[0] for o in flat[i * n:(i + 1) * n]]
                        for i in range(len(batch))]
@@ -403,6 +436,8 @@ def main():
                 "greedy": g_d,
                 "samples": [d for d, _, _ in s_trip],
                 "temperature": args.temperature,
+                "decoding": {"top_p": args.top_p, "top_k": args.top_k, "min_p": args.min_p,
+                             "presence_penalty": args.presence_penalty},
                 "confidence_semantics": conf_sem,
                 "schema_version": "1.0",
             }

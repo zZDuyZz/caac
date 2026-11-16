@@ -23,7 +23,17 @@ QS=Qwen/Qwen3.5-2B; QB=Qwen/Qwen3.5-9B
 # (STOP_AFTER=capprobe -> cap_curve.py prints "RECOMMEND: MT_M=.. MT_G=.. MML=.."):
 #   TAG=v3 MT_M=<..> MT_G=<..> MML=<..> bash session2_all.sh
 TAG=${TAG:-v2}; MT_M=${MT_M:-1024}; MT_G=${MT_G:-512}
-case "${STOP_AFTER:-}" in ""|capprobe|test_pools) ;; *) echo "STOP_AFTER không hợp lệ: '$STOP_AFTER' (dùng capprobe hoặc test_pools)"; exit 1;; esac
+case "${STOP_AFTER:-}" in ""|card|capprobe|test_pools) ;; *) echo "STOP_AFTER không hợp lệ: '$STOP_AFTER' (dùng card, capprobe hoặc test_pools)"; exit 1;; esac
+# Decoding per model (2026-11-16). Empty = the old protocol (temperature 0.7 only, no top-k, no
+# penalty), which reproduces v2/v3 exactly. A new TAG sets both to the vendor profile read from
+# the model card (STOP_AFTER=card prints it from the local cache), e.g.
+#   DEC_QS="--temperature 1.0 --top-p 1.0 --top-k 20 --presence-penalty 2.0"
+# The strings go into protocol.lock, every manifest and every record.
+DEC_QS=${DEC_QS:-}; DEC_QB=${DEC_QB:-}
+if { [ -n "$DEC_QS" ] && [ -z "$DEC_QB" ]; } || { [ -z "$DEC_QS" ] && [ -n "$DEC_QB" ]; }; then
+  echo "DEC_QS và DEC_QB phải cùng đặt hoặc cùng để trống (hai model một giao thức)"; exit 1
+fi
+dec() { if [ "$1" = "$QS" ]; then echo "$DEC_QS"; else echo "$DEC_QB"; fi; }
 # Every set the run generates, with its cap. preflight_prompts.py checks each prompt against
 # max_model_len; for a new TAG it also chooses max_model_len, so the value is never guessed.
 SETS="--set math500:test::$MT_M --set gsm8k:test::$MT_G \
@@ -34,6 +44,10 @@ P=/workspace/pools_$TAG; H=/workspace/hidden; M=/workspace
 if [ "$TAG" = v2 ]; then OUT=outputs/s2; MK=".s2_done_"; BULK=$M/s2_bulk.tar; OUTTAR=$M/s2_outputs.tar.gz
 else OUT=outputs/s2_$TAG; MK=".s2_done_${TAG}_"; BULK=$M/s2_bulk_$TAG.tar; OUTTAR=$M/s2_outputs_$TAG.tar.gz; fi
 mkdir -p "$P" "$H" "$OUT"
+if [ "${STOP_AFTER:-}" = card ]; then   # in lời khuyên giải mã CHÍNH THỨC từ model card trong cache, rồi dừng
+  python print_model_card.py $QS $QB | tee "$OUT/model_card_sampling.txt"
+  echo; echo ">>> Gửi mình đoạn trên ($OUT/model_card_sampling.txt). Chưa tốn giờ GPU."; exit 0
+fi
 if [ "${STOP_AFTER:-}" != capprobe ] && [ -z "${MML:-}" ]; then
   MML=$(python preflight_prompts.py --model $QS --model $QB $SETS) || { echo "preflight lỗi"; exit 1; }
 fi
@@ -43,7 +57,7 @@ MML=${MML:-2048}
 # checked against the first -- calibration pools at other caps than the test pools would
 # break the exchangeability the certificate rests on, and nothing downstream would notice.
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
-LOCK="$OUT/protocol.lock"; NOW="MT_M=$MT_M MT_G=$MT_G MML=$MML GPU=$GPU_NAME"
+LOCK="$OUT/protocol.lock"; NOW="MT_M=$MT_M MT_G=$MT_G MML=$MML GPU=$GPU_NAME DEC_QS=[$DEC_QS] DEC_QB=[$DEC_QB]"
 if [ "${STOP_AFTER:-}" != capprobe ]; then
   if [ -f "$LOCK" ] && [ "$(cat "$LOCK")" != "$NOW" ]; then
     echo "!!!!!! GIAO THỨC KHÁC với các pool đã có của TAG=$TAG:"
@@ -54,8 +68,9 @@ if [ "${STOP_AFTER:-}" != capprobe ]; then
   fi
   [ -f "$LOCK" ] || echo "$NOW" > "$LOCK"
 fi
-if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap ${PROBE_CAP:-4096}, max_model_len ${PROBE_MML:-6144})  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
+if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap ${PROBE_CAP:-4096}, max_model_len ${PROBE_MML:-6144}, ${PROBE_NS:-2} samples)  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
 else echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; fi
+echo "DECODING: small [${DEC_QS:-temperature 0.7 only}]  big [${DEC_QB:-temperature 0.7 only}]"
 T0=$(date +%s)
 FREE_GB=$(df -BG --output=avail "$M" 2>/dev/null | tail -1 | tr -dc '0-9')
 echo "Dung lượng trống tại $M: ${FREE_GB:-?} GB$([ "${FREE_GB:-99}" -lt 10 ] && echo '   !!!!!! DƯỚI 10 GB — pool + tarball có thể không đủ chỗ')"
@@ -83,11 +98,11 @@ s0_capprobe() {
   PROBE_CAP=${PROBE_CAP:-4096}; PROBE_MML=${PROBE_MML:-6144}
   PSETS="--set math_train:train:qids/probe_math_train.txt:$PROBE_CAP --set gsm8k:train:qids/probe_gsm8k_train.txt:$PROBE_CAP"
   python preflight_prompts.py --model $QS --model $QB $PSETS --max-model-len $PROBE_MML || return 1
-  PB="python build_pool.py --max-model-len $PROBE_MML --max-tokens $PROBE_CAP --n-samples 2"
+  PB="python build_pool.py --max-model-len $PROBE_MML --max-tokens $PROBE_CAP --n-samples ${PROBE_NS:-2}"
   for MD in "$QS qs" "$QB qb"; do
     set -- $MD
-    $PB --model $1 --dataset math_train --split train --qids-file qids/probe_math_train.txt --out "$PR/math_train_$2.jsonl.gz" || return 1
-    $PB --model $1 --dataset gsm8k --split train --qids-file qids/probe_gsm8k_train.txt --out "$PR/gsm8k_train_$2.jsonl.gz" || return 1
+    $PB $(dec $1) --model $1 --dataset math_train --split train --qids-file qids/probe_math_train.txt --out "$PR/math_train_$2.jsonl.gz" || return 1
+    $PB $(dec $1) --model $1 --dataset gsm8k --split train --qids-file qids/probe_gsm8k_train.txt --out "$PR/gsm8k_train_$2.jsonl.gz" || return 1
   done
   python cap_curve.py "$PR"/math_train_qs.jsonl.gz "$PR"/math_train_qb.jsonl.gz "$PR"/gsm8k_train_qs.jsonl.gz "$PR"/gsm8k_train_qb.jsonl.gz \
     | tee "$OUT/cap_curve.txt"
@@ -97,10 +112,10 @@ s0_capprobe() {
 }
 s0_smoke() {
   rm -f "$P"/smoke_*
-  $BP --model $QS --dataset gsm8k   --n-questions 5 --n-samples 4 --max-tokens 512  --out "$P/smoke_gsm8k.jsonl.gz" || return 1
-  $BP --model $QS --dataset math500 --n-questions 5 --n-samples 4 --max-tokens 1024 --out "$P/smoke_math.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset gsm8k   --n-questions 5 --n-samples 4 --max-tokens 512  --out "$P/smoke_gsm8k.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset math500 --n-questions 5 --n-samples 4 --max-tokens 1024 --out "$P/smoke_math.jsonl.gz" || return 1
   # model lớn cũng phải nạp + sinh được TRƯỚC khi tốn ~1 giờ cho pool model nhỏ
-  $BP --model $QB --dataset gsm8k   --n-questions 3 --n-samples 2 --max-tokens 512  --out "$P/smoke_gsm8k_qb.jsonl.gz" || return 1
+  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-questions 3 --n-samples 2 --max-tokens 512  --out "$P/smoke_gsm8k_qb.jsonl.gz" || return 1
   python smoke_check.py "$P/smoke_gsm8k.jsonl.gz"    --min-correct 3 || return 1
   python smoke_check.py "$P/smoke_math.jsonl.gz"     --min-correct 1 || return 1
   python smoke_check.py "$P/smoke_gsm8k_qb.jsonl.gz" --min-correct 2 || return 1
@@ -125,10 +140,10 @@ s0_params() {
 # Big model: 16 samples on the TEST pools. It is the escalate target, so its pass@k ceiling is
 # the ceiling of the whole controller.
 s1_test_pools() {
-  $BP --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
-  $BP --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
-  $BP --model $QB --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
+  $BP $(dec $QS) --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
+  $BP $(dec $QB) --model $QB --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
+  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
 }
 s2_compare() {
   # Pool A2 là Qwen2.5 -> không còn đối chiếu tái lập với A2. Thay bằng KIỂM TÍNH XÁC ĐỊNH:
@@ -138,14 +153,14 @@ s2_compare() {
   # (a) SAME batch composition as the main pool's first batch (150 questions, 16 samples,
   #     batch-size 150). Nothing about the generate() call differs, so this is the run-to-run
   #     variation of identical requests (engine scheduling or this pipeline). Expect ~100%.
-  $BP --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
+  $BP $(dec $QS) --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
       --max-tokens $MT_G --out "$P/det_same_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_same_gsm8k_qs.jsonl.gz" \
       | tee "$OUT/determinism_same_batch.txt"
   # (b) DIFFERENT batch composition (30 questions, 4 samples). vLLM V1 is not batch-invariant,
   #     so this is expected to disagree; reporting both arms separates the two causes in the
   #     Limitations section instead of leaving one alarming number.
-  $BP --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens $MT_G --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
+  $BP $(dec $QS) --model $QS --dataset gsm8k --n-questions 30 --n-samples 4 --max-tokens $MT_G --out "$P/det_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_gsm8k_qs.jsonl.gz" | tee "$OUT/determinism_gsm8k_qs.txt"
   return 0
 }
@@ -155,7 +170,7 @@ s3_cross() {
   # It measures whether two machines of the same GPU type produce the same pool. Report only.
   [ -f "$M/.s2_restored_$TAG" ] && [ -f "$P/gsm8k_qs.jsonl.gz" ] || { echo "pool test sinh tại máy này — không cần so chéo máy"; return 0; }
   rm -f "$P"/det_cross_gsm8k_qs*
-  $BP --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
+  $BP $(dec $QS) --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
       --max-tokens $MT_G --out "$P/det_cross_gsm8k_qs.jsonl.gz" || return 0
   python compare_pools.py "$P/gsm8k_qs.jsonl.gz" "$P/det_cross_gsm8k_qs.jsonl.gz" \
       | tee "$OUT/determinism_cross_machine.txt"
@@ -165,12 +180,12 @@ s3_cross() {
 # draws as any policy may take: CAAC samples up to 16 from the small model, and PriceCheck's
 # races draw up to 6 re-solves from the big one (8 leaves headroom).
 s4_a3() {
-  $BP --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 16 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
-  $BP --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 16 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
+  $BP $(dec $QB) --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
   for D in math_train math_test_ex500; do
     S=train; [ $D = math_test_ex500 ] && S=test
-    $BP --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 16 --max-tokens $MT_M --out "$P/a3_${D}_qs.jsonl.gz" || return 1
-    $BP --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens $MT_M --out "$P/a3_${D}_qb.jsonl.gz" || return 1
+    $BP $(dec $QS) --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 16 --max-tokens $MT_M --out "$P/a3_${D}_qs.jsonl.gz" || return 1
+    $BP $(dec $QB) --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens $MT_M --out "$P/a3_${D}_qb.jsonl.gz" || return 1
   done
 }
 s5_hidden() {

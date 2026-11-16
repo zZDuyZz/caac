@@ -105,3 +105,33 @@ def test_a_pool_cut_below_the_grid_top_says_nothing_about_larger_caps(tmp_path):
             f.write(json.dumps({"query_id": f"q{i}", "prompt_tokens": 80, "greedy": comp, "samples": []}) + "\n")
     r = subprocess.run([sys.executable, "cap_curve.py", str(m)], capture_output=True, text=True)
     assert r.returncode == 2 and "NONE up to 1024" in r.stdout and "1536" not in r.stdout
+
+
+def _comps(n, correct_by_cap):
+    """n completions; correct_by_cap[c] = number correct with length <= c (cumulative)."""
+    out, prev = [], 0
+    for c, k in sorted(correct_by_cap.items()):
+        out += [(True, c)] * (k - prev)
+        prev = k
+    return out + [(False, 100)] * (n - prev)
+
+
+def test_accuracy_rule_reproduces_the_16_11_choice():
+    """Probe of 16/11 (TRAIN, cap 12288): the rule gives MT_M=8192 and MT_G=6144."""
+    from cap_curve import accuracy_cap
+    grid = (2048, 3072, 4096, 6144, 8192, 12288)
+    math_g = _comps(200, dict(zip(grid, (120, 125, 127, 132, 132, 132))))
+    math_s = _comps(400, dict(zip(grid, (210, 215, 227, 242, 249, 254))))
+    gsm_g = _comps(200, dict(zip(grid, (160, 162, 162, 162, 162, 162))))
+    gsm_s = _comps(400, dict(zip(grid, (304, 306, 306, 311, 311, 313))))
+    assert accuracy_cap(math_g, math_s, grid, 0.015) == 8192
+    assert accuracy_cap(gsm_g, gsm_s, grid, 0.015) == 6144
+
+
+def test_accuracy_rule_flags_a_probe_that_is_too_short(tmp_path):
+    m = tmp_path / "math_train_qs.jsonl.gz"
+    # probe cap 4096 (10 answers cut there); 40 correct answers finish just below it
+    rows = [(4090, True)] * 40 + [(4096, False)] * 10 + [(300, True)] * 50
+    _graded_pool(m, rows)
+    out = subprocess.run([sys.executable, "cap_curve.py", str(m)], capture_output=True, text=True).stdout
+    assert "ACCURACY RULE: MT_M=" in out and "AT THE PROBE CAP" in out
