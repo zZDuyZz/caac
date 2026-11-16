@@ -27,7 +27,7 @@ import gzip
 import json
 import sys
 
-GRID = (256, 384, 512, 768, 1024, 1536, 2048, 2560, 3072, 3584, 4096)
+GRID = (256, 384, 512, 768, 1024, 1536, 2048, 2560, 3072, 3584, 4096, 6144, 8192, 12288)
 CUT = 10**9      # length of a completion cut at the probe cap: unknown, longer than any cap
 
 

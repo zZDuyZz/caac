@@ -54,7 +54,7 @@ if [ "${STOP_AFTER:-}" != capprobe ]; then
   fi
   [ -f "$LOCK" ] || echo "$NOW" > "$LOCK"
 fi
-if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap 4096, max_model_len 6144)  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
+if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap ${PROBE_CAP:-4096}, max_model_len ${PROBE_MML:-6144})  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
 else echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; fi
 T0=$(date +%s)
 FREE_GB=$(df -BG --output=avail "$M" 2>/dev/null | tail -1 | tr -dc '0-9')
@@ -77,9 +77,13 @@ s0_capprobe() {
   PR=$M/probe_$TAG; mkdir -p "$PR"
   [ -f qids/probe_math_train.txt ]  || python make_qids.py --dataset math_train --n 200 --seed 1 --out qids/probe_math_train.txt || return 1
   [ -f qids/probe_gsm8k_train.txt ] || python make_qids.py --dataset gsm8k --split train --n 200 --seed 1 --out qids/probe_gsm8k_train.txt || return 1
-  PSETS="--set math_train:train:qids/probe_math_train.txt:4096 --set gsm8k:train:qids/probe_gsm8k_train.txt:4096"
-  python preflight_prompts.py --model $QS --model $QB $PSETS --max-model-len 6144 || return 1
-  PB="python build_pool.py --max-model-len 6144 --max-tokens 4096 --n-samples 2"
+  # PROBE_CAP / PROBE_MML default to the first probe (4096 / 6144). The 2026-11-16 probe showed MATH
+  # still 30% cut at 4096, so a second probe runs the SAME questions at a higher cap under its own
+  # TAG (e.g. TAG=v3long PROBE_CAP=12288 PROBE_MML=14336), leaving the first probe untouched.
+  PROBE_CAP=${PROBE_CAP:-4096}; PROBE_MML=${PROBE_MML:-6144}
+  PSETS="--set math_train:train:qids/probe_math_train.txt:$PROBE_CAP --set gsm8k:train:qids/probe_gsm8k_train.txt:$PROBE_CAP"
+  python preflight_prompts.py --model $QS --model $QB $PSETS --max-model-len $PROBE_MML || return 1
+  PB="python build_pool.py --max-model-len $PROBE_MML --max-tokens $PROBE_CAP --n-samples 2"
   for MD in "$QS qs" "$QB qb"; do
     set -- $MD
     $PB --model $1 --dataset math_train --split train --qids-file qids/probe_math_train.txt --out "$PR/math_train_$2.jsonl.gz" || return 1
