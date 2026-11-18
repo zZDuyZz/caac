@@ -23,6 +23,9 @@ conservative to liberal so a one-dimensional grid is one fixed-sequence path.
   pricecheck        PriceCheck's schedule family (2609.37493): re-solve checks
                     vote on the small model's greedy answer, which is the only
                     answer it can ever serve
+  router            RouteLLM-style (2406.18665): from the question alone, send it
+                    to the small or the big model; the faithful version always
+                    answers, ``router_abstain`` may also decline up front
   caac / caac_staged
                     ours: the cheapest action predicted safe enough; the staged
                     version re-decides after each paid step
@@ -47,7 +50,7 @@ from caac.pool.voting import serve_with_greedy
 
 __all__ = ["CONF_GRID", "TAU_GRID", "SHARE_GRID", "lam_cost", "small_abstain", "big_abstain",
            "cascade_abstain", "sc_abstain", "adaptive_abstain", "conformal_cascade",
-           "pricecheck", "caac", "caac_staged_family", "RHO_GRID", "oracle", "Memo"]
+           "pricecheck", "router", "ROUTE_GRID", "caac", "caac_staged_family", "RHO_GRID", "oracle", "Memo"]
 
 CONF_GRID = [0.999, 0.995, 0.99, 0.98, 0.97, 0.96, 0.95, 0.93, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5, 0.0]
 TAU_GRID = [0.99, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.9, 0.88, 0.85, 0.8, 0.75, 0.7,
@@ -309,6 +312,55 @@ def pricecheck(n_big: int = 8) -> Family:
         return fn
     paths = [[i] for i in range(len(configs))]
     return Family("pricecheck", configs, make, paths, needs_big=True)
+
+
+# --------------------------------------------------------------------------- #
+# Router: decides from the question alone, before any answer is generated
+# --------------------------------------------------------------------------- #
+
+# Route to the small model iff P(small correct) >= t. 1.01 sends everything to the
+# big model (the conservative end), 0.0 everything to the small one.
+ROUTE_GRID = [1.01, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.4, 0.3, 0.2, 0.0]
+
+
+def router(scorer, grid=ROUTE_GRID, abstain: bool = False, serve_grid=CONF_GRID,
+           probe_prefill: bool = True) -> Family:
+    """RouteLLM-style routing. ``scorer(small_rec) -> (p_small, p_big)`` must read
+    only the question (see ``caac.pool.router.QuestionRouter``).
+
+    The faithful version always answers with the model it routed to, so its risk
+    is that model's error rate on what it receives; that caps how small an alpha
+    it can be certified at, which is the comparison. ``abstain=True`` adds the
+    natural extension, still before any generation: decline when the routed
+    model's predicted correctness is below t2 (configs (t, t2), one path per t).
+
+    ``probe_prefill`` bills the router's own input: one prefill of the question
+    on the small model (the hidden-state probe is a separate forward pass here).
+    It is billed even when the router later sends the question to the small
+    model, because the pools' probe is not shared with generation.
+    """
+    if abstain:
+        configs = [(t, t2) for t in grid for t2 in serve_grid]
+        paths = [[i * len(serve_grid) + j for j in range(len(serve_grid))] for i in range(len(grid))]
+    else:
+        configs, paths = list(grid), None
+
+    def make(cfg):
+        t, t2 = (cfg if abstain else (cfg, None))
+
+        def fn(s: PoolRecord, b: PoolRecord, order):
+            ps, pb = scorer(s)
+            calls = [Call(s.model, s.prompt_tokens, [0], 0)] if probe_prefill else []
+            to_small = ps >= t
+            if abstain and (ps if to_small else pb) < t2:
+                return _abstain(calls, routed="small" if to_small else "big")
+            rec, act = (s, "answer_now") if to_small else (b, "escalate")
+            calls.append(_greedy_call(rec, 1 if probe_prefill else 0))
+            return PolicyOutcome(True, rec.greedy.answer, rec.greedy.correct, calls, act,
+                                 {"p_small": ps, "p_big": pb})
+        return fn
+    return Family("router_abstain" if abstain else "router", configs, make, paths,
+                  needs_big=True, uses_order=False)
 
 
 # --------------------------------------------------------------------------- #

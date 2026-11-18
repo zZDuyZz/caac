@@ -23,17 +23,20 @@ import numpy as np
 from caac.pool.protocol import (build_table, certify, pick_max_coverage, pick_min_cost,
                                 plugin_select, prune, summarize)
 from caac.pool.schema import load_pool
-from certify import CAAC, baseline_family, caac_family, fit_estimators, fit_fold_estimators, train_table
+from certify import (CAAC, ROUTERS, add_hidden_args, baseline_family, caac_family, fit_estimators,
+                     fit_fold_estimators, fit_fold_routers, fit_router, router_extras, train_table)
 
 
 def run(table, n, alpha, delta, splits, frac, rule, lam, min_cov, seed):
     rng = np.random.default_rng(seed)
     stats = {"certify": [], "plugin": []}
+    n_ok = {"certify": [], "plugin": []}
     for _ in range(splits):
         perm = rng.permutation(n)
         cal, tst = perm[:int(frac * n)], perm[int(frac * n):]
         for name, ok in (("certify", certify(table, cal, alpha, delta)[0]),
                          ("plugin", plugin_select(table, cal, alpha))):
+            n_ok[name].append(int(ok.sum()))
             j = (pick_max_coverage(table, cal, ok) if rule == "max_coverage"
                  else pick_min_cost(table, cal, ok, lam, min_cov))
             if j is None:
@@ -51,6 +54,7 @@ def run(table, n, alpha, delta, splits, frac, rule, lam, min_cov, seed):
             "violation_rate": sum(v for v, _, _ in picked) / len(xs) if xs else 0.0,
             "mean_coverage": float(np.mean([c for _, c, _ in picked])) if picked else 0.0,
             "mean_cost": float(np.mean([c for _, _, c in picked])) if picked else 0.0,
+            "mean_n_certified": float(np.mean(n_ok[name])) if n_ok[name] else 0.0,
         }
     return out
 
@@ -71,6 +75,7 @@ def main():
     ap.add_argument("--min-coverage", type=float, default=0.6)
     ap.add_argument("--k-steps", default="2,4,8,16")
     ap.add_argument("--seed", type=int, default=0)
+    add_hidden_args(ap, parts=("train", "pool"))
     ap.add_argument("--json", default=None)
     a = ap.parse_args()
 
@@ -88,6 +93,11 @@ def main():
 
     ests = fit_estimators(tr_s, tr_b, k_steps) if any(n in CAAC for n in names) else None
     fold_ests = fit_fold_estimators(tr_s, tr_b, k_steps) if ests else []
+    router, fold_routers = None, []
+    if any(n in ROUTERS for n in names):
+        ex = router_extras(a, tr_s, list(tr_s) + list(po_s))
+        router = fit_router(tr_s, tr_b, ex)
+        fold_routers = fit_fold_routers(tr_s, tr_b, ex)
 
     qids = sorted(po_s)
     n_cal = int(a.calib_frac * len(qids))
@@ -95,8 +105,8 @@ def main():
            "n_calib": n_cal, "rule": a.rule, "lam": a.lam, "families": {}}
     for nm in names:
         fam = (caac_family(nm, ests, a.lam, big_model, k_steps) if nm in CAAC
-               else baseline_family(nm, n_big, n_small))
-        tt = train_table(nm, fam, (tr_s, tr_b), fold_ests, a.lam, big_model, k_steps)
+               else baseline_family(nm, n_big, n_small, router))
+        tt = train_table(nm, fam, (tr_s, tr_b), fold_ests, a.lam, big_model, k_steps, fold_routers)
         fam = prune(fam, tt, n_cal, a.alpha, a.delta)
         table = build_table(fam, qids, po_s, po_b)
         res["families"][nm] = run(table, len(qids), a.alpha, a.delta, a.splits, a.calib_frac,
