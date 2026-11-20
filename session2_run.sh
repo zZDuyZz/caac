@@ -137,13 +137,15 @@ s0_params() {
   python verify_params.py --weights $QS --weights $QB | tee "$OUT/params_verified.txt"
   return 0
 }
-# Big model: 16 samples on the TEST pools. It is the escalate target, so its pass@k ceiling is
-# the ceiling of the whole controller.
+# TEST pools hold the same draws as the A3 calibration pools: 16 small / 8 big (2026-11-20).
+# certify.py/resplit.py use the smallest number of draws present in EVERY split, CAAC samples at
+# most 16 and PriceCheck races at most 6 big votes, so draws above 16/8 never reached a result and
+# made the test pools differ in structure from calibration (MASTER, design weakness 6).
 s1_test_pools() {
-  $BP $(dec $QS) --model $QS --dataset math500 --n-samples 32 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
-  $BP $(dec $QB) --model $QB --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
+  $BP $(dec $QB) --model $QB --dataset math500 --n-samples 8 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
   $BP $(dec $QS) --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
-  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
+  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-samples 8 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
 }
 s2_compare() {
   # Pool A2 là Qwen2.5 -> không còn đối chiếu tái lập với A2. Thay bằng KIỂM TÍNH XÁC ĐỊNH:
