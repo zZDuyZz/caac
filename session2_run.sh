@@ -57,7 +57,7 @@ MML=${MML:-2048}
 # checked against the first -- calibration pools at other caps than the test pools would
 # break the exchangeability the certificate rests on, and nothing downstream would notice.
 GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
-LOCK="$OUT/protocol.lock"; NOW="MT_M=$MT_M MT_G=$MT_G MML=$MML GPU=$GPU_NAME DEC_QS=[$DEC_QS] DEC_QB=[$DEC_QB]"
+LOCK="$OUT/protocol.lock"; NOW="MT_M=$MT_M MT_G=$MT_G MML=$MML GPU=$GPU_NAME DEC_QS=[$DEC_QS] DEC_QB=[$DEC_QB] MNS=${MAX_NUM_SEQS:-default}"
 if [ "${STOP_AFTER:-}" != capprobe ]; then
   if [ -f "$LOCK" ] && [ "$(cat "$LOCK")" != "$NOW" ]; then
     echo "!!!!!! GIAO THỨC KHÁC với các pool đã có của TAG=$TAG:"
@@ -74,7 +74,10 @@ echo "DECODING: small [${DEC_QS:-temperature 0.7 only}]  big [${DEC_QB:-temperat
 T0=$(date +%s)
 FREE_GB=$(df -BG --output=avail "$M" 2>/dev/null | tail -1 | tr -dc '0-9')
 echo "Dung lượng trống tại $M: ${FREE_GB:-?} GB$([ "${FREE_GB:-99}" -lt 10 ] && echo '   !!!!!! DƯỚI 10 GB — pool + tarball có thể không đủ chỗ')"
-BP="python build_pool.py --max-model-len $MML"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
+# MAX_NUM_SEQS (optional, 2026-11-20): vLLM's number of concurrent sequences; unset = vLLM default (256).
+# A pool-level protocol setting like the caps: it goes into protocol.lock, so every later session of this TAG
+# must use the same value, and into every manifest. Set it only for a NEW TAG/pool, never to resume an old one.
+BP="python build_pool.py --max-model-len $MML${MAX_NUM_SEQS:+ --max-num-seqs $MAX_NUM_SEQS}"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
 
 tick() { local e=$(( $(date +%s) - T0 )); printf '[%02dh%02dm | ~%d VND] ' $((e/3600)) $(((e%3600)/60)) $((e*${RATE:-52516}/3600)); }
 stage() {  # stage <tên> <hàm>
