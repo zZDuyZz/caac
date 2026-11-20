@@ -115,10 +115,10 @@ s0_capprobe() {
 }
 s0_smoke() {
   rm -f "$P"/smoke_*
-  $BP $(dec $QS) --model $QS --dataset gsm8k   --n-questions 5 --n-samples 4 --max-tokens 512  --out "$P/smoke_gsm8k.jsonl.gz" || return 1
-  $BP $(dec $QS) --model $QS --dataset math500 --n-questions 5 --n-samples 4 --max-tokens 1024 --out "$P/smoke_math.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset gsm8k   --n-questions 5 --n-samples 4 --max-tokens 2048 --out "$P/smoke_gsm8k.jsonl.gz" || return 1
+  $BP $(dec $QS) --model $QS --dataset math500 --n-questions 5 --n-samples 4 --max-tokens 4096 --out "$P/smoke_math.jsonl.gz" || return 1
   # model lớn cũng phải nạp + sinh được TRƯỚC khi tốn ~1 giờ cho pool model nhỏ
-  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-questions 3 --n-samples 2 --max-tokens 512  --out "$P/smoke_gsm8k_qb.jsonl.gz" || return 1
+  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-questions 3 --n-samples 2 --max-tokens 2048 --out "$P/smoke_gsm8k_qb.jsonl.gz" || return 1
   python smoke_check.py "$P/smoke_gsm8k.jsonl.gz"    --min-correct 3 || return 1
   python smoke_check.py "$P/smoke_math.jsonl.gz"     --min-correct 1 || return 1
   python smoke_check.py "$P/smoke_gsm8k_qb.jsonl.gz" --min-correct 2 || return 1
