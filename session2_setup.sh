@@ -10,7 +10,10 @@ export HF_HOME=/workspace/hf_cache REPO=/workspace/caac VENV=/workspace/venv
 REPO_URL=https://github.com/zZDuyZz/caac.git
 # 2026-11-06: model + engine refresh (CAAC_MASTER §5, §13.10). Đổi ở ĐÂY thì đổi cả session2_run.sh.
 VLLM_VERSION=0.32.0
-QS=Qwen/Qwen3.5-2B; QB=Qwen/Qwen3.5-9B
+QS=${QS:-Qwen/Qwen3.5-2B}; QB=${QB:-Qwen/Qwen3.5-9B}
+# 2026-11-20: models of the second family are downloaded and template-checked too, e.g.
+#   EXTRA_MODELS="google/gemma-4-E2B-it google/gemma-4-12B-it" bash session2_setup.sh
+EXTRA_MODELS=${EXTRA_MODELS:-}
 mkdir -p "$HF_HOME"
 
 echo "=== 0. GPU (mọi pool của lần chạy này phải cùng một loại card) ==="
@@ -59,7 +62,7 @@ python -m pytest -q -p no:warnings
 echo "=== 4. Tải model vào cache (sai tên repo -> dừng ở đây, chưa tốn giờ sinh dữ liệu) ==="
 python - <<PY
 from huggingface_hub import snapshot_download
-for m in ("$QS", "$QB"):
+for m in "$QS $QB $EXTRA_MODELS".split():
     p = snapshot_download(m)
     print("  ok", m, "->", p)
 PY
@@ -67,8 +70,8 @@ PY
 echo "=== 4b. Chat template: thinking TẮT tường minh (không có <think> mở trong prompt) ==="
 PYTHONPATH=src python - <<PY
 from transformers import AutoTokenizer
-from caac.data.prompts import build_chat_prompt
-for m in ("$QS", "$QB"):
+from caac.data.prompts import build_chat_prompt, strip_template_bos, leading_bos_count
+for m in "$QS $QB $EXTRA_MODELS".split():
     tok = AutoTokenizer.from_pretrained(m)
     off = build_chat_prompt(tok, "1+1?", thinking=False)
     on = build_chat_prompt(tok, "1+1?", thinking=True)
@@ -76,7 +79,12 @@ for m in ("$QS", "$QB"):
     print(f"  {m}: prompt tail (thinking off) = ...{tail}")
     # một <think> mở mà không đóng ở cuối prompt nghĩa là model sẽ suy nghĩ dài -> sai giao thức
     assert not off.rstrip().endswith("<think>"), "thinking vẫn bật trong prompt"
+    assert "<|think|>" not in off, "Gemma: <|think|> có trong prompt -> thinking vẫn bật"
     print(f"  {m}: thinking on/off khác nhau: {on != off}")
+    nb = leading_bos_count(tok, strip_template_bos(tok, off))   # what build_pool sends to vLLM
+    print(f"  {m}: BOS ở đầu prompt = {'không có (tokenizer không có BOS)' if nb is None else nb}")
+    assert nb is None or nb <= 1, f"{m}: {nb} BOS ở đầu prompt (phải đúng 1)"
+    if nb == 0: print(f"  !!!!!! {m}: tokenizer có BOS nhưng prompt không có -- gửi mình dòng này trước khi chạy")
 PY
 
 echo "=== 5. qids A3 (chọn ngẫu nhiên phân tầng, seed 0; tất định) ==="

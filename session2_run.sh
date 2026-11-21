@@ -16,14 +16,20 @@ export VLLM_USE_FLASHINFER_SAMPLER=${VLLM_USE_FLASHINFER_SAMPLER:-0}
 set +u; source /workspace/venv/bin/activate; set -u     # dựng bởi session2_setup.sh (Python 3.12 + vLLM 0.32.0, V1); +u: script activate có thể đọc biến chưa đặt
 cd /workspace/caac
 # 2026-11-06: cặp chính mới (CAAC_MASTER §13.10). Tên file: qs = model nhỏ, qb = model lớn.
-QS=Qwen/Qwen3.5-2B; QB=Qwen/Qwen3.5-9B
+# 2026-11-20: the pair can be overridden for the second model family (CAAC_MASTER §12.7t), always
+# under its OWN TAG, e.g. TAG=v4g QS=google/gemma-4-E2B-it QB=google/gemma-4-12B-it PLAN=pair2.
+# The pair is locked per TAG (models.lock), like the caps.
+QS=${QS:-Qwen/Qwen3.5-2B}; QB=${QB:-Qwen/Qwen3.5-9B}
+# PLAN: "" = the Qwen run (2a test pools, then 2b A3 + hidden); "pair2" = second family, test-set pools only.
+PLAN=${PLAN:-}
+case "$PLAN" in ""|pair2) ;; *) echo "PLAN không hợp lệ: '$PLAN' (để trống hoặc pair2)"; exit 1;; esac
 # Protocol tag + token caps. TAG=v2 = day-1 protocol (cap 1024 MATH / 512 GSM8K, max_model_len 2048),
 # kept for the appendix ("tight token budget"). A new TAG gets its own pools_<TAG>/, outputs/s2_<TAG>/
 # and marker files, so it never touches day-1 data. Caps for the new protocol come from the cap probe
 # (STOP_AFTER=capprobe -> cap_curve.py prints "RECOMMEND: MT_M=.. MT_G=.. MML=.."):
 #   TAG=v3 MT_M=<..> MT_G=<..> MML=<..> bash session2_all.sh
 TAG=${TAG:-v2}; MT_M=${MT_M:-1024}; MT_G=${MT_G:-512}
-case "${STOP_AFTER:-}" in ""|card|capprobe|test_pools) ;; *) echo "STOP_AFTER không hợp lệ: '$STOP_AFTER' (dùng card, capprobe hoặc test_pools)"; exit 1;; esac
+case "${STOP_AFTER:-}" in ""|card|capprobe|test_pools|smoke) ;; *) echo "STOP_AFTER không hợp lệ: '$STOP_AFTER' (dùng card, capprobe, smoke hoặc test_pools)"; exit 1;; esac
 # Decoding per model (2026-11-16). Empty = the old protocol (temperature 0.7 only, no top-k, no
 # penalty), which reproduces v2/v3 exactly. A new TAG sets both to the vendor profile read from
 # the model card (STOP_AFTER=card prints it from the local cache), e.g.
@@ -67,6 +73,13 @@ if [ "${STOP_AFTER:-}" != capprobe ]; then
     [ "${ALLOW_PROTOCOL_CHANGE:-0}" = 1 ] || exit 1
   fi
   [ -f "$LOCK" ] || echo "$NOW" > "$LOCK"
+  # The model pair is part of the protocol too (2026-11-20). Kept in its own file so the
+  # protocol.lock of existing tags (v4) stays byte-identical; created on the first run that has it.
+  MLOCK="$OUT/models.lock"; MNOW="QS=$QS QB=$QB PLAN=${PLAN:-qwen}"
+  if [ -f "$MLOCK" ] && [ "$(cat "$MLOCK")" != "$MNOW" ]; then
+    echo "!!!!!! CẶP MODEL KHÁC với TAG=$TAG: đã khóa [$(cat "$MLOCK")], lần này [$MNOW]. Cặp mới cần TAG mới."; exit 1
+  fi
+  [ -f "$MLOCK" ] || echo "$MNOW" > "$MLOCK"
 fi
 if [ "${STOP_AFTER:-}" = capprobe ]; then echo "PROTOCOL: TAG=$TAG cap probe (train sets, cap ${PROBE_CAP:-4096}, max_model_len ${PROBE_MML:-6144}, ${PROBE_NS:-2} samples)  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"
 else echo "PROTOCOL: TAG=$TAG  max_tokens MATH=$MT_M GSM8K=$MT_G  max_model_len=$MML  FLASHINFER_SAMPLER=$VLLM_USE_FLASHINFER_SAMPLER"; fi
@@ -79,7 +92,21 @@ echo "Dung lượng trống tại $M: ${FREE_GB:-?} GB$([ "${FREE_GB:-99}" -lt 1
 # must use the same value, and into every manifest. Set it only for a NEW TAG/pool, never to resume an old one.
 BP="python build_pool.py --max-model-len $MML${MAX_NUM_SEQS:+ --max-num-seqs $MAX_NUM_SEQS}"   # cấu hình MẶC ĐỊNH (batch 150, max_num_seqs mặc định của vLLM), thinking TẮT
 
-tick() { local e=$(( $(date +%s) - T0 )); printf '[%02dh%02dm | ~%d VND] ' $((e/3600)) $(((e%3600)/60)) $((e*${RATE:-52516}/3600)); }
+# Elapsed time only. The old VND figure used a default rate ~3.7x below the real price (Day 2a:
+# script ~52.6k VND/h vs 194,830 VND/h on the rental page), so no cost is printed unless the
+# real hourly rate is given: RATE_VND_H=194830. Counts from this script's start, not from rental.
+tick() { local e=$(( $(date +%s) - T0 )); printf '[%02dh%02dm' $((e/3600)) $(((e%3600)/60))
+  [ -n "${RATE_VND_H:-}" ] && printf ' | ~%d VND từ lúc script chạy' $((e*RATE_VND_H/3600)); printf '] '; }
+# runpool <label> <build_pool args...>: one pool, timed, checked right after it is written
+# (truncation, thinking leaks, tokens/s -> $OUT/pool_times.tsv). The check never stops the run.
+runpool() {
+  local label=$1; shift; local t1 out="" a prev=""
+  for a in "$@"; do [ "$prev" = "--out" ] && out=$a; prev=$a; done
+  t1=$(date +%s)
+  $BP "$@" || return 1
+  python pool_check.py "$out" --label "$label" --seconds $(( $(date +%s) - t1 )) --times "$OUT/pool_times.tsv"
+  return 0
+}
 stage() {  # stage <tên> <hàm>
   if [ -f "$M/$MK$1" ]; then echo "$(tick)#### $1: đã xong trước đó — bỏ qua"; return 0; fi
   echo "$(tick)#### $1: BẮT ĐẦU"
@@ -124,7 +151,8 @@ s0_smoke() {
   python smoke_check.py "$P/smoke_gsm8k_qb.jsonl.gz" --min-correct 2 || return 1
   # A4 reads hidden states through transformers, a different code path from vLLM. Try it on
   # 5 questions now so that a failure is known hours before s5_hidden. Never fatal.
-  if timeout 900 python extract_hidden.py --model $QS --dataset gsm8k --n-questions 5 \
+  if [ "$PLAN" = pair2 ]; then echo "HIDDEN SMOKE: bỏ qua (pair2 không trích hidden state)"
+  elif timeout 900 python extract_hidden.py --model $QS --dataset gsm8k --n-questions 5 \
        --out "$H/smoke_hidden.npz" > "$M/smoke_hidden_$TAG.log" 2>&1; then
     echo "HIDDEN SMOKE OK"
   else
@@ -145,10 +173,10 @@ s0_params() {
 # most 16 and PriceCheck races at most 6 big votes, so draws above 16/8 never reached a result and
 # made the test pools differ in structure from calibration (MASTER, design weakness 6).
 s1_test_pools() {
-  $BP $(dec $QS) --model $QS --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
-  $BP $(dec $QB) --model $QB --dataset math500 --n-samples 8 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
-  $BP $(dec $QS) --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
-  $BP $(dec $QB) --model $QB --dataset gsm8k   --n-samples 8 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
+  runpool math500_qs $(dec $QS) --model $QS --dataset math500 --n-samples 16 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
+  runpool math500_qb $(dec $QB) --model $QB --dataset math500 --n-samples 8 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
+  runpool gsm8k_qs   $(dec $QS) --model $QS --dataset gsm8k   --n-samples 16 --max-tokens $MT_G  --out "$P/gsm8k_qs.jsonl.gz"   || return 1
+  runpool gsm8k_qb   $(dec $QB) --model $QB --dataset gsm8k   --n-samples 8 --max-tokens $MT_G  --out "$P/gsm8k_qb.jsonl.gz"   || return 1
 }
 s2_compare() {
   # Pool A2 là Qwen2.5 -> không còn đối chiếu tái lập với A2. Thay bằng KIỂM TÍNH XÁC ĐỊNH:
@@ -173,6 +201,7 @@ s3_cross() {
   # Arm (a) of s2_compare again -- same slice, seeds and batch composition -- on THIS machine,
   # when the test pools were generated on another one (session2_restore.sh leaves the flag).
   # It measures whether two machines of the same GPU type produce the same pool. Report only.
+  [ "${SKIP_CROSS:-0}" = 1 ] && { echo "so chéo máy: bỏ qua (SKIP_CROSS=1)"; return 0; }   # ~7.4 min of GPU (Day 2a det_same: 443 s)
   [ -f "$M/.s2_restored_$TAG" ] && [ -f "$P/gsm8k_qs.jsonl.gz" ] || { echo "pool test sinh tại máy này — không cần so chéo máy"; return 0; }
   rm -f "$P"/det_cross_gsm8k_qs*
   $BP $(dec $QS) --model $QS --dataset gsm8k --n-questions 150 --n-samples 16 --batch-size 150 \
@@ -184,21 +213,45 @@ s3_cross() {
 # A3 = train + calibration. Calibration must run the SAME policies as test, so it needs as many
 # draws as any policy may take: CAAC samples up to 16 from the small model, and PriceCheck's
 # races draw up to 6 re-solves from the big one (8 leaves headroom).
+# 2026-11-20 (Day 2b budget, CAAC_MASTER §12.7q/§12.7s): the big model draws NB_A3 samples (6 =
+# PriceCheck's maximum; certify/resplit use the smallest count present in every split), and the
+# train sets can be nested random subsets (subset_qids.py) that grow later without regenerating.
+# Order = priority: calibration first, so a run cut short still has what the certificate needs.
+NB_A3=${NB_A3:-8}
+# Small-model draws of the A3 pools (train + calibration). Default 16 = the 2a test pools. 8 is the Day 2b
+# plan (CAAC_MASTER §12.7y): certify.py/resplit.py use the smallest draw count present in EVERY split,
+# so CAAC then samples at most 8 small draws (run certify with --k-steps 2,4,8). It changes the method's
+# maximum k, so it must be declared before the freeze and justified on train/calib, never on test.
+NS_A3=${NS_A3:-16}
+Q_MATH_CAL=${Q_MATH_CAL:-qids/a3_math_test_ex500.txt}
+Q_MATH_TRAIN=${Q_MATH_TRAIN:-qids/a3_math_train.txt}
+Q_GSM_TRAIN=${Q_GSM_TRAIN:-qids/a3_gsm8k_train.txt}
 s4_a3() {
-  $BP $(dec $QS) --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 16 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
-  $BP $(dec $QB) --model $QB --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --n-samples 8 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
-  for D in math_train math_test_ex500; do
-    S=train; [ $D = math_test_ex500 ] && S=test
-    $BP $(dec $QS) --model $QS --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 16 --max-tokens $MT_M --out "$P/a3_${D}_qs.jsonl.gz" || return 1
-    $BP $(dec $QB) --model $QB --dataset $D --split $S --qids-file qids/a3_$D.txt --n-samples 8 --max-tokens $MT_M --out "$P/a3_${D}_qb.jsonl.gz" || return 1
-  done
+  local f
+  for f in "$Q_MATH_CAL" "$Q_MATH_TRAIN" "$Q_GSM_TRAIN"; do [ -s "$f" ] || { echo "thiếu qids $f"; return 1; }; done
+  runpool a3_math_test_ex500_qs $(dec $QS) --model $QS --dataset math_test_ex500 --split test --qids-file "$Q_MATH_CAL" --n-samples $NS_A3 --max-tokens $MT_M --out "$P/a3_math_test_ex500_qs.jsonl.gz" || return 1
+  runpool a3_math_test_ex500_qb $(dec $QB) --model $QB --dataset math_test_ex500 --split test --qids-file "$Q_MATH_CAL" --n-samples $NB_A3 --max-tokens $MT_M --out "$P/a3_math_test_ex500_qb.jsonl.gz" || return 1
+  runpool a3_math_train_qs $(dec $QS) --model $QS --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --n-samples $NS_A3 --max-tokens $MT_M --out "$P/a3_math_train_qs.jsonl.gz" || return 1
+  runpool a3_math_train_qb $(dec $QB) --model $QB --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --n-samples $NB_A3 --max-tokens $MT_M --out "$P/a3_math_train_qb.jsonl.gz" || return 1
+  runpool a3_gsm8k_train_qs $(dec $QS) --model $QS --dataset gsm8k --split train --qids-file "$Q_GSM_TRAIN" --n-samples $NS_A3 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
+  runpool a3_gsm8k_train_qb $(dec $QB) --model $QB --dataset gsm8k --split train --qids-file "$Q_GSM_TRAIN" --n-samples $NB_A3 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
+}
+# Second model family (PLAN=pair2): the MATH-500 test set only, NS_P2 small / NB_P2 big draws, same
+# caps and context length as the Qwen tag (pass MT_M/MT_G/MML explicitly). Calibration and test
+# for this pair come from resplitting these 500 questions (resplit.py), declared before reading them.
+NS_P2=${NS_P2:-8}; NB_P2=${NB_P2:-4}
+# Q_P2 = optional qids file (e.g. qids/p2_math500_300.txt, a nested random subset of MATH-500) to cut the pool.
+s7_pair2() {
+  local qf=""; [ -n "${Q_P2:-}" ] && qf="--qids-file $Q_P2"
+  runpool p2_math500_qs $(dec $QS) --model $QS --dataset math500 $qf --n-samples $NS_P2 --max-tokens $MT_M --out "$P/math500_qs.jsonl.gz" || return 1
+  runpool p2_math500_qb $(dec $QB) --model $QB --dataset math500 $qf --n-samples $NB_P2 --max-tokens $MT_M --out "$P/math500_qb.jsonl.gz" || return 1
 }
 s5_hidden() {
   python extract_hidden.py --model $QS --dataset math500 --out "$H/math500_qs.npz" || return 1
   python extract_hidden.py --model $QS --dataset gsm8k   --out "$H/gsm8k_qs.npz" || return 1
-  python extract_hidden.py --model $QS --dataset gsm8k --split train --qids-file qids/a3_gsm8k_train.txt --out "$H/a3_gsm8k_train_qs.npz" || return 1
-  python extract_hidden.py --model $QS --dataset math_train --split train --qids-file qids/a3_math_train.txt --out "$H/a3_math_train_qs.npz" || return 1
-  python extract_hidden.py --model $QS --dataset math_test_ex500 --split test --qids-file qids/a3_math_test_ex500.txt --out "$H/a3_math_test_ex500_qs.npz" || return 1
+  python extract_hidden.py --model $QS --dataset gsm8k --split train --qids-file "$Q_GSM_TRAIN" --out "$H/a3_gsm8k_train_qs.npz" || return 1
+  python extract_hidden.py --model $QS --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --out "$H/a3_math_train_qs.npz" || return 1
+  python extract_hidden.py --model $QS --dataset math_test_ex500 --split test --qids-file "$Q_MATH_CAL" --out "$H/a3_math_test_ex500_qs.npz" || return 1
 }
 s6_collect() {
   cp "$P"/*.jsonl.gz.manifest.json "$OUT"/ 2>/dev/null
@@ -221,7 +274,8 @@ s6_collect() {
   rm -f /tmp/rg.jsonl.gz
   python s2_summary.py --pools "$P" --out "$OUT/s2_summary.md" > /dev/null
   echo "Hidden-state files: $(ls "$H"/*.npz 2>/dev/null | wc -l) (5 after a full run; 0 after part 2a)" >> "$OUT/s2_summary.md"
-  tar -cf "$BULK" -C "$M" "pools_$TAG" hidden                # sidecar + hidden: KHÔNG vào git
+  if [ "$PLAN" = pair2 ]; then tar -cf "$BULK" -C "$M" "pools_$TAG"   # pair2 has no hidden states (the dir holds the Qwen tag's)
+  else tar -cf "$BULK" -C "$M" "pools_$TAG" hidden; fi                # sidecar + hidden: KHÔNG vào git
 }
 
 # ---------------------------------------------------------------- chạy
@@ -233,6 +287,15 @@ fi
 python preflight_prompts.py --model $QS --model $QB $SETS --max-model-len $MML || die "prompt không vừa max_model_len=$MML"
 stage s0_smoke s0_smoke      || die "smoke test lỗi (xem 'SMOKE FAIL' ở trên). Chưa tốn giờ GPU đáng kể."
 stage s0_params s0_params
+if [ "${STOP_AFTER:-}" = smoke ]; then   # 2026-11-20: check a new pair loads and generates, then stop
+  rm -f "$M/${MK}s0_smoke"               # smoke is rerun anyway on every machine; keep params
+  echo "$(tick)>>> SMOKE XONG cho QS=$QS QB=$QB (đã dừng theo STOP_AFTER=smoke). Xem các dòng 'BOS at prompt start', 'wrote', 'SMOKE' ở trên."
+  exit 0
+fi
+if [ "$PLAN" = pair2 ]; then
+  stage s7_pair2 s7_pair2    || die "pool pair2 lỗi"
+  stage s6_collect s6_collect || die "gom kết quả lỗi"
+else
 stage s1_test_pools s1_test_pools || die "sinh pool test lỗi"
 stage s2_compare s2_compare
 # STOP_AFTER=test_pools -> stop after the test pools + determinism check and collect for download (2a);
@@ -250,6 +313,7 @@ else
   # hidden states that arrive on a later attempt must still reach the tarball
   [ "$HID_BEFORE" = 0 ] && [ -f "$M/${MK}s5_hidden" ] && rm -f "$M/${MK}s6_collect"
   stage s6_collect s6_collect  || die "gom kết quả lỗi"
+fi
 fi
 cp "$M"/s2*.log "$OUT"/ 2>/dev/null || true
 

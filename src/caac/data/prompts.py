@@ -22,3 +22,30 @@ def build_chat_prompt(tok, question: str, thinking: bool = False) -> str:
     msgs = [{"role": "user", "content": question + SUFFIX}]
     return tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True,
                                    enable_thinking=thinking)
+
+
+def strip_template_bos(tok, prompt: str) -> str:
+    """Drop a BOS that the chat template wrote as text (2026-11-20, Gemma 4).
+
+    vLLM tokenizes a text prompt with the tokenizer's special tokens, so a template
+    that already starts with the BOS text (Gemma's ``<bos>``) ends up with TWO BOS
+    tokens. The Gemma 4 report asks for exactly one. Tokenizers without a BOS
+    (Qwen3.5: ``bos_token`` is None) and templates that do not write it are returned
+    unchanged byte for byte, so existing pools keep their prompts.
+    """
+    bos = getattr(tok, "bos_token", None)
+    if bos and prompt.startswith(bos):
+        return prompt[len(bos):]
+    return prompt
+
+
+def leading_bos_count(tok, prompt: str) -> int | None:
+    """How many BOS ids the engine will see at the start of ``prompt`` (None = no BOS)."""
+    bos_id = getattr(tok, "bos_token_id", None)
+    if bos_id is None:
+        return None
+    ids = list(tok(prompt).input_ids)
+    n = 0
+    while n < len(ids) and ids[n] == bos_id:
+        n += 1
+    return n

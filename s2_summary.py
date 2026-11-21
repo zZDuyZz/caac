@@ -108,11 +108,14 @@ def main():
         # Only the same-batch arm is expected to match: V1 is not batch-invariant by design.
         # A miss there is run-to-run variation on identical requests; it does not say whether
         # the engine's scheduling or this pipeline causes it, so it is flagged, not attributed.
-        flag = ("  **<98%: identical requests gave different outputs -- CHECK before quoting a "
-                "reproducibility figure**"
-                if want is not None and r["greedy_answer_match"] < want else "")
+        # 2026-11-20: token identity is not expected (Day 2a measured 0.893/0.237 on identical
+        # requests); the flag now fires when ACCURACY moves (paired 95% CI excludes 0).
+        from compare_pools import shifted, _fmt_ci
+        flag = "  **accuracy shifted (95% CI excludes 0) -- CHECK**" if shifted(r) else ""
         lines.append(f"- {label}: common={r['n_common']}  greedy={r['greedy_answer_match']:.3f}  "
-                     f"length={r['greedy_len_match']:.3f}  samples={r['sample_match']:.3f}{flag}")
+                     f"length={r['greedy_len_match']:.3f}  samples={r['sample_match']:.3f}  "
+                     f"acc greedy {r['greedy_acc_old']:.3f}->{r['greedy_acc_new']:.3f} {_fmt_ci(r['greedy_acc_ci'])}  "
+                     f"acc samples {r['sample_acc_old']:.3f}->{r['sample_acc_new']:.3f} {_fmt_ci(r['sample_acc_ci'])}{flag}")
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text("\n".join(lines) + "\n")
     print("\n".join(lines))

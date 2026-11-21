@@ -283,7 +283,7 @@ def main():
     from caac.eval.grade import mathverify_available
     from caac.pool.schema import (text_sidecar_path, token_sidecar_path, append_texts,
                                   repair_jsonl)
-    from caac.data.prompts import build_chat_prompt
+    from caac.data.prompts import build_chat_prompt, strip_template_bos, leading_bos_count
 
     if args.grader == "mathverify" and not mathverify_available():
         print("WARNING: --grader mathverify but math-verify not importable; "
@@ -302,8 +302,25 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.model)
 
     def build_prompt(q: str) -> str:
-        # same text as the A2 prompt for templates without a thinking switch
-        return build_chat_prompt(tok, q, thinking=args.thinking)
+        # same text as the A2 prompt for templates without a thinking switch; a BOS the
+        # template writes as text is dropped so the engine adds exactly one (no-op for Qwen)
+        return strip_template_bos(tok, build_chat_prompt(tok, q, thinking=args.thinking))
+
+    # Exactly one BOS at the start, or none for tokenizers without one. Checked once on a real
+    # prompt BEFORE the engine loads, so a wrong template costs seconds, not a pool.
+    # Fatal only when the fix itself could be wrong: two BOS, or none after a template BOS was
+    # dropped. A tokenizer that has a BOS id but neither adds nor templates it (unchanged path,
+    # e.g. an existing pool) only gets a warning, so a running protocol is never stopped by this.
+    if problems:
+        raw = build_chat_prompt(tok, problems[0]["question"], thinking=args.thinking)
+        dropped = strip_template_bos(tok, raw) != raw
+        nb = leading_bos_count(tok, build_prompt(problems[0]["question"]))
+        print(f"BOS at prompt start: {'none (tokenizer has no BOS)' if nb is None else nb}"
+              f"{' (template BOS dropped, tokenizer adds it)' if dropped else ''}", flush=True)
+        if nb is not None and (nb > 1 or (nb == 0 and dropped)):
+            raise SystemExit(f"BOS count {nb} at the start of the prompt (want 1) -- fix the template before generating")
+        if nb == 0:
+            print("  WARN: tokenizer has a BOS token but the prompt starts without it (unchanged path)", flush=True)
 
     try:
         from transformers import AutoConfig
