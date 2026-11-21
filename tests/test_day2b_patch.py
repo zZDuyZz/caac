@@ -99,3 +99,16 @@ def test_pool_check_writes_times_row(tmp_path, capsys):
     assert rows[0].startswith("label\t") and len(rows) == 3
     assert rows[1].split("\t")[:3] == ["x", "10", "30"]
     assert "[pool_check] x:" in capsys.readouterr().out
+
+
+def test_s4_a3_runs_gsm8k_before_math_train():
+    """If a rental is cut short, GSM8K (second benchmark) must already exist; MATH train is the most dispensable."""
+    import re
+    from pathlib import Path
+    body = Path(__file__).resolve().parents[1].joinpath("session2_run.sh").read_text()
+    body = body[body.index("s4_a3() {"):]
+    body = body[:body.index("\n}\n")]
+    order = re.findall(r"runpool (a3_\w+)", body)
+    assert order == ["a3_math_test_ex500_qs", "a3_math_test_ex500_qb",
+                     "a3_gsm8k_train_qs", "a3_gsm8k_train_qb",
+                     "a3_math_train_qs", "a3_math_train_qb"], order

@@ -226,15 +226,18 @@ NS_A3=${NS_A3:-16}
 Q_MATH_CAL=${Q_MATH_CAL:-qids/a3_math_test_ex500.txt}
 Q_MATH_TRAIN=${Q_MATH_TRAIN:-qids/a3_math_train.txt}
 Q_GSM_TRAIN=${Q_GSM_TRAIN:-qids/a3_gsm8k_train.txt}
+# ORDER (decided 21/11, for the case a rental is cut short): MATH calib -> GSM8K train -> MATH train.
+# MATH calib is the anchor; GSM8K is the second benchmark; MATH train is the most dispensable (certify can split
+# the calib pool when no train pool exists). Each pool resumes by batches, so a rerun continues where it stopped.
 s4_a3() {
   local f
   for f in "$Q_MATH_CAL" "$Q_MATH_TRAIN" "$Q_GSM_TRAIN"; do [ -s "$f" ] || { echo "thiếu qids $f"; return 1; }; done
   runpool a3_math_test_ex500_qs $(dec $QS) --model $QS --dataset math_test_ex500 --split test --qids-file "$Q_MATH_CAL" --n-samples $NS_A3 --max-tokens $MT_M --out "$P/a3_math_test_ex500_qs.jsonl.gz" || return 1
   runpool a3_math_test_ex500_qb $(dec $QB) --model $QB --dataset math_test_ex500 --split test --qids-file "$Q_MATH_CAL" --n-samples $NB_A3 --max-tokens $MT_M --out "$P/a3_math_test_ex500_qb.jsonl.gz" || return 1
-  runpool a3_math_train_qs $(dec $QS) --model $QS --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --n-samples $NS_A3 --max-tokens $MT_M --out "$P/a3_math_train_qs.jsonl.gz" || return 1
-  runpool a3_math_train_qb $(dec $QB) --model $QB --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --n-samples $NB_A3 --max-tokens $MT_M --out "$P/a3_math_train_qb.jsonl.gz" || return 1
   runpool a3_gsm8k_train_qs $(dec $QS) --model $QS --dataset gsm8k --split train --qids-file "$Q_GSM_TRAIN" --n-samples $NS_A3 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qs.jsonl.gz" || return 1
   runpool a3_gsm8k_train_qb $(dec $QB) --model $QB --dataset gsm8k --split train --qids-file "$Q_GSM_TRAIN" --n-samples $NB_A3 --max-tokens $MT_G --out "$P/a3_gsm8k_train_qb.jsonl.gz" || return 1
+  runpool a3_math_train_qs $(dec $QS) --model $QS --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --n-samples $NS_A3 --max-tokens $MT_M --out "$P/a3_math_train_qs.jsonl.gz" || return 1
+  runpool a3_math_train_qb $(dec $QB) --model $QB --dataset math_train --split train --qids-file "$Q_MATH_TRAIN" --n-samples $NB_A3 --max-tokens $MT_M --out "$P/a3_math_train_qb.jsonl.gz" || return 1
 }
 # Second model family (PLAN=pair2): the MATH-500 test set only, NS_P2 small / NB_P2 big draws, same
 # caps and context length as the Qwen tag (pass MT_M/MT_G/MML explicitly). Calibration and test
