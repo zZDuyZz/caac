@@ -105,7 +105,7 @@ def test_s4_a3_runs_gsm8k_before_math_train():
     """If a rental is cut short, GSM8K (second benchmark) must already exist; MATH train is the most dispensable."""
     import re
     from pathlib import Path
-    body = Path(__file__).resolve().parents[1].joinpath("session2_run.sh").read_text()
+    body = Path(__file__).resolve().parents[1].joinpath("session2_run.sh").read_text(encoding="utf-8")
     body = body[body.index("s4_a3() {"):]
     body = body[:body.index("\n}\n")]
     order = re.findall(r"runpool (a3_\w+)", body)
