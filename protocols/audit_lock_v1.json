@@ -2,7 +2,7 @@
  "format": "caac-lock",
  "version": "1",
  "status": "draft",
- "note": "DRAFT 21/11/2026. Must be set to frozen (and committed) BEFORE auditing any public source or our test split. Do not edit after the first audit run.",
+ "note": "DRAFT 25/11/2026 (rules completed from the STRUCTURE of the downloaded sources; no correctness was looked at). Must be set to frozen (and committed) BEFORE auditing any public source or our test split. Do not edit after the first audit run.",
  "audit": {
   "alpha": 0.1,
   "delta": 0.1,
@@ -41,19 +41,143 @@
    "LLMRouterBench": "usd if provided, else tokens"
   },
   "lambda_rule_for_tokens": "lambda = parameter count of big / parameter count of small (compute per token); report also break-even lambda (R4)",
-  "c_max_rule": "tokens: generation caps from meta.json; usd/gpu_s: the cap in tokens times the largest per-token price of the pair (stated in the config)"
+  "c_max_rule": "tokens: generation caps from meta.json; usd/gpu_s: the cap in tokens times the largest per-token price of the pair (stated in the config)",
+  "measures": {
+   "lurume": [
+    "usd",
+    "tokens_lambda1"
+   ],
+   "lrb": [
+    "usd",
+    "tokens_lambda1"
+   ],
+   "monkey": [
+    "tokens_params",
+    "tokens_lambda1"
+   ],
+   "qwen": [
+    "tokens_params",
+    "tokens_lambda1"
+   ]
+  },
+  "measure_rules": {
+   "usd": "c_max = (cap_small + max prompt tokens) x max price per token of small + the same for big (price per token = cost_usd/(in+out), from cost and token columns)",
+   "tokens_lambda1": "raw token counts, lambda = 1 (a reference: saves only if the small model writes fewer tokens)",
+   "tokens_params": "lambda = nominal parameter count of big / small (compute per token)"
+  }
  },
  "pairs": {
   "rule": "every pair (small, big) of the same source and benchmark where big has more parameters (or a higher price if parameters are unknown) and both models answered >= n_min common questions; NOT chosen by outcome",
   "n_min": 100,
-  "report": "number of pairs AND number of distinct models and benchmarks (pairs share models; not independent experiments)"
+  "report": "number of pairs AND number of distinct models and benchmarks (pairs share models; not independent experiments)",
+  "primary": {
+   "lurume": [
+    [
+     "deepseek-v4-flash",
+     "deepseek-v4-pro"
+    ],
+    [
+     "glm-5-3-flash",
+     "glm-5.3"
+    ]
+   ],
+   "lrb": [
+    [
+     "Qwen3-8B",
+     "qwen3-235b-a22b-2507"
+    ],
+    [
+     "Qwen3-8B",
+     "qwen3-235b-a22b-thinking-2507"
+    ],
+    [
+     "DeepSeek-R1-0528-Qwen3-8B",
+     "deepseek-r1-0528"
+    ],
+    [
+     "Intern-S1-mini",
+     "intern-s1"
+    ],
+    [
+     "GLM-Z1-9B-0414",
+     "glm-4.6"
+    ],
+    [
+     "gemini-2.5-flash",
+     "gemini-2.5-pro"
+    ]
+   ],
+   "monkey": [
+    [
+     "Llama-3-8B-Instruct",
+     "Llama-3-70B-Instruct"
+    ],
+    [
+     "Gemma-2B",
+     "Gemma-7B"
+    ]
+   ],
+   "qwen": [
+    [
+     "Qwen3.5-2B",
+     "Qwen3.5-9B"
+    ]
+   ]
+  },
+  "primary_rule": "same family / vendor, smaller or cheaper -> larger or dearer; listed from model NAMES before any audit",
+  "secondary_rule": "every ordered pair of the pool where the big model has a larger nominal parameter count (nominal_params_b, when both are listed) or else a higher median billed price per token (cost_usd/(in+out)); equal or unknown -> no pair",
+  "nominal_params_b": {
+   "Llama-3-8B-Instruct": 8,
+   "Llama-3-70B-Instruct": 70,
+   "Llama-3-8B": 8,
+   "Gemma-2B": 2,
+   "Gemma-7B": 7,
+   "Pythia-70M": 0.07,
+   "Pythia-160M": 0.16,
+   "Pythia-410M": 0.41,
+   "Pythia-1B": 1,
+   "Pythia-1.4B": 1.4,
+   "Pythia-2.8B": 2.8,
+   "Pythia-6.9B": 6.9,
+   "Pythia-12B": 12,
+   "Qwen3.5-2B": 2,
+   "Qwen3.5-9B": 9
+  }
  },
  "criteria": {
   "a": "fraction of configurations with verdict GO",
   "b": "number of configurations where the point-estimate rule (cheapest policy with empirical risk <= alpha and empirical saving >= s on all data) says GO but the audit does not",
   "c": "number of configurations whose verdict changes between cost measures (R3)",
   "d": "questions needed (R4) in the INCONCLUSIVE configurations: median and range",
-  "if_not_notable": "report as is; most-INCONCLUSIVE is itself a finding; no threshold changes after seeing results; findings after looking are labelled exploratory with the number of comparisons tried"
+  "if_not_notable": "report as is; most-INCONCLUSIVE is itself a finding; no threshold changes after seeing results; findings after looking are labelled exploratory with the number of comparisons tried",
+  "b_naive_rule": "naive GO iff some candidate policy has empirical risk <= alpha and empirical saving >= s on ALL data (no split, no interval, no correction)"
  },
- "test_split": "our Qwen test split is opened once, after the tag protocol-freeze (15/12/2026)"
+ "test_split": "our Qwen test split is opened once, after the tag protocol-freeze (15/12/2026)",
+ "benchmarks": {
+  "rule": "every (source, benchmark) pool; a pair enters only with >= pairs.n_min common questions",
+  "exclude_from_primary": [
+   "hle",
+   "simpleqa",
+   "arenahard",
+   "arenahard_coding",
+   "arenahard_creative_writing",
+   "arenahard_math"
+  ],
+  "exclude_reason": "correctness from an LLM judge (source: LLMRouterBench Table 9): the judge's own error is not covered; reported as tier 'excluded'"
+ },
+ "data_rules": {
+  "finish_length": "a generation with finish = length has no answer (escalated by the replay)",
+  "finish_other": "finish missing -> 'unknown'; content_filter / engine_overloaded are kept as answers graded by the source (conservative for GO)",
+  "lrb_caps": "LLMRouterBench states no max_tokens: cap = smallest power of two >= the largest completion_tokens of the model on the benchmark (token counts only)",
+  "lrb_question_identity": "a question whose text hash differs between models is dropped",
+  "lrb_models_skipped": [
+   "openrouter"
+  ],
+  "monkey": "first 64 of 10,000 samples per problem; tokens ESTIMATED = ceil(chars/4), output clipped at the source's cap; answer keys = extracted final answers compared as exact strings",
+  "lurume": "k = 1; cost_usd = official_usd (billed, reported by the source); cap = largest requested_max_tokens of the model on the benchmark"
+ },
+ "run": {
+  "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v1.json --out map/",
+  "primary_claims": "tier primary only; secondary and excluded are reported as supporting / exploratory"
+ }
 }
