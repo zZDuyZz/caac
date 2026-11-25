@@ -185,6 +185,15 @@ def validate(rows: list[Row], meta: Meta | None = None, *, row_errors=(), meta_e
     if leak:
         rep.issues.append(Issue("error", "E_LEAK", "*",
                                 f"{len(leak)} question(s) appear in more than one split, e.g. {leak[0]}"))
+    q_groups = defaultdict(set)
+    for r in rows:
+        if r.group is not None:
+            q_groups[r.qid].add(r.group)
+    mixed = sorted(q for q, g in q_groups.items() if len(g) > 1)
+    if mixed:
+        rep.issues.append(Issue("warning", "W_GROUP_MIXED", "*",
+                                f"{len(mixed)} question(s) carry different group labels across rows, e.g. "
+                                f"{mixed[0]}; the report uses the small model's draw 0"))
     neg = [r for r in rows if any(v is not None and v < 0 for v in (r.out_tokens, r.in_tokens, r.gpu_s, r.cost_usd))]
     if neg:
         rep.issues.append(Issue("error", "E_NEG", "*", f"{len(neg)} row(s) with a negative count or cost"))

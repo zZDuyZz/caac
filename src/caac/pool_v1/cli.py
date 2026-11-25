@@ -3,6 +3,8 @@
   caac validate POOL_DIR                       -> data-quality report, levels (exit 1 on errors)
   caac audit POOL_DIR --config CFG [--out R.json] [--md R.md] [--lock LOCK.json]
   caac lock-hash LOCK.json                     -> sha256 of the canonical lock file
+  caac plan --risk R [--coverage C] [--alpha A --delta D] | --from-report R.json
+                                               -> questions needed before a GO is possible
 
 POOL_DIR holds rows.jsonl[.gz] or rows.csv and meta.json (CAAC-Pool v1).
 """
@@ -75,6 +77,23 @@ def cmd_lock_hash(a) -> int:
     return 0
 
 
+def cmd_plan(a) -> int:
+    from caac.pool_v1.plan import plan
+    alpha, delta, risk, cov = a.alpha, a.delta, a.risk, a.coverage
+    if a.from_report:
+        rep = json.loads(Path(a.from_report).read_text(encoding="utf-8"))
+        v, r2 = rep.get("R1_verdict", {}), rep.get("R2_estimates", {})
+        if r2.get("risk") is None or not r2.get("coverage") or "alpha" not in v:
+            raise ValueError("the report has no chosen policy with served answers (nothing to plan from)")
+        alpha, delta = float(v["alpha"]), float(v["delta"])
+        risk, cov = float(r2["risk"]), float(r2["coverage"])
+    if risk is None:
+        raise ValueError("give --risk (expected selective risk) or --from-report")
+    out = plan(alpha, delta, risk, cov)
+    print(json.dumps(out, indent=1, sort_keys=True))
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="caac", description="CAAC: certified verdict for small-model-first")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -91,6 +110,13 @@ def main(argv=None) -> int:
     lh = sub.add_parser("lock-hash", help="hash of a protocol lock file")
     lh.add_argument("lock")
     lh.set_defaults(fn=cmd_lock_hash)
+    pl = sub.add_parser("plan", help="how many questions are needed before a GO is possible")
+    pl.add_argument("--risk", type=float, help="expected selective risk (e.g. 0.05)")
+    pl.add_argument("--coverage", type=float, default=1.0, help="share of questions the policy serves")
+    pl.add_argument("--alpha", type=float, default=0.10)
+    pl.add_argument("--delta", type=float, default=0.10)
+    pl.add_argument("--from-report", help="take alpha, delta, risk, coverage from a report JSON")
+    pl.set_defaults(fn=cmd_plan)
     a = p.parse_args(argv)
     try:
         return a.fn(a)

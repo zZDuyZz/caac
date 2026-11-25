@@ -21,6 +21,8 @@ optional (each one unlocks analyses, see the package docstring)
   split      str   "train" | "calib" | "test"; missing => the tool splits by a
                    salted hash of qid and records it
   flags      list[str]  data-quality marks set by the adapter, e.g. "think_marker"
+  group      str   slice label of the QUESTION (domain, source, difficulty ...); the report
+                   lists risk per group on the tested half (descriptive, not certified)
 
 meta.json
 ---------
@@ -41,7 +43,7 @@ VERSION = "1"
 
 REQUIRED = ("qid", "model", "draw", "correct")
 OPTIONAL = ("answer_key", "out_tokens", "in_tokens", "finish", "is_greedy",
-            "gpu_s", "cost_usd", "split", "flags")
+            "gpu_s", "cost_usd", "split", "flags", "group")
 SPLITS = ("train", "calib", "test")
 GRADER_KINDS = ("math-verify", "exact", "unit-tests", "llm-judge", "other")
 EQUIVALENCE = ("math", "exact", "none")
@@ -62,6 +64,7 @@ class Row:
     cost_usd: float | None = None
     split: str | None = None
     flags: list[str] = field(default_factory=list)
+    group: str | None = None
 
 
 @dataclass

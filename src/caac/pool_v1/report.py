@@ -119,6 +119,9 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                                "p_saving": _f(g["p_saving"])}
     else:
         rep["R2_estimates"] = {"policy": None, "reason": res.go.get("reason")}
+    grp = _by_group(rows, cfg, rr, res)
+    if grp is not None:
+        rep["R2_estimates"]["by_group"] = grp
     allp = []
     for row, pd in zip(res.nogo["policies"], rr.audit_input.policies):
         x = {k: _f(v) if isinstance(v, float) else v for k, v in row.items()}
@@ -195,6 +198,38 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
     return rep
 
 
+def _by_group(rows: list[Row], cfg: Config, rr, res) -> dict | None:
+    """Risk of the chosen policy per question group on the tested half (B). DESCRIPTIVE: the
+    guarantee is for the whole pool; no multiplicity correction is applied to the groups."""
+    if res.chosen is None:
+        return None
+    gmap = {r.qid: r.group for r in rows if r.model == cfg.small and r.draw == 0 and r.group}
+    if not gmap:
+        return None
+    pd = next(p for p in rr.audit_input.policies if p.name == res.chosen)
+    acc: dict[str, list[int]] = {}
+    for q, sv, er in zip(rr.audit_input.qids, pd.served, pd.error):
+        if in_half_a(q, cfg.salt):
+            continue
+        a = acc.setdefault(gmap.get(q, "(none)"), [0, 0, 0])
+        a[0] += 1
+        a[1] += 1 if sv else 0
+        a[2] += 1 if er else 0
+    out = {}
+    for g in sorted(acc):
+        n, sv, er = acc[g]
+        row = {"questions": n, "served": sv, "errors": er}
+        if sv:
+            lo, hi = clopper_pearson(er, sv, 1 - cfg.delta)
+            row.update({"risk": _f(er / sv), "risk_interval": [_f(lo), _f(hi)],
+                        "lower_bound_above_alpha": lo > cfg.alpha})
+        out[g] = row
+    return {"policy": res.chosen, "tested_half": "B", "interval_level": 1 - cfg.delta,
+            "note": "descriptive only: the verdict covers the whole pool, not each group; "
+                    "no multiplicity correction; small groups have wide intervals",
+            "groups": out}
+
+
 def dumps(rep: dict) -> str:
     return json.dumps(rep, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
 
@@ -217,6 +252,17 @@ def to_markdown(rep: dict) -> str:
                   f"- served {r2['served']}, wrong {r2['errors']}: risk {r2['risk']} "
                   f"(interval {lo} to {hi} at level {r2['interval_level']})",
                   f"- answered {r2['coverage']} of the tested questions; saving vs big model only: {r2['saving']}", ""]
+        bg = r2.get("by_group")
+        if bg:
+            L += ["## Risk by group (tested half, descriptive, not certified)", ""]
+            for g, x in bg["groups"].items():
+                if "risk" in x:
+                    flag = " **lower bound above alpha**" if x["lower_bound_above_alpha"] else ""
+                    L.append(f"- {g}: served {x['served']}/{x['questions']}, wrong {x['errors']}, risk {x['risk']} "
+                             f"(interval {x['risk_interval'][0]} to {x['risk_interval'][1]}){flag}")
+                else:
+                    L.append(f"- {g}: no served answers ({x['questions']} questions)")
+            L += ["", bg["note"], ""]
         r3 = rep["R3_cost_measures"]
         L += ["## Cost measures", ""]
         for m, x in sorted(r3["by_measure"].items()):
