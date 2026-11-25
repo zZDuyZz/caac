@@ -7,6 +7,10 @@ text is copied into the pools (only ids, correctness, token counts, costs, answe
   python scripts\\convert_public.py D:\\data D:\\data\\pools          (both sources)
   python scripts\\convert_public.py D:\\data D:\\data\\pools --only lrb
   python scripts\\convert_public.py D:\\data D:\\data\\pools --only monkey
+  python scripts\\convert_public.py D:\\data D:\\data\\pools --only monkey ^
+      --tok Llama-3=D:\\data\\tok\\llama3.json --tok Gemma=D:\\data\\tok\\gemma.json --tok Pythia=D:\\data\\tok\\pythia.json
+  (--tok PREFIX=tokenizer.json, repeatable: a model whose name starts with PREFIX gets REAL token
+   counts from that tokenizer (needs: pip install tokenizers); the others stay ESTIMATED)
 
 Output: one folder per (source, benchmark) with rows.jsonl.gz + meta.json, and convert_log.txt.
 
@@ -25,8 +29,10 @@ Monkey Business (D:\\data\\monkey\\<TASK>_<MODEL>.json, 10,000 samples per probl
   correct = is_corrects[d] (graded by the source);  answer_key = final answer extracted from the
   sample text (GSM8K: "#### x"; MATH: "The final answer is x"), compared as exact strings;
   none for CodeContests / MiniF2F
-  out_tokens = min(cap, ceil(characters / 4)) -- ESTIMATED (no token counts in the source);
-  in_tokens = ceil(prompt characters / 4) -- ESTIMATED;  caps = the source's max length
+  out_tokens = min(cap, tokens) and in_tokens = tokens of the prompt, with tokens = the model's own
+  tokenizer when --tok gives one (MEASURED; special tokens not added), else ceil(characters / 4)
+  (ESTIMATED; the source has no token counts); meta.token_source says which, per model;
+  caps = the source's max length
   (GSM8K / MATH 512, CodeContests 1024, MiniF2F 200);  finish = "unknown"
 """
 
@@ -249,7 +255,42 @@ def est_tokens(text, cap=None):
     return min(cap, t) if cap else t
 
 
-def convert_monkey(root, out_root, log, draws=MONKEY_DRAWS):
+class Counter:
+    """Token counts: a real tokenizer (tokenizers library, a tokenizer.json) or ceil(chars / 4)."""
+
+    def __init__(self, path=None):
+        self.tk, self.label = None, "estimated: ceil(characters / 4)"
+        if path:
+            try:
+                from tokenizers import Tokenizer
+            except ImportError:
+                sys.exit("--tok needs the tokenizers library: pip install tokenizers")
+            self.tk = Tokenizer.from_file(path)
+            sha = hashlib.sha256(open(path, "rb").read()).hexdigest()[:16]
+            self.label = f"measured: {os.path.basename(path)} sha256:{sha}"
+
+    def one(self, text):
+        return len(self.tk.encode(text, add_special_tokens=False).ids) if self.tk else math.ceil(len(text) / 4)
+
+    def many(self, texts):
+        if not self.tk:
+            return [math.ceil(len(t) / 4) for t in texts]
+        return [len(e.ids) for e in self.tk.encode_batch(list(texts), add_special_tokens=False)]
+
+
+def counter_for(model, toks, cache={}):
+    for prefix, path in toks.items():
+        if model.startswith(prefix):
+            if path not in cache:
+                cache[path] = Counter(path)
+            return cache[path]
+    if None not in cache:
+        cache[None] = Counter()
+    return cache[None]
+
+
+def convert_monkey(root, out_root, log, draws=MONKEY_DRAWS, toks=None):
+    toks = toks or {}
     base = os.path.join(root, "monkey")
     by_task = defaultdict(list)
     for f in sorted(os.listdir(base)):
@@ -260,8 +301,11 @@ def convert_monkey(root, out_root, log, draws=MONKEY_DRAWS):
     for task, items in sorted(by_task.items()):
         cap = MONKEY_CAPS.get(task)
         rows, files, stats = [], [], defaultdict(int)
+        token_source = {}
         for model, path in items:
             t0 = time.time()
+            ctr = counter_for(model, toks)
+            token_source[model] = ctr.label
             files.append({"file": os.path.basename(path), "size": os.path.getsize(path)})
             n = 0
             for prob in iter_json_array(path):
@@ -270,12 +314,14 @@ def convert_monkey(root, out_root, log, draws=MONKEY_DRAWS):
                 samples, corrects = prob["samples"], prob["is_corrects"]
                 if len(samples) < draws:
                     stats["problems_with_fewer_draws"] += 1
-                pin = math.ceil(len(prob.get("prompt", "")) / 4)
-                for d in range(min(draws, len(samples))):
+                pin = ctr.one(prob.get("prompt", ""))
+                use = min(draws, len(samples))
+                counts = ctr.many(samples[:use])
+                for d in range(use):
                     txt = samples[d]
                     rows.append(row(qid, model, d, bool(corrects[d]),
                                     answer_key=answer_key(task, txt),
-                                    out_tokens=est_tokens(txt, cap), in_tokens=pin,
+                                    out_tokens=min(cap, counts[d]) if cap else counts[d], in_tokens=pin,
                                     finish="unknown", is_greedy=False))
             log(f"  monkey {task}/{model}: problems={n} ({time.time() - t0:.0f}s)")
         keys = task in ("GSM8K", "MATH")
@@ -290,9 +336,12 @@ def convert_monkey(root, out_root, log, draws=MONKEY_DRAWS):
                 "grader": {"kind": grader[0], "name": grader[1]},
                 "answer_equivalence": "exact" if keys else "none", "answer_keys": keys,
                 "caps": {m: cap for m, _ in items},
-                "token_label": "out_tokens and in_tokens ESTIMATED as ceil(characters/4), out_tokens clipped at the cap",
+                "token_source": token_source,
+                "token_label": "per model, see token_source: MEASURED with the model's tokenizer, or ESTIMATED as "
+                               "ceil(characters/4); out_tokens clipped at the cap",
                 "notes": f"first {draws} of 10,000 samples per problem (temperature 0.6 / 0.5); "
-                         f"answer keys compared as exact strings (votes may split equivalent forms); stats: {dict(stats)}",
+                         f"answer keys compared as exact strings (the replay canonicalizes numbers and wrappers); "
+                         f"stats: {dict(stats)}",
                 "adapter": {"name": "convert_public.monkey", "draw0": "first sample (not greedy)"}}
         name = f"monkey_{task}".replace("-", "_")
         write_pool(os.path.join(out_root, name), rows, meta)
@@ -306,7 +355,17 @@ def main(argv=None):
     ap.add_argument("data_root")
     ap.add_argument("out_root")
     ap.add_argument("--only", choices=["lrb", "monkey"])
+    ap.add_argument("--tok", action="append", default=[], metavar="PREFIX=tokenizer.json",
+                    help="real token counts for Monkey models whose name starts with PREFIX (repeatable)")
     a = ap.parse_args(argv)
+    toks = {}
+    for t in a.tok:
+        if "=" not in t:
+            ap.error(f"--tok {t!r}: expected PREFIX=path")
+        k, v = t.split("=", 1)
+        if not os.path.isfile(v):
+            ap.error(f"--tok {k}: no such file {v}")
+        toks[k] = v
     os.makedirs(a.out_root, exist_ok=True)
     logf = open(os.path.join(a.out_root, "convert_log.txt"), "a", encoding="utf-8", newline="\n")
 
@@ -318,7 +377,7 @@ def main(argv=None):
     if a.only in (None, "lrb"):
         convert_lrb(a.data_root, a.out_root, log)
     if a.only in (None, "monkey"):
-        convert_monkey(a.data_root, a.out_root, log)
+        convert_monkey(a.data_root, a.out_root, log, toks=toks)
     log("done")
     logf.close()
 

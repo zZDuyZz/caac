@@ -83,6 +83,8 @@ def pairs_for(pool_name, rows, L) -> list[dict]:
     models = sorted({r.model for r in rows})
     out = []
     declared = [tuple(p) for p in L["pairs"]["primary"].get(src, [])]
+    if benchmark_of(pool_name) in L["pairs"].get("primary_exclude_benchmarks", []):
+        declared = []           # lock v2: multi-step agent tasks -> their pairs are secondary
     params = L["pairs"].get("nominal_params_b", {})
     price = {m: unit_price(rows, m) for m in models}
     seen = set()

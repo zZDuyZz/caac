@@ -192,7 +192,12 @@
    "deepseek-r1-0528": "37B activated of 671B (DeepSeek-V3 architecture; 684.5B on Hugging Face incl. MTP) - VERIFY in the paper",
    "intern-s1": "28B activated, 241B total (Intern-S1 technical report, arXiv 2508.15763)",
    "glm-4.6": "32B activated, ~355-357B total (third-party listing; VERIFY against the official model card)"
-  }
+  },
+  "primary_exclude_benchmarks": [
+   "swe_bench_verified",
+   "tau2_test"
+  ],
+  "primary_exclude_reason": "multi-step agent tasks: one 'question' is a whole episode with tool calls; small-first-then-escalate on a finished episode is not the single-turn question answering the claim is about"
  },
  "criteria": {
   "a": "fraction of configurations with verdict GO",
@@ -224,9 +229,10 @@
   "lrb_models_skipped": [
    "openrouter"
   ],
-  "monkey": "first 64 of 10,000 samples per problem; tokens ESTIMATED = ceil(chars/4), output clipped at the source's cap; answer keys = extracted final answers compared as exact strings",
+  "monkey": "first 64 of 10,000 samples per problem; token counts MEASURED with the model family's own tokenizer when it is supplied (Llama-3 for Llama-3-*, Gemma for Gemma-*, GPT-NeoX for Pythia-*; special tokens not added; tokenizer file sha256 recorded per model in meta.token_source), else ESTIMATED = ceil(chars/4); output clipped at the source's cap; answer keys = extracted final answers, canonicalized when votes are counted",
   "lurume": "k = 1; cost_usd = official_usd (billed); cap = the largest of requested_max_tokens and the observed output of the model on the benchmark (the source reports outputs above the requested maximum: deepseek-v4-flash up to 515,083 > 384,000 in 100 rows); rows kept, count in meta.notes",
-  "price_rows": "the largest price per token of a model counts rows with zero output tokens (a billed prompt) too"
+  "price_rows": "the largest price per token of a model counts rows with zero output tokens (a billed prompt) too",
+  "answer_equivalence_exact": "exact = whitespace collapsed, case folded, $...$ / \\\\boxed{...} / a final period removed, plain decimal numbers written canonically (18 = 18.0; 1,000 = 1000); applied when votes are counted"
  },
  "run": {
   "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v2.json --out map_v2/   (default --tier both)",
@@ -283,6 +289,25 @@
    "what": "R4 gives a planning estimate (or 'unreachable with these candidates') when no policy passed half A",
    "why": "criterion d was empty in v1; reporting only, verdicts unaffected",
    "seen_v1_results": true
+  },
+  {
+   "id": "v2-5",
+   "what": "answer keys compared after canonical number / wrapper normalization",
+   "why": "exact string comparison split equivalent answers into different votes (changes 9.4% of Monkey MATH keys, 0.85% of GSM8K)",
+   "seen_v1_results": true
+  },
+  {
+   "id": "v2-6",
+   "what": "swe_bench_verified and tau2_test: declared pairs become secondary",
+   "why": "multi-step agent episodes, not single-turn questions; decided from task structure",
+   "seen_v1_results": true
+  },
+  {
+   "id": "v2-7",
+   "what": "Monkey token counts measured with each model family's tokenizer (estimate kept only where a tokenizer is not supplied)",
+   "why": "the source has no token counts; a measured count removes the estimate from the cost measure",
+   "seen_v1_results": true
   }
- ]
+ ],
+ "revision": "v2 final: amendments v2-5..v2-7 were added in a second commit, before any audit was run under v2 (the first v2 commit, tag audit-lock-v2, has amendments v2-1..v2-4); the audit under v2 uses THIS file"
 }

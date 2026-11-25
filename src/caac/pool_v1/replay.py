@@ -29,7 +29,9 @@ proportion to the tokens used (an ESTIMATE, flagged in the result).
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
+from decimal import Decimal
 from dataclasses import dataclass, field
 from itertools import product
 
@@ -39,15 +41,41 @@ from caac.pool_v1.schema import Meta, Row
 
 
 # ----------------------------------------------------------------------------- C5
+_NUM = re.compile(r"^[+-]?(\d+(\.\d*)?|\.\d+)$")
+
+
+def _canon_exact(key: str) -> str:
+    k = " ".join(key.split()).casefold()
+    # wrappers that do not change the answer: $...$, \boxed{...}, a final period
+    changed = True
+    while changed:
+        changed = False
+        if len(k) >= 2 and k[0] == "$" and k[-1] == "$":
+            k, changed = k[1:-1].strip(), True
+        if k.startswith("\\boxed{") and k.endswith("}"):
+            k, changed = k[len("\\boxed{"):-1].strip(), True
+        if k.endswith(".") and _NUM.match(k[:-1].replace(",", "")):
+            k, changed = k[:-1], True
+    num = k.replace(",", "")
+    if _NUM.match(num):                       # 18 = 18.0 = 18.00 = 1,8 not touched (comma only as thousands)
+        d = Decimal(num).normalize()
+        k = format(d, "f")
+        if k in ("-0", "+0"):
+            k = "0"
+    return k
+
+
 def normalize_key(key: str | None, equivalence: str) -> str | None:
     """Answer equivalence. math: the adapter already canonicalized (unchanged);
-    exact: whitespace collapsed + case folded; none: answers cannot be compared."""
+    exact: whitespace collapsed, case folded, $...$ / \\boxed{...} / a final period removed,
+    and plain decimal numbers written canonically (18 = 18.0 = 18.00; 1,000 = 1000);
+    none: answers cannot be compared."""
     if key is None or equivalence == "none":
         return None
     if equivalence == "math":
         return key
     if equivalence == "exact":
-        return " ".join(key.split()).casefold()
+        return _canon_exact(key)
     raise ValueError(f"unknown answer_equivalence {equivalence!r}")
 
 

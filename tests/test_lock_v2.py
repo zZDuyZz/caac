@@ -25,7 +25,7 @@ def test_v2_keeps_every_threshold_of_v1():
     assert a["audit"] == b["audit"] and a["sensitivity"] == b["sensitivity"]
     assert a["pairs"]["primary"] == b["pairs"]["primary"]
     assert a["benchmarks"]["exclude_from_primary"] == b["benchmarks"]["exclude_from_primary"]
-    assert all(x["seen_v1_results"] for x in b["amendments"]) and len(b["amendments"]) == 4
+    assert all(x["seen_v1_results"] for x in b["amendments"]) and len(b["amendments"]) == 7
 
 
 def test_cut_budgets_below_the_cap_only():
@@ -134,3 +134,22 @@ def test_v2_map_runs(tmp_path):
     lines = [json.loads(l) for l in (tmp_path / "map" / "map.jsonl").read_text(encoding="utf-8").splitlines()]
     assert s["pre_registered"] and {x["measure"] for x in lines} == {"tokens_params", "tokens_lambda1"}
     assert all("reachable" in x for x in lines)
+
+
+def test_exact_answers_are_canonical():
+    from caac.pool_v1.replay import normalize_key as n
+    assert n("18", "exact") == n("18.0", "exact") == n("$18$", "exact") == n("\\boxed{18}", "exact") == "18"
+    assert n("1,000", "exact") == n("1000.", "exact") == "1000"
+    assert n("-0.0", "exact") == "0" and n(".5", "exact") == "0.5"
+    assert n("1/2", "exact") == "1/2" and n(" Yes ", "exact") == "yes"
+    assert n("x", "none") is None and n("\\frac{1}{2}", "math") == "\\frac{1}{2}"
+
+
+def test_agent_benchmarks_have_no_primary_pairs():
+    from caac.pool_v1.crossmap import pairs_for
+    rows = [Row(f"q{i}", m, 0, True, out_tokens=10, in_tokens=5, cost_usd=c * 15)
+            for i in range(120) for m, c in (("gemini-2.5-flash", 1e-7), ("gemini-2.5-pro", 1e-6))]
+    t = {p["tier"] for p in pairs_for("lrb_tau2_test", rows, load_lock(V2))}
+    assert t == {"secondary"}
+    assert {p["tier"] for p in pairs_for("lrb_tau2_test", rows, load_lock(V1))} == {"primary"}
+    assert {p["tier"] for p in pairs_for("lrb_gpqa_test", rows, load_lock(V2))} == {"primary"}

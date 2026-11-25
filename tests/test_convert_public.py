@@ -118,3 +118,41 @@ def test_lurume_adapter(tmp_path):
     assert m.caps == {"a-flash": 1000, "a-pro": 2000} and "score_without_response': 1" in m.notes
     assert {r.finish for r in rows} == {"stop", "length", "unknown"}
     assert validate(rows, m).ok
+
+
+def test_monkey_real_token_counts(tmp_path):
+    import pytest
+    tokenizers = pytest.importorskip("tokenizers")
+    from tokenizers import Tokenizer, models, pre_tokenizers
+    vocab = {"[UNK]": 0, "step": 1, "one": 2, "so": 3, "x": 4, "=": 5, "42": 6, "####": 7, "Question": 8}
+    tk = Tokenizer(models.WordLevel(vocab, unk_token="[UNK]"))
+    tk.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+    tkp = tmp_path / "llama3.json"
+    tk.save(str(tkp))
+    _monkey(tmp_path)
+    out = tmp_path / "pools"
+    cp.main([str(tmp_path), str(out), "--only", "monkey", "--tok", f"Llama-3={tkp}"])
+    rows, rerr, meta, merr = load_pool_v1(out / "monkey_GSM8K")
+    assert not rerr and not merr and validate(rows, meta).ok
+    meta_json = json.loads((out / "monkey_GSM8K" / "meta.json").read_text(encoding="utf-8"))
+    assert set(meta_json["token_source"]) == {"Llama-3-8B-Instruct", "Llama-3-70B-Instruct"}
+    assert all(v.startswith("measured:") for v in meta_json["token_source"].values())
+    r = [x for x in rows if x.model == "Llama-3-8B-Instruct" and x.qid.endswith(":100") and x.draw == 1][0]
+    assert r.out_tokens == 8                           # " step one, so x = 42.\n#### 42" under this word-level vocab
+    assert r.in_tokens == 11                           # "Question: ...Question: ..." (x10) -> 11 whitespace tokens
+    # Pythia has no --tok: stays estimated, in a pool that mixes both
+    rows, _, _, _ = load_pool_v1(out / "monkey_MATH")
+    meta_math = json.loads((out / "monkey_MATH" / "meta.json").read_text(encoding="utf-8"))
+    assert meta_math["token_source"]["Pythia-70M"].startswith("estimated")
+    # deterministic bytes with a tokenizer too
+    cp.main([str(tmp_path), str(tmp_path / "pools2"), "--only", "monkey", "--tok", f"Llama-3={tkp}"])
+    assert (tmp_path / "pools2" / "monkey_GSM8K" / "rows.jsonl.gz").read_bytes() == \
+        (out / "monkey_GSM8K" / "rows.jsonl.gz").read_bytes()
+
+
+def test_tok_option_errors(tmp_path, capsys):
+    import pytest
+    with pytest.raises(SystemExit):
+        cp.main([str(tmp_path), str(tmp_path / "o"), "--tok", "Llama-3"])
+    with pytest.raises(SystemExit):
+        cp.main([str(tmp_path), str(tmp_path / "o"), "--tok", f"Llama-3={tmp_path / 'nope.json'}"])
