@@ -108,6 +108,39 @@ def _bern_p(x: list[float], lo: float, hi: float) -> float:
     return hi_d
 
 
+# ------------------------------------------------- alternative cost test: betting
+def _betting_p(x: list[float], lo: float, hi: float, order: list[int] | None = None) -> float:
+    """p-value against H0: E[x] <= 0 (small = evidence E[x] > 0), x in [lo, hi], lo < 0 < hi.
+
+    Test by betting (Waudby-Smith & Ramdas, JRSS-B 2024): wealth K_t = prod(1 + l_i x_i)
+    with a PREDICTABLE bet l_i in [0, 0.5/|lo|] (depends on x_1..x_{i-1} only), so
+    1 + l_i x_i >= 0.5 > 0. Under H0 (i.i.d., mean <= 0) K is a nonnegative
+    supermartingale; by Ville's inequality P(max_t K_t >= 1/d) <= d, so p = 1/max K.
+    The order is fixed and data-independent (the caller passes a hash order); the bound
+    uses only the range, not a variance estimate, and adapts to small variance."""
+    n = len(x)
+    if n < 2 or lo >= 0 or hi <= 0:
+        return 1.0
+    idx = order if order is not None else list(range(n))
+    lmax = 0.5 / (-lo)
+    logk, best = 0.0, 0.0
+    s1 = s2 = 0.0
+    m = 0
+    for i in idx:
+        mu = s1 / m if m else 0.0
+        var = (s2 / m - mu * mu) if m else 0.0
+        lam = 0.0 if mu <= 0 else min(lmax, mu / (var + mu * mu + 1e-12))
+        logk += math.log1p(lam * x[i])
+        best = max(best, logk)
+        s1 += x[i]; s2 += x[i] * x[i]; m += 1
+    return min(1.0, math.exp(-best))
+
+
+def _order(qids: list[str], salt: str) -> list[int]:
+    """A fixed, data-independent order of the questions (hash of qid)."""
+    return sorted(range(len(qids)), key=lambda i: hashlib.sha256(f"order|{salt}|{qids[i]}".encode()).hexdigest())
+
+
 # ----------------------------------------------------------------------------- split
 def in_half_a(qid: str, salt: str = DEFAULT_SALT) -> bool:
     """Fixed, data-independent A/B assignment: first byte of sha256(salt|qid) is even."""
@@ -181,8 +214,12 @@ def _stats(p: PolicyData, idx: list[int], big: list[float], s: float):
 
 
 def audit(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float = 0.20,
-          salt: str = DEFAULT_SALT) -> AuditResult:
+          salt: str = DEFAULT_SALT, cost_test: str = "bernstein") -> AuditResult:
+    """cost_test: "bernstein" (empirical Bernstein, default) or "betting" (test by betting).
+    Both are valid at the stated level; which one is used must be fixed in advance."""
     _check(inp)
+    if cost_test not in ("bernstein", "betting"):
+        raise ValueError("cost_test must be 'bernstein' or 'betting'")
     n = len(inp.qids)
     lo, hi = -inp.c_max, (1.0 - s) * inp.c_max          # range of d = (1-s)B - C
     A = [i for i, q in enumerate(inp.qids) if in_half_a(q, salt)]
@@ -201,7 +238,10 @@ def audit(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float
         p = inp.policies[j]
         served, errors, d, mean_c, mean_b = _stats(p, B, inp.big_cost, s)
         pr = p_risk_below(errors, served, alpha)
-        ps = p_mean_nonneg(d, lo, hi)
+        if cost_test == "betting":   # evidence E[d] > 0 (boundary E[d] = 0 counted as the null)
+            ps = _betting_p(d, lo, hi, _order([inp.qids[i] for i in B], salt))
+        else:
+            ps = p_mean_nonneg(d, lo, hi)
         go = pr <= delta and ps <= delta
         res.chosen = p.name
         res.go = {"policy": p.name, "served_b": served, "errors_b": errors,
@@ -218,7 +258,10 @@ def audit(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float
     for p in inp.policies:
         served, errors, d, mean_c, mean_b = _stats(p, list(range(n)), inp.big_cost, s)
         pr = p_risk_above(errors, served, alpha)
-        ps = p_mean_neg(d, lo, hi)
+        if cost_test == "betting":   # evidence E[d] < 0: bet on -d
+            ps = _betting_p([-v for v in d], -hi, -lo, _order(inp.qids, salt))
+        else:
+            ps = p_mean_neg(d, lo, hi)
         rej = pr <= delta / 2 or ps <= delta / 2
         all_rejected &= rej
         rows.append({"policy": p.name, "served": served, "errors": errors,
@@ -226,6 +269,7 @@ def audit(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float
                      "saving": round(1 - mean_c / mean_b, 6) if mean_b else None,
                      "p_risk_above": pr, "p_saving_below": ps, "rejected": rej})
     res.nogo = {"level_each_leg": delta / 2, "policies": rows, "passed": all_rejected}
+    res.notes.append(f"cost test: {cost_test}")
 
     if go and all_rejected:
         res.verdict, res.conflict = "INCONCLUSIVE", True
