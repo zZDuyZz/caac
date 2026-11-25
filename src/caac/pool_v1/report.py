@@ -175,18 +175,50 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         sn = served_needed(rate, cfg.alpha, cfg.delta) if rate is not None else None
         if sn is None:
             cert["questions_needed"] = None
+            cert["reachable"] = False
             cert["reason"] = ("risk on half B is >= alpha: more questions of the same kind will not "
                               "certify this policy")
         else:
             share = served / n_b if n_b else 0
             total = math.ceil(2 * sn / share) if share > 0 else None
             cert["served_needed_on_tested_half"] = sn
+            cert["reachable"] = True
             cert["questions_needed"] = total
             cert["more_questions_needed"] = max(0, total - n) if total is not None else None
         cert["note"] = "ESTIMATE for the risk leg only, if the observed rates hold; the cost leg may need more"
         r4["certification"] = cert
     else:
         r4["reason"] = "no policy reached risk <= alpha on half A"
+        # planning estimate (does not change the verdict): the candidate with the lowest risk on
+        # ALL audited questions; if even its rate is >= alpha, more questions of the same kind
+        # cannot give GO; otherwise the questions needed if that rate held (risk leg only)
+        inp = rr.audit_input
+        best = None
+        for p in inp.policies:
+            sv = sum(p.served)
+            if sv:
+                rate = sum(p.error) / sv
+                if best is None or rate < best[0]:
+                    best = (rate, p.name, sv)
+        cert = {"basis": "lowest-risk candidate on all audited questions (no policy passed half A)",
+                "questions_available": len(inp.qids)}
+        if best is None:
+            cert.update({"questions_needed": None, "reachable": False, "reason": "no candidate served any question"})
+        else:
+            rate, pname, sv = best
+            cert.update({"policy": pname, "risk_all": _f(rate), "served_share": _f(sv / len(inp.qids))})
+            sn = served_needed(rate, cfg.alpha, cfg.delta) if rate < cfg.alpha else None
+            if sn is None:
+                cert.update({"questions_needed": None, "reachable": False,
+                             "reason": "the lowest observed risk is >= alpha: more questions of the same "
+                                       "kind will not give GO with these candidates"})
+            else:
+                share = sv / len(inp.qids)
+                total = math.ceil(2 * sn / share) if share > 0 else None
+                cert.update({"served_needed_on_tested_half": sn, "questions_needed": total, "reachable": True,
+                             "more_questions_needed": max(0, total - len(inp.qids)) if total else None})
+        cert["note"] = "ESTIMATE for the risk leg only, if the observed rate holds; the cost leg may need more"
+        r4["certification"] = cert
     floor = certification_floor(cfg.alpha, cfg.delta)
     r4["minimum_questions_zero_errors"] = 2 * floor
     r4["minimum_note"] = (f"even with zero errors, GO needs >= {floor} served answers on the tested half, "
@@ -278,6 +310,10 @@ def to_markdown(rep: dict) -> str:
                   f"(have {c['questions_available']})" + (f"; {c['reason']}" if c.get("reason") else ""), ""]
         else:
             L += [f"- {r4.get('reason')}"]
+            c = r4.get("certification")
+            if c:
+                L += [f"- planning estimate ({c['basis']}): questions needed {c.get('questions_needed')} "
+                      f"(have {c['questions_available']})" + (f"; {c['reason']}" if c.get("reason") else "")]
         L += [f"- {r4['minimum_note']}", ""]
     r5 = rep["R5_data_quality"]
     L += ["## Data quality", "", f"- pool ok: {r5['ok']}; levels: " +

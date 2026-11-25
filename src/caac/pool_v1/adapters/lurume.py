@@ -11,7 +11,10 @@ responses_eval.jsonl) and scores_eval.jsonl[.gz]. Mapping (one response = questi
                  a missing finish_reason becomes "unknown"; content_filter / engine_overloaded
                  are kept: the source graded them, so they count as served answers (conservative
                  for GO)
-  caps[model]  = the largest requested_max_tokens of that model in that benchmark
+  caps[model]  = the largest of (requested_max_tokens, observed usage.output) of that model in
+                 that benchmark: the source reports some outputs ABOVE the requested maximum
+                 (deepseek-v4-flash, up to 515,083 > 384,000), and a cap must bound every
+                 observed cost; the count of such rows is written to meta.notes
 No answer keys (gpqa has no text; the others are not needed with k = 1).
 Rows without a score, or a score without a response, are dropped and counted in meta.notes.
 """
@@ -62,7 +65,7 @@ def load(meta_path, scores_path):
 def to_rows(resp: dict, score: dict):
     """Return {dataset: [Row]}, {dataset: caps}, counts of dropped cells."""
     rows, caps = defaultdict(list), defaultdict(dict)
-    dropped = {"score_without_response": 0, "response_without_score": 0}
+    dropped = {"score_without_response": 0, "response_without_score": 0, "output_above_requested_max": 0}
     for key in sorted(set(resp) | set(score)):
         r, s = resp.get(key), score.get(key)
         if r is None:
@@ -83,7 +86,9 @@ def to_rows(resp: dict, score: dict):
                             finish=r.get("finish_reason") or "unknown",
                             cost_usd=float(r["official_usd"]), is_greedy=False))
         cap = int(r["requested_max_tokens"])
-        caps[ds][m] = max(caps[ds].get(m, 0), cap)
+        if int(u["output"]) > cap:
+            dropped["output_above_requested_max"] += 1     # counted, kept (not dropped)
+        caps[ds][m] = max(caps[ds].get(m, 0), cap, int(u["output"]))
     return rows, caps, dropped
 
 
@@ -110,7 +115,8 @@ def convert(meta_path, scores_path, out_root, datasets=None) -> list[Path]:
                 "answer_equivalence": "none", "answer_keys": False,
                 "caps": caps[ds],
                 "notes": (f"k=1; cost_usd = official_usd (billed, reported by the source); "
-                          f"dropped cells (all benchmarks): {dropped}"),
+                          f"counts (all benchmarks; output_above_requested_max rows are KEPT and the cap "
+                          f"raised to cover them): {dropped}"),
                 "adapter": {"name": "lurume", "draw0": "sample_index 0"}}
         (d / "meta.json").write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         out.append(d)

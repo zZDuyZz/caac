@@ -28,7 +28,7 @@ from pathlib import Path
 
 from caac.pool_v1.config import config_from_dict
 from caac.pool_v1.io import load_pool_v1
-from caac.pool_v1.lock import check_config_against_lock, load_lock, lock_hash, sensitivity_cells
+from caac.pool_v1.lock import allowed_cuts, check_config_against_lock, load_lock, lock_hash, sensitivity_cells
 from caac.pool_v1.replay import replay
 from caac.pool_v1.report import dumps, make_report
 
@@ -37,16 +37,18 @@ from caac.pool_v1.report import dumps, make_report
 def unit_price(rows, model) -> float | None:
     """Median billed price per token (cost_usd / (in + out tokens)) of a model: a property of
     the price list, read from cost and token columns only."""
-    v = [r.cost_usd / (r.out_tokens + (r.in_tokens or 0)) for r in rows
-         if r.model == model and r.draw == 0 and r.cost_usd is not None and r.out_tokens
-         and (r.out_tokens + (r.in_tokens or 0)) > 0]
+    v = [r.cost_usd / ((r.out_tokens or 0) + (r.in_tokens or 0)) for r in rows
+         if r.model == model and r.draw == 0 and r.cost_usd is not None
+         and ((r.out_tokens or 0) + (r.in_tokens or 0)) > 0]
     return statistics.median(v) if v else None
 
 
 def max_unit_price(rows, model) -> float | None:
-    v = [r.cost_usd / (r.out_tokens + (r.in_tokens or 0)) for r in rows
-         if r.model == model and r.cost_usd is not None and r.out_tokens
-         and (r.out_tokens + (r.in_tokens or 0)) > 0]
+    # rows with out_tokens = 0 (a billed prompt with no output) count too: leaving them out
+    # could UNDER-estimate the largest price and break the cost bound
+    v = [r.cost_usd / ((r.out_tokens or 0) + (r.in_tokens or 0)) for r in rows
+         if r.model == model and r.cost_usd is not None
+         and ((r.out_tokens or 0) + (r.in_tokens or 0)) > 0]
     return max(v) if v else None
 
 
@@ -116,13 +118,18 @@ def measures_for(pool_name, rows, meta, pair, L) -> list[dict]:
         if m == "usd":
             if not all(r.cost_usd is not None for r in rows if r.model in (pair["small"], pair["big"])):
                 continue
+            local = set(L["cost"].get("locally_run_models", {}).get(src, []))
+            if pair["small"] in local or pair["big"] in local:
+                continue        # lock v2: a price the source estimated by an unstated method
             ps, pb = max_unit_price(rows, pair["small"]), max_unit_price(rows, pair["big"])
             caps = meta.caps or {}
             if ps is None or pb is None or pair["small"] not in caps or pair["big"] not in caps:
                 continue
             in_s = max((r.in_tokens or 0) for r in rows if r.model == pair["small"])
             in_b = max((r.in_tokens or 0) for r in rows if r.model == pair["big"])
-            c_max = (caps[pair["small"]] + in_s) * ps + (caps[pair["big"]] + in_b) * pb
+            cap_s = max(caps[pair["small"]], max((r.out_tokens or 0) for r in rows if r.model == pair["small"]))
+            cap_b = max(caps[pair["big"]], max((r.out_tokens or 0) for r in rows if r.model == pair["big"]))
+            c_max = (cap_s + in_s) * ps + (cap_b + in_b) * pb
             out.append({"name": "usd", "cost": {"measure": "usd", "c_max": c_max}})
         elif m == "tokens_lambda1":
             out.append({"name": "tokens_lambda1", "cost": {"measure": "tokens", "lambda": 1.0}})
@@ -146,7 +153,7 @@ def policy_grid(rows, meta, pair, L) -> dict:
     keys = bool(meta.answer_keys) and meta.answer_equivalence != "none"
     ks = [k for k in P["k"] if k <= k_min and (k == 1 or keys)]
     cap = (meta.caps or {}).get(pair["small"])
-    cuts = [None] + ([round(f * cap) for f in P["cut_fraction_of_cap"]] if cap else [])
+    cuts = [None] + (sorted(allowed_cuts(P, cap)) if cap else [])
     return {"k": ks, "tau": P["tau"], "cut": cuts, "on_unsure": P["on_unsure"]}
 
 
@@ -269,6 +276,7 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
                               "chosen": rep["R1_verdict"].get("chosen_on_half_a"),
                               "naive_go": ng, "naive_policy": npol,
                               "questions_needed": cert.get("questions_needed"),
+                              "reachable": cert.get("reachable"),
                               "cost_bound_ratio": (rep.get("R5_data_quality") or {}).get("cost_bound_ratio"),
                               "report": fn, "report_sha16": rid, "lock_status": status,
                               "sensitivity": sens})
@@ -300,7 +308,8 @@ def summarize(lines, L, lh) -> dict:
         for x in run_:
             bycfg[(x["pool"], x["small"], x["big"])].add(x["verdict"])
         c = sum(1 for v in bycfg.values() if len(v) > 1)
-        qn = [x["questions_needed"] for x in run_ if x["verdict"] == "INCONCLUSIVE" and x["questions_needed"]]
+        inc_ = [x for x in run_ if x["verdict"] == "INCONCLUSIVE"]
+        qn = [x["questions_needed"] for x in inc_ if x["questions_needed"]]
         out[tier] = {"configurations": len(X), "verdicts": dict(verdicts),
                      "a_share_go": a,
                      "b_naive_go_but_audit_not": b,
@@ -308,7 +317,10 @@ def summarize(lines, L, lh) -> dict:
                      "c_pairs_whose_verdict_changes_with_measure": c,
                      "c_pairs_with_several_measures": sum(1 for x in bycfg.values()),
                      "d_questions_needed_inconclusive": {"n": len(qn), "median": statistics.median(qn) if qn else None,
-                                                         "min": min(qn) if qn else None, "max": max(qn) if qn else None},
+                                                         "min": min(qn) if qn else None, "max": max(qn) if qn else None,
+                                                         "inconclusive": len(inc_),
+                                                         "unreachable_with_these_candidates":
+                                                             sum(1 for x in inc_ if x.get("reachable") is False)},
                      "models": len({x["small"] for x in X} | {x["big"] for x in X}),
                      "benchmarks": len({x["pool"] for x in X})}
         bys = defaultdict(lambda: defaultdict(int))

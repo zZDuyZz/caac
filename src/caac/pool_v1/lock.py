@@ -30,6 +30,14 @@ def lock_hash(path) -> str:
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
+def allowed_cuts(pol: dict, cap: int) -> set:
+    """Cut values a lock allows for a small model with generation cap `cap`: fractions of the
+    cap (v1) and, from lock v2, absolute token budgets strictly below the cap."""
+    out = {round(f * cap) for f in pol.get("cut_fraction_of_cap", [])}
+    out |= {int(t) for t in pol.get("cut_tokens_absolute", []) if int(t) < cap}
+    return out
+
+
 def sensitivity_cells(L: dict) -> list[tuple[float, float]]:
     """(alpha, s) cells of the lock's pre-declared sensitivity grid, main cell excluded."""
     g = L.get("sensitivity") or {}
@@ -66,11 +74,12 @@ def check_config_against_lock(cfg: Config, path, caps: dict | None = None,
         if caps is None or cfg.small not in caps:
             bad.append("policies.cut set but the small model's cap is unknown (meta.caps)")
         else:
-            allowed = {round(f * caps[cfg.small]) for f in pol["cut_fraction_of_cap"]}
+            allowed = allowed_cuts(pol, caps[cfg.small])
             for c in cuts:
                 if c not in allowed:
                     bad.append(f"policies.cut {c} not in lock-allowed {sorted(allowed)} "
-                               f"(fractions {pol['cut_fraction_of_cap']} of cap {caps[cfg.small]})")
+                               f"(fractions {pol.get('cut_fraction_of_cap')} of cap {caps[cfg.small]}, "
+                               f"absolute {pol.get('cut_tokens_absolute', [])})")
     if None not in g.cut and pol.get("require_no_cut", True):
         bad.append("policies.cut must include null (no early stop) as a candidate")
     return bad

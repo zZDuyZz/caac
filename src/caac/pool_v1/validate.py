@@ -220,6 +220,12 @@ def validate(rows: list[Row], meta: Meta | None = None, *, row_errors=(), meta_e
         if ks and min(ks) != max(ks):
             rep.issues.append(Issue("warning", "W_UNEVEN", m,
                                     f"draws per question range {min(ks)}..{max(ks)}: only the first {min(ks)} are used"))
+        cap_m = (meta.caps or {}).get(m) if meta else None
+        over = sum(1 for r in mr if cap_m is not None and r.out_tokens is not None and r.out_tokens > cap_m)
+        if over:
+            rep.issues.append(Issue("warning", "W_OUT_OVER_CAP", m,
+                                    f"{over} row(s) with out_tokens above the cap {cap_m}: the cost bound "
+                                    "c_max does not hold; raise the cap in meta.json to the largest observed"))
         greedy = Counter(r.qid for r in mr if r.is_greedy)
         if any(c > 1 for c in greedy.values()):
             rep.issues.append(Issue("error", "E_GREEDY", m, "more than one greedy draw for a question"))

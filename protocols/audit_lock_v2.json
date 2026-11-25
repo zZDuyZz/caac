@@ -1,0 +1,288 @@
+{
+ "format": "caac-lock",
+ "version": "2",
+ "status": "frozen",
+ "note": "FROZEN 25/11/2026. Amends v1 AFTER its primary results were seen (0 GO / 74 NO-GO / 6 INCONCLUSIVE at the main cell). Each amendment fixes a defect found by structure (caps, prices, a cut grid that could not act), not a threshold: alpha, delta, s, salt, cost test, primary pairs, excluded benchmarks and the sensitivity grid are unchanged. Results under v2 are labelled 'amended after v1'. Our own test split is opened once, under the final lock.",
+ "audit": {
+  "alpha": 0.1,
+  "delta": 0.1,
+  "s": 0.2,
+  "salt": "caac-audit-v1",
+  "cost_test": "betting"
+ },
+ "policies": {
+  "k": [
+   1,
+   2,
+   4,
+   8
+  ],
+  "tau": [
+   0.5,
+   0.75,
+   1.0
+  ],
+  "cut_fraction_of_cap": [
+   0.25,
+   0.5
+  ],
+  "require_no_cut": true,
+  "on_unsure": [
+   "escalate"
+  ],
+  "rule": "k limited to the draws every question has; k >= 2 only with answer keys; cut values = fractions 0.25/0.5 of the SMALL model's generation cap AND absolute token budgets (powers of two 512..32768) strictly below that cap",
+  "abstain_note": "ABSTAIN is excluded from the primary claim: without a coverage requirement a policy could 'save' by not answering. A coverage-constrained claim is future work.",
+  "cut_tokens_absolute": [
+   512,
+   1024,
+   2048,
+   4096,
+   8192,
+   16384,
+   32768
+  ]
+ },
+ "cost": {
+  "primary_measure": {
+   "Lurume": "usd (measured billing)",
+   "Qwen anchor": "gpu_s (measured)",
+   "Monkey": "tokens",
+   "LLMRouterBench": "usd if provided, else tokens"
+  },
+  "lambda_rule_for_tokens": "lambda = parameter count of big / parameter count of small (compute per token); report also break-even lambda (R4)",
+  "c_max_rule": "tokens: generation caps from meta.json; usd/gpu_s: the cap in tokens times the largest per-token price of the pair (stated in the config)",
+  "measures": {
+   "lurume": [
+    "usd",
+    "tokens_lambda1"
+   ],
+   "lrb": [
+    "usd",
+    "tokens_params",
+    "tokens_lambda1"
+   ],
+   "monkey": [
+    "tokens_params",
+    "tokens_lambda1"
+   ],
+   "qwen": [
+    "tokens_params",
+    "tokens_lambda1"
+   ]
+  },
+  "measure_rules": {
+   "usd": "c_max = (cap_small + max prompt tokens) x max price per token of small + the same for big (price per token = cost_usd/(in+out), from cost and token columns); skipped when either model is in locally_run_models (LLMRouterBench ran its 7-9B models on its own GPUs; their cost field is an estimate whose method the source does not state)",
+   "tokens_lambda1": "raw token counts, lambda = 1 (a reference: saves only if the small model writes fewer tokens)",
+   "tokens_params": "lambda = parameters used per generated token, big / small: total for dense models, ACTIVATED for mixture-of-experts (compute per token)"
+  },
+  "locally_run_models": {
+   "lrb": [
+    "DeepHermes-3-Llama-3-8B-Preview",
+    "DeepSeek-R1-0528-Qwen3-8B",
+    "DeepSeek-R1-Distill-Qwen-7B",
+    "Fin-R1",
+    "GLM-Z1-9B-0414",
+    "Intern-S1-mini",
+    "Llama-3.1-8B-Instruct",
+    "Llama-3.1-8B-UltraMedical",
+    "Llama-3.1-Nemotron-Nano-8B-v1",
+    "MiMo-7B-RL-0530",
+    "MiniCPM4.1-8B",
+    "NVIDIA-Nemotron-Nano-9B-v2",
+    "OpenThinker3-7B",
+    "Qwen2.5-Coder-7B-Instruct",
+    "Qwen3-8B",
+    "cogito-v1-preview-llama-8B",
+    "gemma-2-9b-it",
+    "glm-4-9b-chat",
+    "granite-3.3-8b-instruct",
+    "internlm3-8b-instruct"
+   ]
+  }
+ },
+ "pairs": {
+  "rule": "every pair (small, big) of the same source and benchmark where big has more parameters (or a higher price if parameters are unknown) and both models answered >= n_min common questions; NOT chosen by outcome",
+  "n_min": 100,
+  "report": "number of pairs AND number of distinct models and benchmarks (pairs share models; not independent experiments)",
+  "primary": {
+   "lurume": [
+    [
+     "deepseek-v4-flash",
+     "deepseek-v4-pro"
+    ],
+    [
+     "glm-5-3-flash",
+     "glm-5.3"
+    ]
+   ],
+   "lrb": [
+    [
+     "Qwen3-8B",
+     "qwen3-235b-a22b-2507"
+    ],
+    [
+     "Qwen3-8B",
+     "qwen3-235b-a22b-thinking-2507"
+    ],
+    [
+     "DeepSeek-R1-0528-Qwen3-8B",
+     "deepseek-r1-0528"
+    ],
+    [
+     "Intern-S1-mini",
+     "intern-s1"
+    ],
+    [
+     "GLM-Z1-9B-0414",
+     "glm-4.6"
+    ],
+    [
+     "gemini-2.5-flash",
+     "gemini-2.5-pro"
+    ]
+   ],
+   "monkey": [
+    [
+     "Llama-3-8B-Instruct",
+     "Llama-3-70B-Instruct"
+    ],
+    [
+     "Gemma-2B",
+     "Gemma-7B"
+    ]
+   ],
+   "qwen": [
+    [
+     "Qwen3.5-2B",
+     "Qwen3.5-9B"
+    ]
+   ]
+  },
+  "primary_rule": "same family / vendor, smaller or cheaper -> larger or dearer; listed from model NAMES before any audit",
+  "secondary_rule": "every ordered pair of the pool where the big model has a larger nominal parameter count (nominal_params_b, when both are listed) or else a higher median billed price per token (cost_usd/(in+out)); equal or unknown -> no pair",
+  "nominal_params_b": {
+   "Llama-3-8B-Instruct": 8,
+   "Llama-3-70B-Instruct": 70,
+   "Llama-3-8B": 8,
+   "Gemma-2B": 2,
+   "Gemma-7B": 7,
+   "Pythia-70M": 0.07,
+   "Pythia-160M": 0.16,
+   "Pythia-410M": 0.41,
+   "Pythia-1B": 1,
+   "Pythia-1.4B": 1.4,
+   "Pythia-2.8B": 2.8,
+   "Pythia-6.9B": 6.9,
+   "Pythia-12B": 12,
+   "Qwen3.5-2B": 2,
+   "Qwen3.5-9B": 9,
+   "Qwen3-8B": 8.2,
+   "DeepSeek-R1-0528-Qwen3-8B": 8.2,
+   "Intern-S1-mini": 8.5,
+   "GLM-Z1-9B-0414": 9.4,
+   "qwen3-235b-a22b-2507": 22,
+   "qwen3-235b-a22b-thinking-2507": 22,
+   "deepseek-r1-0528": 37,
+   "intern-s1": 28,
+   "glm-4.6": 32
+  },
+  "params_sources": {
+   "dense 8-9B": "Hugging Face model pages (parameter count of the safetensors): Qwen3-8B 8.19B, DeepSeek-R1-0528-Qwen3-8B 8.19B, Intern-S1-mini 8.54B, GLM-Z1-9B-0414 9.40B",
+   "qwen3-235b-a22b": "22B activated (model name A22B; 235.1B total on Hugging Face)",
+   "deepseek-r1-0528": "37B activated of 671B (DeepSeek-V3 architecture; 684.5B on Hugging Face incl. MTP) - VERIFY in the paper",
+   "intern-s1": "28B activated, 241B total (Intern-S1 technical report, arXiv 2508.15763)",
+   "glm-4.6": "32B activated, ~355-357B total (third-party listing; VERIFY against the official model card)"
+  }
+ },
+ "criteria": {
+  "a": "fraction of configurations with verdict GO",
+  "b": "number of configurations where the point-estimate rule (cheapest policy with empirical risk <= alpha and empirical saving >= s on all data) says GO but the audit does not",
+  "c": "number of configurations whose verdict changes between cost measures (R3)",
+  "d": "questions needed (R4) in the INCONCLUSIVE configurations: median and range",
+  "if_not_notable": "report as is; most-INCONCLUSIVE is itself a finding; no threshold changes after seeing results; findings after looking are labelled exploratory with the number of comparisons tried",
+  "b_naive_rule": "naive GO iff some candidate policy has empirical risk <= alpha and empirical saving >= s on ALL data (no split, no interval, no correction)"
+ },
+ "test_split": "our Qwen test split is opened once, after the tag protocol-freeze (15/12/2026)",
+ "benchmarks": {
+  "rule": "every (source, benchmark) pool; a pair enters only with >= pairs.n_min common questions",
+  "exclude_from_primary": [
+   "hle",
+   "simpleqa",
+   "arenahard",
+   "arenahard_coding",
+   "arenahard_creative_writing",
+   "arenahard_math"
+  ],
+  "exclude_reason": "correctness from an LLM judge (source: LLMRouterBench Table 9): the judge's own error is not covered; reported as tier 'excluded'",
+  "excluded_run": "not audited in the main run (crossmap --tier both); --tier excluded gives an exploratory run"
+ },
+ "data_rules": {
+  "finish_length": "a generation with finish = length has no answer (escalated by the replay)",
+  "finish_other": "finish missing -> 'unknown'; content_filter / engine_overloaded are kept as answers graded by the source (conservative for GO)",
+  "lrb_caps": "LLMRouterBench states no max_tokens: cap = smallest power of two >= the largest completion_tokens of the model on the benchmark (token counts only)",
+  "lrb_question_identity": "a question whose text hash differs between models is dropped",
+  "lrb_models_skipped": [
+   "openrouter"
+  ],
+  "monkey": "first 64 of 10,000 samples per problem; tokens ESTIMATED = ceil(chars/4), output clipped at the source's cap; answer keys = extracted final answers compared as exact strings",
+  "lurume": "k = 1; cost_usd = official_usd (billed); cap = the largest of requested_max_tokens and the observed output of the model on the benchmark (the source reports outputs above the requested maximum: deepseek-v4-flash up to 515,083 > 384,000 in 100 rows); rows kept, count in meta.notes",
+  "price_rows": "the largest price per token of a model counts rows with zero output tokens (a billed prompt) too"
+ },
+ "run": {
+  "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v2.json --out map_v2/   (default --tier both)",
+  "primary_claims": "tier primary only; secondary and excluded are reported as supporting / exploratory"
+ },
+ "sensitivity": {
+  "alpha": [
+   0.05,
+   0.1,
+   0.2
+  ],
+  "s": [
+   0.1,
+   0.2,
+   0.3
+  ],
+  "delta": "fixed at audit.delta",
+  "tiers": [
+   "primary"
+  ],
+  "rule": "every primary configuration is also audited at each (alpha, s) cell; all cells are reported, whatever their verdict; the main result is the cell (audit.alpha, audit.s) and is never replaced by another cell"
+ },
+ "reporting": {
+  "primary": "one row per configuration (pool x pair x cost measure): verdict, chosen policy, naive verdict, questions needed; plus the sensitivity grid",
+  "secondary": "aggregate only: verdict shares per source and overall, criteria a-d; descriptive (pairs share models and questions); never quoted as a single-pair claim",
+  "excluded": "LLM-judged benchmarks: listed with configuration counts; not audited in the main run (optional exploratory run, labelled as such)",
+  "multiplicity": "each verdict carries its own guarantee at level delta; no family-wise correction across configurations; the number of configurations is always reported next to any count of GO",
+  "dry_run_25_11": "structure-only listing before freezing: 13,126 configurations = 80 primary (10 pairs, 40 pair-pool cells, 2 measures each), 9,666 secondary, 3,380 excluded; lurume_aime dropped (22 questions < n_min)",
+  "v1_and_v2": "v1 = the run registered first (reported in full, as is); v2 = amended after v1 was seen, reported beside it with the amendment list; claims of the paper rest on v2 for public sources and on the single opening of our test split"
+ },
+ "frozen_on": "2026-11-25",
+ "supersedes": "audit_lock_v1.json (tag audit-lock-v1, commit 8a4177b); v1 results stay reported as the registered run",
+ "amendments": [
+  {
+   "id": "v2-1",
+   "what": "cut grid: absolute token budgets 512..32768 added to the cap fractions",
+   "why": "with caps of 128k-384k tokens, cuts at 25%/50% of the cap never act, so on k = 1 sources every candidate was 'always the small model'",
+   "seen_v1_results": true
+  },
+  {
+   "id": "v2-2",
+   "what": "LLMRouterBench: usd skipped for locally run 7-9B models; tokens_params (activated parameters) added",
+   "why": "the source does not state how it priced its locally run models (noted in MASTER 12.32 before v1 was frozen)",
+   "seen_v1_results": true
+  },
+  {
+   "id": "v2-3",
+   "what": "Lurume cap covers the observed output; largest price per token counts zero-output rows",
+   "why": "the cost bound c_max must hold for every row; the secondary v1 run stopped on a row above it (data defect, found after v1)",
+   "seen_v1_results": true
+  },
+  {
+   "id": "v2-4",
+   "what": "R4 gives a planning estimate (or 'unreachable with these candidates') when no policy passed half A",
+   "why": "criterion d was empty in v1; reporting only, verdicts unaffected",
+   "seen_v1_results": true
+  }
+ ]
+}
