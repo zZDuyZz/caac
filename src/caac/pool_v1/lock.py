@@ -1,0 +1,60 @@
+"""Protocol lock: what is fixed BEFORE any audit of public or test data is run.
+
+The lock (JSON) fixes alpha, delta, s, the split salt, the cost test, the allowed
+candidate policies, the pair-selection rule and the pre-registered criteria. Its
+hash goes into every report. A config used with --lock must stay inside it.
+status "draft" = still editable (results NOT pre-registered); "frozen" = final.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+from caac.pool_v1.config import Config
+
+
+def load_lock(path) -> dict:
+    d = json.loads(Path(path).read_text(encoding="utf-8"))
+    if d.get("format") != "caac-lock":
+        raise ValueError("not a caac-lock file")
+    if d.get("status") not in ("draft", "frozen"):
+        raise ValueError("lock status must be 'draft' or 'frozen'")
+    return d
+
+
+def lock_hash(path) -> str:
+    d = load_lock(path)
+    canon = json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()
+
+
+def check_config_against_lock(cfg: Config, path, caps: dict | None = None) -> list[str]:
+    """Return a list of mismatches (empty = the config is inside the lock)."""
+    L = load_lock(path)
+    a, pol = L["audit"], L["policies"]
+    bad = []
+    for k in ("alpha", "delta", "s", "salt", "cost_test"):
+        if getattr(cfg, k) != a[k]:
+            bad.append(f"{k}: config {getattr(cfg, k)!r} != lock {a[k]!r}")
+    g = cfg.policies
+    if not set(g.k) <= set(pol["k"]):
+        bad.append(f"policies.k {g.k} not within lock {pol['k']}")
+    if not set(float(t) for t in g.tau) <= set(float(t) for t in pol["tau"]):
+        bad.append(f"policies.tau {g.tau} not within lock {pol['tau']}")
+    if not set(g.on_unsure) <= set(pol["on_unsure"]):
+        bad.append(f"policies.on_unsure {g.on_unsure} not within lock {pol['on_unsure']}")
+    cuts = [c for c in g.cut if c is not None]
+    if cuts:
+        if caps is None or cfg.small not in caps:
+            bad.append("policies.cut set but the small model's cap is unknown (meta.caps)")
+        else:
+            allowed = {round(f * caps[cfg.small]) for f in pol["cut_fraction_of_cap"]}
+            for c in cuts:
+                if c not in allowed:
+                    bad.append(f"policies.cut {c} not in lock-allowed {sorted(allowed)} "
+                               f"(fractions {pol['cut_fraction_of_cap']} of cap {caps[cfg.small]})")
+    if None not in g.cut and pol.get("require_no_cut", True):
+        bad.append("policies.cut must include null (no early stop) as a candidate")
+    return bad

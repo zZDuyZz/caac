@@ -17,6 +17,9 @@ dependencies = [
     "numpy>=1.24",
 ]
 
+[project.scripts]
+caac = "caac.pool_v1.cli:main"
+
 [project.optional-dependencies]
 # Pool building on GPU (build_pool.py, extract_hidden.py). session2_setup.sh pins vllm.
 gpu = [

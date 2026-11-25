@@ -1,0 +1,11 @@
+{
+ "small": "org/small-model",
+ "big": "org/big-model",
+ "alpha": 0.1, "delta": 0.1, "s": 0.2,
+ "salt": "caac-audit-v1",
+ "audit_split": "test",
+ "cost": {"measure": "tokens", "lambda": 8.0},
+ "policies": {"k": [1, 2], "tau": [1.0], "cut": [null, 1024], "on_unsure": ["escalate"]},
+ "cost_test": "betting",
+ "serving_mode": "batch"
+}

@@ -1,0 +1,10 @@
+{
+ "format": "caac-pool",
+ "version": "1",
+ "source": {"name": "my benchmark run", "url": "", "version_or_sha": "v1"},
+ "grader": {"kind": "exact", "name": "exact match on the final answer"},
+ "answer_equivalence": "exact",
+ "answer_keys": true,
+ "caps": {"org/small-model": 4096, "org/big-model": 4096},
+ "notes": "template: one row per generation; draw 0 is the answer served first"
+}

@@ -1,0 +1,7 @@
+qid,model,draw,correct,answer_key,out_tokens,in_tokens,finish,is_greedy,gpu_s,cost_usd,split,flags
+q001,org/small-model,0,1,42,180,95,stop,1,,,test,
+q001,org/small-model,1,1,42,201,95,stop,0,,,test,
+q001,org/big-model,0,1,42,150,95,stop,1,,,test,
+q002,org/small-model,0,0,17,4096,120,length,1,,,test,
+q002,org/small-model,1,1,18,640,120,stop,0,,,test,
+q002,org/big-model,0,1,18,512,120,stop,1,,,test,

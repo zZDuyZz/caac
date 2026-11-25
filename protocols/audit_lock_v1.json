@@ -1,0 +1,59 @@
+{
+ "format": "caac-lock",
+ "version": "1",
+ "status": "draft",
+ "note": "DRAFT 21/11/2026. Must be set to frozen (and committed) BEFORE auditing any public source or our test split. Do not edit after the first audit run.",
+ "audit": {
+  "alpha": 0.1,
+  "delta": 0.1,
+  "s": 0.2,
+  "salt": "caac-audit-v1",
+  "cost_test": "betting"
+ },
+ "policies": {
+  "k": [
+   1,
+   2,
+   4,
+   8
+  ],
+  "tau": [
+   0.5,
+   0.75,
+   1.0
+  ],
+  "cut_fraction_of_cap": [
+   0.25,
+   0.5
+  ],
+  "require_no_cut": true,
+  "on_unsure": [
+   "escalate"
+  ],
+  "rule": "k limited to the draws every question has; k >= 2 only with answer keys; cut values are fractions of the SMALL model's generation cap (a protocol constant, not data)",
+  "abstain_note": "ABSTAIN is excluded from the primary claim: without a coverage requirement a policy could 'save' by not answering. A coverage-constrained claim is future work."
+ },
+ "cost": {
+  "primary_measure": {
+   "Lurume": "usd (measured billing)",
+   "Qwen anchor": "gpu_s (measured)",
+   "Monkey": "tokens",
+   "LLMRouterBench": "usd if provided, else tokens"
+  },
+  "lambda_rule_for_tokens": "lambda = parameter count of big / parameter count of small (compute per token); report also break-even lambda (R4)",
+  "c_max_rule": "tokens: generation caps from meta.json; usd/gpu_s: the cap in tokens times the largest per-token price of the pair (stated in the config)"
+ },
+ "pairs": {
+  "rule": "every pair (small, big) of the same source and benchmark where big has more parameters (or a higher price if parameters are unknown) and both models answered >= n_min common questions; NOT chosen by outcome",
+  "n_min": 100,
+  "report": "number of pairs AND number of distinct models and benchmarks (pairs share models; not independent experiments)"
+ },
+ "criteria": {
+  "a": "fraction of configurations with verdict GO",
+  "b": "number of configurations where the point-estimate rule (cheapest policy with empirical risk <= alpha and empirical saving >= s on all data) says GO but the audit does not",
+  "c": "number of configurations whose verdict changes between cost measures (R3)",
+  "d": "questions needed (R4) in the INCONCLUSIVE configurations: median and range",
+  "if_not_notable": "report as is; most-INCONCLUSIVE is itself a finding; no threshold changes after seeing results; findings after looking are labelled exploratory with the number of comparisons tried"
+ },
+ "test_split": "our Qwen test split is opened once, after the tag protocol-freeze (15/12/2026)"
+}
