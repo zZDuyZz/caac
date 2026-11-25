@@ -30,12 +30,28 @@ def lock_hash(path) -> str:
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
-def check_config_against_lock(cfg: Config, path, caps: dict | None = None) -> list[str]:
-    """Return a list of mismatches (empty = the config is inside the lock)."""
+def sensitivity_cells(L: dict) -> list[tuple[float, float]]:
+    """(alpha, s) cells of the lock's pre-declared sensitivity grid, main cell excluded."""
+    g = L.get("sensitivity") or {}
+    main = (L["audit"]["alpha"], L["audit"]["s"])
+    return [(al, s) for al in g.get("alpha", []) for s in g.get("s", []) if (al, s) != main]
+
+
+def check_config_against_lock(cfg: Config, path, caps: dict | None = None,
+                              sensitivity: bool = False) -> list[str]:
+    """Return a list of mismatches (empty = the config is inside the lock).
+    sensitivity=True also accepts (alpha, s) from the lock's sensitivity grid (reported
+    beside the main result, never replacing it)."""
     L = load_lock(path)
     a, pol = L["audit"], L["policies"]
     bad = []
-    for k in ("alpha", "delta", "s", "salt", "cost_test"):
+    keys = ("alpha", "delta", "s", "salt", "cost_test")
+    if sensitivity:
+        g = L.get("sensitivity") or {}
+        if cfg.alpha not in g.get("alpha", []) or cfg.s not in g.get("s", []):
+            bad.append(f"(alpha, s) = ({cfg.alpha}, {cfg.s}) not in the lock's sensitivity grid")
+        keys = ("delta", "salt", "cost_test")
+    for k in keys:
         if getattr(cfg, k) != a[k]:
             bad.append(f"{k}: config {getattr(cfg, k)!r} != lock {a[k]!r}")
     g = cfg.policies

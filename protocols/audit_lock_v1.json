@@ -1,8 +1,8 @@
 {
  "format": "caac-lock",
  "version": "1",
- "status": "draft",
- "note": "DRAFT 25/11/2026 (rules completed from the STRUCTURE of the downloaded sources; no correctness was looked at). Must be set to frozen (and committed) BEFORE auditing any public source or our test split. Do not edit after the first audit run.",
+ "status": "frozen",
+ "note": "FROZEN 25/11/2026, approved by the author before any audit of a public source or of our test split. Rules were completed from the STRUCTURE of the sources only (model names, question ids, token counts, prices, a dry run listing configurations); no correctness was looked at. Do not edit: a change means a new file audit_lock_v2.json, frozen and committed before use, and the change is reported in the paper.",
  "audit": {
   "alpha": 0.1,
   "delta": 0.1,
@@ -163,7 +163,8 @@
    "arenahard_creative_writing",
    "arenahard_math"
   ],
-  "exclude_reason": "correctness from an LLM judge (source: LLMRouterBench Table 9): the judge's own error is not covered; reported as tier 'excluded'"
+  "exclude_reason": "correctness from an LLM judge (source: LLMRouterBench Table 9): the judge's own error is not covered; reported as tier 'excluded'",
+  "excluded_run": "not audited in the main run (crossmap --tier both); --tier excluded gives an exploratory run"
  },
  "data_rules": {
   "finish_length": "a generation with finish = length has no answer (escalated by the replay)",
@@ -177,7 +178,32 @@
   "lurume": "k = 1; cost_usd = official_usd (billed, reported by the source); cap = largest requested_max_tokens of the model on the benchmark"
  },
  "run": {
-  "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v1.json --out map/",
+  "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v1.json --out map/   (default --tier both = primary + secondary)",
   "primary_claims": "tier primary only; secondary and excluded are reported as supporting / exploratory"
- }
+ },
+ "sensitivity": {
+  "alpha": [
+   0.05,
+   0.1,
+   0.2
+  ],
+  "s": [
+   0.1,
+   0.2,
+   0.3
+  ],
+  "delta": "fixed at audit.delta",
+  "tiers": [
+   "primary"
+  ],
+  "rule": "every primary configuration is also audited at each (alpha, s) cell; all cells are reported, whatever their verdict; the main result is the cell (audit.alpha, audit.s) and is never replaced by another cell"
+ },
+ "reporting": {
+  "primary": "one row per configuration (pool x pair x cost measure): verdict, chosen policy, naive verdict, questions needed; plus the sensitivity grid",
+  "secondary": "aggregate only: verdict shares per source and overall, criteria a-d; descriptive (pairs share models and questions); never quoted as a single-pair claim",
+  "excluded": "LLM-judged benchmarks: listed with configuration counts; not audited in the main run (optional exploratory run, labelled as such)",
+  "multiplicity": "each verdict carries its own guarantee at level delta; no family-wise correction across configurations; the number of configurations is always reported next to any count of GO",
+  "dry_run_25_11": "structure-only listing before freezing: 13,126 configurations = 80 primary (10 pairs, 40 pair-pool cells, 2 measures each), 9,666 secondary, 3,380 excluded; lurume_aime dropped (22 questions < n_min)"
+ },
+ "frozen_on": "2026-11-25"
 }

@@ -41,9 +41,9 @@ def test_map_runs_and_counts_criteria(tmp_path):
           300, 3, judge=True)
     _pool(P / "monkey_GSM8K", {"Llama-3-8B-Instruct": (0.92, 150, 0, 512), "Llama-3-70B-Instruct": (0.97, 150, 0, 512)},
           200, 4, draws=4, keys=True)
-    s = run(P, LOCK, tmp_path / "map", log=lambda *_: None)
+    s = run(P, LOCK, tmp_path / "map", tiers=("primary", "secondary", "excluded"), log=lambda *_: None)
     lines = [json.loads(l) for l in (tmp_path / "map" / "map.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert s["pre_registered"] is False and all(x["lock_status"] == "draft" for x in lines)
+    assert s["pre_registered"] is True and all(x["lock_status"] == "frozen" for x in lines)
     prim = [x for x in lines if x["tier"] == "primary"]
     assert {(x["pool"], x["small"], x["measure"]) for x in prim} >= {
         ("lurume_mmlu_pro", "deepseek-v4-flash", "usd"), ("lurume_mmlu_pro", "deepseek-v4-flash", "tokens_lambda1"),
@@ -55,10 +55,21 @@ def test_map_runs_and_counts_criteria(tmp_path):
     for x in lines:
         assert x["verdict"] in ("GO", "NO-GO", "INCONCLUSIVE") and (tmp_path / "map" / "reports" / x["report"]).exists()
     assert set(s) >= {"primary", "secondary", "excluded", "lock_hash"}
-    assert len(list_configs(P, LOCK)) == len(lines)          # the dry run lists exactly what is audited
+    assert len(list_configs(P, LOCK, tiers=("primary", "secondary", "excluded"))) == len(lines)
+    # default run = primary + secondary: LLM-judged pools are listed, not audited
+    assert not any(x["tier"] == "excluded" for x in list_configs(P, LOCK, tiers=("primary", "secondary")))
+    # sensitivity grid: every primary row has the 8 non-main cells, others none
+    for x in lines:
+        if x["tier"] == "primary":
+            assert len(x["sensitivity"]) == 8 and "alpha=0.1,s=0.2" not in x["sensitivity"]
+            for c in x["sensitivity"].values():
+                assert c["verdict"] in ("GO", "NO-GO", "INCONCLUSIVE")
+        else:
+            assert x["sensitivity"] is None
+    assert "sensitivity" in s["primary"] and s["reporting"]["secondary"].startswith("aggregate")
     # same inputs -> same map bytes
     a = (tmp_path / "map" / "map.jsonl").read_bytes()
-    run(P, LOCK, tmp_path / "map2", log=lambda *_: None)
+    run(P, LOCK, tmp_path / "map2", tiers=("primary", "secondary", "excluded"), log=lambda *_: None)
     assert (tmp_path / "map2" / "map.jsonl").read_bytes() == a
 
 
@@ -83,3 +94,22 @@ def test_primary_pairs_come_from_the_lock_by_name(tmp_path):
     pr = pairs_for("lurume_x", rows, L)
     # declared pair kept even though the "flash" model is dearer here (names, not outcomes or prices)
     assert {"small": "glm-5-3-flash", "big": "glm-5.3", "tier": "primary", "n_common": 120} in pr
+
+
+def test_sensitivity_cells_are_checked_against_the_lock():
+    from caac.pool_v1.config import config_from_dict
+    from caac.pool_v1.lock import check_config_against_lock, load_lock, sensitivity_cells
+    L = load_lock(LOCK)
+    cells = sensitivity_cells(L)
+    assert len(cells) == 8 and (L["audit"]["alpha"], L["audit"]["s"]) not in cells
+    base = {"small": "a", "big": "b", "alpha": 0.05, "delta": L["audit"]["delta"], "s": 0.3,
+            "salt": L["audit"]["salt"], "cost_test": L["audit"]["cost_test"],
+            "cost": {"measure": "tokens", "lambda": 1.0},
+            "policies": {"k": [1], "tau": [1.0], "cut": [None], "on_unsure": ["escalate"]}}
+    cfg = config_from_dict(base)
+    assert check_config_against_lock(cfg, LOCK)                       # outside the main cell
+    assert check_config_against_lock(cfg, LOCK, sensitivity=True) == []
+    off = config_from_dict(dict(base, alpha=0.15))
+    assert check_config_against_lock(off, LOCK, sensitivity=True)     # not a grid value
+    d2 = config_from_dict(dict(base, delta=0.05))
+    assert check_config_against_lock(d2, LOCK, sensitivity=True)      # delta is never varied

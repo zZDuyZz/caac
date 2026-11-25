@@ -28,7 +28,7 @@ from pathlib import Path
 
 from caac.pool_v1.config import config_from_dict
 from caac.pool_v1.io import load_pool_v1
-from caac.pool_v1.lock import check_config_against_lock, load_lock, lock_hash
+from caac.pool_v1.lock import check_config_against_lock, load_lock, lock_hash, sensitivity_cells
 from caac.pool_v1.replay import replay
 from caac.pool_v1.report import dumps, make_report
 
@@ -170,7 +170,10 @@ def naive_go(rr, alpha, s) -> tuple[bool, str | None]:
 
 
 # ------------------------------------------------------------------ run
-def list_configs(pools_dir, lock_path, only_pools=None) -> list[dict]:
+DEFAULT_TIERS = ("primary", "secondary")
+
+
+def list_configs(pools_dir, lock_path, only_pools=None, tiers=None) -> list[dict]:
     """Dry run: the configurations a run WOULD audit (structure only: no replay, no audit,
     no correctness read). For checking the lock before freezing it."""
     L = load_lock(lock_path)
@@ -186,15 +189,22 @@ def list_configs(pools_dir, lock_path, only_pools=None) -> list[dict]:
             q = common_questions(rows, pair["small"], pair["big"])
             sub = [r for r in rows if r.model in (pair["small"], pair["big"]) and r.qid in q]
             grid = policy_grid(sub, meta, pair, L)
+            tier = pair["tier"] if inc else "excluded"
+            if tiers is not None and tier not in tiers:
+                continue
             for ms in measures_for(d.name, sub, meta, pair, L):
                 out.append({"pool": d.name, "small": pair["small"], "big": pair["big"],
-                            "tier": pair["tier"] if inc else "excluded", "n": pair["n_common"],
+                            "tier": tier, "n": pair["n_common"],
                             "measure": ms["name"], "policies": len(grid["k"]) * len(grid["cut"]) *
                             (len(grid["tau"]) if max(grid["k"]) > 1 else 1)})
     return out
 
 
-def run(pools_dir, lock_path, out_dir, tiers=("primary", "secondary"), only_pools=None, log=print) -> dict:
+def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log=print) -> dict:
+    """Audit every configuration of the given tiers. LLM-judged benchmarks form the tier
+    'excluded' and are audited only when asked (tiers including "excluded"): the lock lists
+    them with counts, their labels carry the judge's error. Primary configurations are also
+    run on the lock's sensitivity grid (alpha x s, same delta), reported beside the main cell."""
     L = load_lock(lock_path)
     lh = lock_hash(lock_path)
     status = L["status"]
@@ -210,9 +220,9 @@ def run(pools_dir, lock_path, out_dir, tiers=("primary", "secondary"), only_pool
             continue
         inc, why = included(d.name, L)
         for pair in pairs_for(d.name, rows, L):
-            if pair["tier"] not in tiers:
-                continue
             tier = pair["tier"] if inc else "excluded"
+            if tier not in tiers:
+                continue
             q = common_questions(rows, pair["small"], pair["big"])
             sub = [r for r in rows if r.model in (pair["small"], pair["big"]) and r.qid in q]
             grid = policy_grid(sub, meta, pair, L)
@@ -231,10 +241,27 @@ def run(pools_dir, lock_path, out_dir, tiers=("primary", "secondary"), only_pool
                 fn = f"{d.name}__{pair['small']}__{pair['big']}__{ms['name']}.json".replace("/", "_")
                 (out / "reports" / fn).write_text(text, encoding="utf-8", newline="\n")
                 v = rep["R1_verdict"]["verdict"]
-                ng, npol = (None, None)
+                ng, npol, rr = None, None, None
                 if v != "NOT RUN":
                     rr = replay(sub, meta, cfg)
                     ng, npol = naive_go(rr, cfg.alpha, cfg.s)
+                sens = None
+                if tier == "primary" and v != "NOT RUN":
+                    sens = {}
+                    for al, sv in sensitivity_cells(L):
+                        cg = config_from_dict(dict(cfgd, alpha=al, s=sv))
+                        bad = check_config_against_lock(cg, lock_path, caps=meta.caps, sensitivity=True)
+                        if bad:
+                            raise ValueError(f"{d.name} {pair} sensitivity: {bad}")
+                        rp = make_report(sub, meta, cg, input_info={"pool": d.name, "lock": lh, "lock_status": status,
+                                                                    "sensitivity_cell": True})
+                        tx = dumps(rp)
+                        sf = fn[:-5] + f"__a{al}_s{sv}.json"
+                        (out / "reports" / "sensitivity").mkdir(exist_ok=True)
+                        (out / "reports" / "sensitivity" / sf).write_text(tx, encoding="utf-8", newline="\n")
+                        sng, _ = naive_go(rr, al, sv)
+                        sens[f"alpha={al},s={sv}"] = {"verdict": rp["R1_verdict"]["verdict"], "naive_go": sng,
+                                                     "report_sha16": hashlib.sha256(tx.encode("utf-8")).hexdigest()[:16]}
                 cert = (rep.get("R4_break_even") or {}).get("certification") or {}
                 lines.append({"pool": d.name, "source": source_of(d.name), "benchmark": benchmark_of(d.name),
                               "small": pair["small"], "big": pair["big"], "tier": tier, "excluded_reason": why or None,
@@ -243,7 +270,8 @@ def run(pools_dir, lock_path, out_dir, tiers=("primary", "secondary"), only_pool
                               "naive_go": ng, "naive_policy": npol,
                               "questions_needed": cert.get("questions_needed"),
                               "cost_bound_ratio": (rep.get("R5_data_quality") or {}).get("cost_bound_ratio"),
-                              "report": fn, "report_sha16": rid, "lock_status": status})
+                              "report": fn, "report_sha16": rid, "lock_status": status,
+                              "sensitivity": sens})
         log(f"{d.name}: done")
     lines.sort(key=lambda x: (x["source"], x["benchmark"], x["tier"], x["small"], x["big"], x["measure"]))
     with open(out / "map.jsonl", "w", encoding="utf-8", newline="\n") as f:
@@ -283,7 +311,23 @@ def summarize(lines, L, lh) -> dict:
                                                          "min": min(qn) if qn else None, "max": max(qn) if qn else None},
                      "models": len({x["small"] for x in X} | {x["big"] for x in X}),
                      "benchmarks": len({x["pool"] for x in X})}
+        bys = defaultdict(lambda: defaultdict(int))
+        for x in X:
+            bys[x["source"]][x["verdict"]] += 1
+        out[tier]["verdicts_by_source"] = {k: dict(v) for k, v in sorted(bys.items())}
+        cells = defaultdict(lambda: defaultdict(int))
+        for x in X:
+            for c, r in (x.get("sensitivity") or {}).items():
+                cells[c][r["verdict"]] += 1
+                cells[c]["naive_go_but_audit_not"] += int(bool(r["naive_go"]) and r["verdict"] != "GO")
+        if cells:
+            out[tier]["sensitivity"] = {k: dict(v) for k, v in sorted(cells.items())}
+    out["reporting"] = L.get("reporting")
     return out
+
+
+def _tiers(t):
+    return {"both": DEFAULT_TIERS, "all": ("primary", "secondary", "excluded")}.get(t, (t,))
 
 
 def main(argv=None) -> int:
@@ -291,12 +335,13 @@ def main(argv=None) -> int:
     ap.add_argument("pools")
     ap.add_argument("--lock", required=True)
     ap.add_argument("--out")
-    ap.add_argument("--tier", choices=["primary", "secondary", "both"], default="both")
+    ap.add_argument("--tier", choices=["primary", "secondary", "both", "excluded", "all"], default="both",
+                    help="both = primary + secondary (default); excluded = LLM-judged benchmarks only (exploratory)")
     ap.add_argument("--pool", action="append", help="only these pool folders (repeatable)")
     ap.add_argument("--dry-run", action="store_true", help="list the configurations only (no audit)")
     a = ap.parse_args(argv)
     if a.dry_run:
-        cf = list_configs(a.pools, a.lock, only_pools=a.pool)
+        cf = list_configs(a.pools, a.lock, only_pools=a.pool, tiers=_tiers(a.tier))
         for x in cf:
             print(json.dumps(x, sort_keys=True))
         by = defaultdict(int)
@@ -309,8 +354,7 @@ def main(argv=None) -> int:
     L = load_lock(a.lock)
     if L["status"] != "frozen":
         print("WARNING: the lock is a DRAFT: results are NOT pre-registered", file=sys.stderr)
-    tiers = ("primary", "secondary") if a.tier == "both" else (a.tier,)
-    s = run(a.pools, a.lock, a.out, tiers=tiers, only_pools=a.pool)
+    s = run(a.pools, a.lock, a.out, tiers=_tiers(a.tier), only_pools=a.pool)
     print(json.dumps(s, indent=1, sort_keys=True))
     return 0
 
