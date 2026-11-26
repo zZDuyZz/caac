@@ -1,0 +1,50 @@
+criterion (b): max diff 1.1102230246251565e-16
+S1_rel_feasible [(0.007, np.float64(0.367)), (0.057, np.float64(0.617)), (0.002, np.float64(0.067)), (0.0255, np.float64(0.184)), (0.045, np.float64(0.234))]
+  n=  150 false 0.000 defined 0.003 meanS 0.133 go20 0.002 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.002 defined 0.106 meanS 0.066 go20 0.038 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.002 defined 0.448 meanS 0.032 go20 0.075 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.003 defined 0.814 meanS 0.057 go20 0.144 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.006 defined 0.985 meanS 0.117 go20 0.321 go20&S<.2 0 S>=.2&noGO 0
+S2_rel_tight [(0.0168, np.float64(0.267)), (0.057, np.float64(0.617)), (0.002, np.float64(0.067)), (0.0255, np.float64(0.184)), (0.045, np.float64(0.234))]
+  n=  150 false 0.001 defined 0.001 meanS -0.040 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.002 defined 0.086 meanS -0.033 go20 0.003 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.003 defined 0.388 meanS -0.015 go20 0.004 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.006 defined 0.784 meanS 0.008 go20 0.013 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.003 defined 0.976 meanS 0.025 go20 0.034 go20&S<.2 0 S>=.2&noGO 0
+S3_rel_bound_false [(0.025, np.float64(0.367)), (0.002, np.float64(0.067)), (0.057, np.float64(0.617))]
+  n=  150 false 0.000 defined 0.007 meanS -0.080 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.003 defined 0.152 meanS -0.036 go20 0.002 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.009 defined 0.508 meanS -0.012 go20 0.005 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.014 defined 0.810 meanS 0.008 go20 0.008 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.007 defined 0.991 meanS 0.020 go20 0.001 go20&S<.2 0 S>=.2&noGO 0
+S4_rel_bound_true [(0.02, np.float64(0.367)), (0.002, np.float64(0.067)), (0.057, np.float64(0.617))]
+  n=  150 false 0.001 defined 0.007 meanS 0.026 go20 0.001 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.002 defined 0.182 meanS -0.016 go20 0.016 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.003 defined 0.490 meanS -0.007 go20 0.010 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.006 defined 0.820 meanS 0.012 go20 0.012 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.005 defined 0.983 meanS 0.024 go20 0.014 go20&S<.2 0 S>=.2&noGO 0
+S5_rel_false_risk [(0.04, np.float64(0.467)), (0.057, np.float64(0.617)), (0.045, np.float64(0.234)), (0.002, np.float64(0.067))]
+  n=  150 false 0.000 defined 0.002 meanS -0.060 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.001 defined 0.102 meanS -0.039 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.001 defined 0.419 meanS -0.018 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.002 defined 0.787 meanS 0.004 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.005 defined 0.982 meanS 0.018 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+S6_rel_false_saving [(0.0023, np.float64(0.117)), (0.005, np.float64(0.167)), (0.008, np.float64(0.134))]
+  n=  150 false 0.000 defined 0.026 meanS -0.021 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.003 defined 0.266 meanS 0.022 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.008 defined 0.598 meanS 0.054 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.012 defined 0.868 meanS 0.080 go20 0.001 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.024 defined 0.995 meanS 0.105 go20 0.002 go20&S<.2 0 S>=.2&noGO 0
+S7_rel_heavy [(0.007, np.float64(0.366)), (0.057, np.float64(0.616)), (0.002, np.float64(0.066)), (0.0255, np.float64(0.183)), (0.045, np.float64(0.233))]
+  n=  150 false 0.001 defined 0.014 meanS -0.174 go20 0.000 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.004 defined 0.101 meanS -0.084 go20 0.001 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.002 defined 0.457 meanS -0.040 go20 0.044 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.002 defined 0.812 meanS 0.022 go20 0.161 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.003 defined 0.982 meanS 0.091 go20 0.328 go20&S<.2 0 S>=.2&noGO 0
+S8_rel_discordant [(0.007, np.float64(0.367)), (0.057, np.float64(0.617)), (0.002, np.float64(0.067)), (0.0255, np.float64(0.184)), (0.045, np.float64(0.234))]
+  n=  150 false 0.002 defined 0.017 meanS 0.171 go20 0.007 go20&S<.2 0 S>=.2&noGO 0
+  n=  300 false 0.000 defined 0.105 meanS 0.021 go20 0.025 go20&S<.2 0 S>=.2&noGO 0
+  n=  600 false 0.005 defined 0.408 meanS 0.011 go20 0.037 go20&S<.2 0 S>=.2&noGO 0
+  n= 1200 false 0.001 defined 0.781 meanS 0.020 go20 0.046 go20&S<.2 0 S>=.2&noGO 0
+  n= 2400 false 0.009 defined 0.982 meanS 0.040 go20 0.066 go20&S<.2 0 S>=.2&noGO 0
+seconds 457

@@ -278,7 +278,8 @@
   "dry_run_25_11": "structure-only listing before freezing: 13,126 configurations = 80 primary (10 pairs, 40 pair-pool cells, 2 measures each), 9,666 secondary, 3,380 excluded; lurume_aime dropped (22 questions < n_min)",
   "v1_and_v2": "v1 = the run registered first (reported in full, as is); v2 = amended after v1 was seen, reported beside it with the amendment list; claims of the paper rest on v2 for public sources and on the single opening of our test split",
   "v1_v2_v3": "v1 = registered first, v2 = amended after v1, v3 = amended after v2 (see amendments v3-1..v3-4); all three reported side by side; claims of the paper rest on v3 for public sources and on the single opening of our test split",
-  "claims": "relative = the paper's answer to 'is small-first worth deploying instead of big-only'; absolute = SLA option; each verdict controls its own error at delta (no joint guarantee)"
+  "claims": "relative = the paper's answer to 'is small-first worth deploying instead of big-only'; absolute = SLA option; each verdict controls its own error at delta (no joint guarantee)",
+  "certified_saving": "every v3 report gives S* (certified saving) beside the verdict; same guarantee as the verdict; reported for all configurations"
  },
  "frozen_on": null,
  "supersedes": "audit_lock_v2.json (tag audit-lock-v2-final, commit 35f3706, hash 5a542f87...) for the verdict procedure; v1 and v2 results stay reported beside v3",
@@ -364,6 +365,15 @@
    "why": "pre-registered choice rule (DECISION_rel_before_real.md, revision 2)",
    "seen_v2_results": true,
    "seen_v3_results": true
+  },
+  {
+   "id": "v3-7",
+   "what": "certified saving S* added to every v3 report (R1): for each policy, the GO risk leg at delta/|Pi| and a lower bound on its saving (fixed sequence over S_GRID ascending, betting on d_s, structural range, delta/|Pi|); S* = largest bound among policies passing the risk leg; GO iff S* >= s. Supplementary: no verdict changes",
+   "why": "a binary verdict hides how much is certified; deployers need the certified amount (user request 26/11: output must help readers act, not only GO/NO-GO)",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_relative_results": true,
+   "evidence": "protocols/v3_decision/ua/ (design + criteria hashed before any run; simulation: validity <= 0.024; real data: GO iff S* >= .20 in 12,062/12,062 rows)"
   }
  ],
  "revision": 1,

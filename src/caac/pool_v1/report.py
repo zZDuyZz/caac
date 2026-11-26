@@ -13,6 +13,7 @@ import json
 import math
 
 from caac.pool_v1.audit import audit, audit3, binom_cdf, certified_frontier, in_half_a, served_needed, structural_range
+from caac.pool_v1.certsave import certified_saving
 from caac.pool_v1.gap import gap as evidence_gap, gap_relative
 from caac.pool_v1.config import Config
 from caac.pool_v1.replay import replay
@@ -136,6 +137,14 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
             rep["R1_verdict"]["big_only_error"] = _f(sum(bool(x) for x in inp0.big_error) / len(inp0.qids))
         if cfg.claim == "relative":
             rep["R1_verdict"].update({"claim": "relative", "eps": cfg.eps, "rel_test": res.go.get("rel_test")})
+        cs = certified_saving(inp0, claim=cfg.claim or "absolute", alpha=cfg.alpha, eps=cfg.eps, delta=cfg.delta,
+                              salt=cfg.salt)
+        rep["R1_verdict"]["certified_saving"] = {
+            "value": cs["certified_saving"], "policy": cs["policy"],
+            "saving_hat_of_policy": _f(cs["saving_hat_of_policy"]), "n_risk_pass": cs["n_risk_pass"],
+            "note": ("lower bound on the saving of a policy that also meets the risk claim, same guarantee "
+                     "(wrong with probability <= delta); GO iff value >= s; supplementary, never changes the "
+                     "verdict; a negative value bounds a cost increase")}
     else:
       rep["R1_verdict"] = {"verdict": res.verdict, "guarantee": _guarantee(cfg), "alpha": cfg.alpha,
                          "delta": cfg.delta, "s": cfg.s, "salt": cfg.salt, "cost_test": cfg.cost_test,
@@ -424,6 +433,16 @@ def dumps(rep: dict) -> str:
     return json.dumps(rep, indent=1, sort_keys=True, ensure_ascii=False) + "\n"
 
 
+def _certified_saving_line(c: dict, delta) -> str:
+    if c.get("value") is None:
+        return ("- certified saving: none (no candidate policy passes the risk leg at this sample size)")
+    v = c["value"]
+    what = (f"at least {v:.0%} of the big-model-only cost" if v > 0 else
+            f"cost at most {-v:.0%} above big-only (no saving certified)" if v < 0 else "at least 0% (no loss)")
+    return (f"- certified saving: {what} with policy {c['policy']} (estimate {c.get('saving_hat_of_policy')}); "
+            f"wrong with probability <= {delta}")
+
+
 def to_markdown(rep: dict) -> str:
     v = rep["R1_verdict"]
     L = ["# CAAC report", ""]
@@ -434,6 +453,7 @@ def to_markdown(rep: dict) -> str:
                                                if v.get("conflict") else ""), "", v["guarantee"], "",
               ] + ([f"- claim: relative, error within {v['eps']} of big-only ({v.get('rel_test')} test); "
                     f"big-only error {v.get('big_only_error')}"] if v.get("claim") == "relative" else []) + (
+                   [_certified_saving_line(v["certified_saving"], v.get("delta"))] if "certified_saving" in v else []) + (
                    [f"- questions: {v['n_questions']} (all questions test every policy; design v3)",
                     f"- candidate policies: {v['n_policies']}; each leg at level {v['level_each_leg']}; "
                     f"chosen (cheapest passing): {v['chosen']}",

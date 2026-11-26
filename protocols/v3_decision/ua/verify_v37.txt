@@ -1,0 +1,14 @@
+== map_rel vs map_rel37 (relative)
+reports 6559, differing 0; S* compared 5855; map lines equal (except report hash): False (5855)
+map lines equal ignoring all report hashes: True
+== map_abs vs map_abs37 (absolute)
+reports 6367, differing 0; S* compared 5855; map lines equal (except report hash): False (5855)
+map lines equal ignoring all report hashes: True
+== map_monkey_rel vs map_mrel37 (relative)
+reports 308, differing 0; S* compared 176; map lines equal (except report hash): False (176)
+map lines equal ignoring all report hashes: True
+== map_monkey_abs vs map_mabs37 (absolute)
+reports 272, differing 0; S* compared 176; map lines equal (except report hash): False (176)
+map lines equal ignoring all report hashes: True
+== v2 primary: diff -rq rel_v2p2 rel_v2p3 (empty = identical)
+v2 map.jsonl identical; 64 reports
