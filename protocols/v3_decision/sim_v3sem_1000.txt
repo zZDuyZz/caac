@@ -1,0 +1,62 @@
+feasible claim True c_max/Eb 3.3
+  n=  150  v2: GO 0.128 NG 0.000 | v2+U2: GO 0.250 NG 0.000 | bonf: GO 0.256 NG 0.000 | bonf+U2: GO 0.469 NG 0.000 |
+  n=  300  v2: GO 0.550 NG 0.000 | v2+U2: GO 0.570 NG 0.000 | bonf: GO 0.814 NG 0.000 | bonf+U2: GO 0.817 NG 0.000 |
+  n=  600  v2: GO 0.845 NG 0.000 | v2+U2: GO 0.845 NG 0.000 | bonf: GO 0.998 NG 0.000 | bonf+U2: GO 0.998 NG 0.000 |
+  n= 1200  v2: GO 0.917 NG 0.000 | v2+U2: GO 0.917 NG 0.000 | bonf: GO 1.000 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+  n= 2400  v2: GO 0.984 NG 0.000 | v2+U2: GO 0.984 NG 0.000 | bonf: GO 1.000 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+boundary_true claim True c_max/Eb 3.3
+  n=  150  v2: GO 0.002 NG 0.004 | v2+U2: GO 0.003 NG 0.005 | bonf: GO 0.001 NG 0.004 | bonf+U2: GO 0.001 NG 0.005 |
+  n=  300  v2: GO 0.001 NG 0.004 | v2+U2: GO 0.001 NG 0.006 | bonf: GO 0.001 NG 0.004 | bonf+U2: GO 0.001 NG 0.006 |
+  n=  600  v2: GO 0.001 NG 0.012 | v2+U2: GO 0.001 NG 0.012 | bonf: GO 0.000 NG 0.012 | bonf+U2: GO 0.000 NG 0.012 |
+  n= 1200  v2: GO 0.001 NG 0.021 | v2+U2: GO 0.000 NG 0.021 | bonf: GO 0.000 NG 0.021 | bonf+U2: GO 0.000 NG 0.021 |
+  n= 2400  v2: GO 0.001 NG 0.034 | v2+U2: GO 0.004 NG 0.031 | bonf: GO 0.000 NG 0.034 | bonf+U2: GO 0.000 NG 0.031 |
+false_risk claim False c_max/Eb 3.3
+  n=  150  v2: GO 0.005 NG 0.005 | v2+U2: GO 0.008 NG 0.005 | bonf: GO 0.003 NG 0.005 | bonf+U2: GO 0.004 NG 0.005 |
+  n=  300  v2: GO 0.007 NG 0.028 | v2+U2: GO 0.008 NG 0.027 | bonf: GO 0.002 NG 0.028 | bonf+U2: GO 0.002 NG 0.027 |
+  n=  600  v2: GO 0.006 NG 0.066 | v2+U2: GO 0.006 NG 0.066 | bonf: GO 0.000 NG 0.066 | bonf+U2: GO 0.000 NG 0.066 |
+  n= 1200  v2: GO 0.000 NG 0.170 | v2+U2: GO 0.001 NG 0.169 | bonf: GO 0.000 NG 0.170 | bonf+U2: GO 0.000 NG 0.169 |
+  n= 2400  v2: GO 0.000 NG 0.365 | v2+U2: GO 0.000 NG 0.367 | bonf: GO 0.000 NG 0.365 | bonf+U2: GO 0.000 NG 0.367 |
+false_saving claim False c_max/Eb 3.3
+  n=  150  v2: GO 0.012 NG 0.003 | v2+U2: GO 0.012 NG 0.008 | bonf: GO 0.004 NG 0.003 | bonf+U2: GO 0.004 NG 0.008 |
+  n=  300  v2: GO 0.004 NG 0.037 | v2+U2: GO 0.007 NG 0.035 | bonf: GO 0.000 NG 0.037 | bonf+U2: GO 0.001 NG 0.035 |
+  n=  600  v2: GO 0.002 NG 0.179 | v2+U2: GO 0.006 NG 0.152 | bonf: GO 0.000 NG 0.179 | bonf+U2: GO 0.000 NG 0.152 |
+  n= 1200  v2: GO 0.001 NG 0.449 | v2+U2: GO 0.006 NG 0.420 | bonf: GO 0.000 NG 0.449 | bonf+U2: GO 0.000 NG 0.420 |
+  n= 2400  v2: GO 0.000 NG 0.846 | v2+U2: GO 0.001 NG 0.818 | bonf: GO 0.000 NG 0.846 | bonf+U2: GO 0.000 NG 0.819 |
+heavy_feasible claim True c_max/Eb 17.5
+  n=  150  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.002 NG 0.000 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.001 NG 0.000 |
+  n=  300  v2: GO 0.001 NG 0.000 | v2+U2: GO 0.088 NG 0.000 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.113 NG 0.000 |
+  n=  600  v2: GO 0.103 NG 0.000 | v2+U2: GO 0.581 NG 0.000 | bonf: GO 0.182 NG 0.000 | bonf+U2: GO 0.858 NG 0.000 |
+  n= 1200  v2: GO 0.838 NG 0.000 | v2+U2: GO 0.925 NG 0.000 | bonf: GO 0.986 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+  n= 2400  v2: GO 0.979 NG 0.000 | v2+U2: GO 0.979 NG 0.000 | bonf: GO 1.000 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+heavy_false claim False c_max/Eb 17.5
+  n=  150  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.000 NG 0.000 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.000 NG 0.000 |
+  n=  300  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.004 NG 0.005 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.000 NG 0.005 |
+  n=  600  v2: GO 0.000 NG 0.004 | v2+U2: GO 0.001 NG 0.037 | bonf: GO 0.000 NG 0.004 | bonf+U2: GO 0.000 NG 0.037 |
+  n= 1200  v2: GO 0.001 NG 0.087 | v2+U2: GO 0.001 NG 0.156 | bonf: GO 0.000 NG 0.087 | bonf+U2: GO 0.000 NG 0.156 |
+  n= 2400  v2: GO 0.000 NG 0.377 | v2+U2: GO 0.000 NG 0.365 | bonf: GO 0.000 NG 0.377 | bonf+U2: GO 0.000 NG 0.365 |
+pi24_feasible claim True c_max/Eb 3.3
+  n=  150  v2: GO 0.055 NG 0.000 | v2+U2: GO 0.081 NG 0.000 | bonf: GO 0.025 NG 0.000 | bonf+U2: GO 0.164 NG 0.000 |
+  n=  300  v2: GO 0.140 NG 0.000 | v2+U2: GO 0.143 NG 0.000 | bonf: GO 0.702 NG 0.000 | bonf+U2: GO 0.754 NG 0.000 |
+  n=  600  v2: GO 0.213 NG 0.000 | v2+U2: GO 0.213 NG 0.000 | bonf: GO 0.991 NG 0.000 | bonf+U2: GO 0.991 NG 0.000 |
+  n= 1200  v2: GO 0.261 NG 0.000 | v2+U2: GO 0.261 NG 0.000 | bonf: GO 1.000 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+  n= 2400  v2: GO 0.331 NG 0.000 | v2+U2: GO 0.331 NG 0.000 | bonf: GO 1.000 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+pi24_false claim False c_max/Eb 3.3
+  n=  150  v2: GO 0.026 NG 0.000 | v2+U2: GO 0.028 NG 0.000 | bonf: GO 0.002 NG 0.000 | bonf+U2: GO 0.003 NG 0.000 |
+  n=  300  v2: GO 0.035 NG 0.000 | v2+U2: GO 0.035 NG 0.000 | bonf: GO 0.009 NG 0.000 | bonf+U2: GO 0.009 NG 0.000 |
+  n=  600  v2: GO 0.027 NG 0.000 | v2+U2: GO 0.027 NG 0.000 | bonf: GO 0.006 NG 0.000 | bonf+U2: GO 0.006 NG 0.000 |
+  n= 1200  v2: GO 0.026 NG 0.000 | v2+U2: GO 0.028 NG 0.000 | bonf: GO 0.001 NG 0.000 | bonf+U2: GO 0.001 NG 0.000 |
+  n= 2400  v2: GO 0.024 NG 0.000 | v2+U2: GO 0.024 NG 0.000 | bonf: GO 0.002 NG 0.000 | bonf+U2: GO 0.002 NG 0.000 |
+usd_feasible claim True c_max/Eb 12.6
+  n=  150  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.018 NG 0.000 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.028 NG 0.000 |
+  n=  300  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.178 NG 0.000 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.406 NG 0.000 |
+  n=  600  v2: GO 0.092 NG 0.000 | v2+U2: GO 0.571 NG 0.000 | bonf: GO 0.255 NG 0.000 | bonf+U2: GO 0.914 NG 0.000 |
+  n= 1200  v2: GO 0.659 NG 0.000 | v2+U2: GO 0.802 NG 0.000 | bonf: GO 0.981 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+  n= 2400  v2: GO 0.878 NG 0.000 | v2+U2: GO 0.878 NG 0.000 | bonf: GO 1.000 NG 0.000 | bonf+U2: GO 1.000 NG 0.000 |
+usd_false claim False c_max/Eb 12.6
+  n=  150  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.000 NG 0.000 | bonf: GO 0.001 NG 0.000 | bonf+U2: GO 0.001 NG 0.000 |
+  n=  300  v2: GO 0.000 NG 0.000 | v2+U2: GO 0.000 NG 0.001 | bonf: GO 0.000 NG 0.000 | bonf+U2: GO 0.000 NG 0.001 |
+  n=  600  v2: GO 0.000 NG 0.008 | v2+U2: GO 0.001 NG 0.032 | bonf: GO 0.000 NG 0.008 | bonf+U2: GO 0.000 NG 0.032 |
+  n= 1200  v2: GO 0.000 NG 0.265 | v2+U2: GO 0.000 NG 0.324 | bonf: GO 0.000 NG 0.265 | bonf+U2: GO 0.000 NG 0.324 |
+  n= 2400  v2: GO 0.000 NG 0.662 | v2+U2: GO 0.000 NG 0.670 | bonf: GO 0.000 NG 0.662 | bonf+U2: GO 0.000 NG 0.670 |
+seconds 390
+ALLDONE

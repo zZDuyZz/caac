@@ -155,7 +155,7 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                                "p_saving": _f(g["p_saving"])}
     else:
         rep["R2_estimates"] = {"policy": None, "reason": res.go.get("reason")}
-    grp = _by_group(rows, cfg, rr, res) if not v3 else None
+    grp = _by_group(rows, cfg, rr, res, all_questions=v3)
     if grp is not None:
         rep["R2_estimates"]["by_group"] = grp
     allp = []
@@ -203,8 +203,12 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         r4["lambda_needed_for_saving_s"] = _f(sbar / need) if need > 0 else "inf"
         r4["note"] = ("on all audited questions, output tokens only (prompt tokens ignored); "
                       "small-first saves at a token price ratio lambda above break_even_lambda")
-        served, errors = (res.go["served"], res.go["errors"]) if v3 else (res.go["served_b"], res.go["errors_b"])
-        n_b = res.n_questions if v3 else res.n_b
+        if v3:
+            r4["certification"] = _go_reached_v3(res, cfg, len(rr.policies))
+    if name is not None and not v3:
+        n = len(rr.qids)
+        served, errors = res.go["served_b"], res.go["errors_b"]
+        n_b = res.n_b
         rate = errors / served if served else None
         cert = {"risk_on_half_b": _f(rate), "served_share_half_b": _f(served / n_b) if n_b else None,
                 "questions_available": n}
@@ -224,8 +228,9 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         cert["note"] = "ESTIMATE for the risk leg only, if the observed rates hold; the cost leg may need more"
         r4["certification"] = cert
     elif v3:
-        r4["reason"] = "no policy passed both legs on all questions"
-        r4["certification"] = _evidence_gap(rr.audit_input, cfg)
+        if name is None:
+            r4["reason"] = "no policy passed both legs on all questions"
+            r4["certification"] = _evidence_gap(rr.audit_input, cfg)
     else:
         r4["reason"] = "no policy reached risk <= alpha on half A"
         # planning estimate (does not change the verdict): the candidate with the lowest risk on
@@ -315,9 +320,20 @@ def _evidence_gap(inp, cfg: Config) -> dict:
     return out
 
 
-def _by_group(rows: list[Row], cfg: Config, rr, res) -> dict | None:
-    """Risk of the chosen policy per question group on the tested half (B). DESCRIPTIVE: the
-    guarantee is for the whole pool; no multiplicity correction is applied to the groups."""
+def _go_reached_v3(res, cfg: Config, m: int) -> dict:
+    """Design v3, verdict GO: both legs already passed on all questions; nothing more is needed."""
+    g = res.go
+    return {"basis": "GO reached: both legs passed on all questions at level delta/|Pi|",
+            "policy": res.chosen, "questions_available": res.n_questions, "questions_needed": 0,
+            "more_questions_needed": 0, "reachable": True, "risk": _f(g["risk"]),
+            "coverage": _f(g["served"] / res.n_questions) if res.n_questions else None,
+            "level_each_leg": _f(cfg.delta / m)}
+
+
+def _by_group(rows: list[Row], cfg: Config, rr, res, all_questions: bool = False) -> dict | None:
+    """Risk of the chosen policy per question group on the tested questions (half B in v2, all
+    questions in v3). DESCRIPTIVE: the guarantee is for the whole pool; no multiplicity correction
+    is applied to the groups."""
     if res.chosen is None:
         return None
     gmap = {r.qid: r.group for r in rows if r.model == cfg.small and r.draw == 0 and r.group}
@@ -326,7 +342,7 @@ def _by_group(rows: list[Row], cfg: Config, rr, res) -> dict | None:
     pd = next(p for p in rr.audit_input.policies if p.name == res.chosen)
     acc: dict[str, list[int]] = {}
     for q, sv, er in zip(rr.audit_input.qids, pd.served, pd.error):
-        if in_half_a(q, cfg.salt):
+        if not all_questions and in_half_a(q, cfg.salt):
             continue
         a = acc.setdefault(gmap.get(q, "(none)"), [0, 0, 0])
         a[0] += 1
@@ -341,7 +357,8 @@ def _by_group(rows: list[Row], cfg: Config, rr, res) -> dict | None:
             row.update({"risk": _f(er / sv), "risk_interval": [_f(lo), _f(hi)],
                         "lower_bound_above_alpha": lo > cfg.alpha})
         out[g] = row
-    return {"policy": res.chosen, "tested_half": "B", "interval_level": 1 - cfg.delta,
+    return {"policy": res.chosen, ("tested" if all_questions else "tested_half"): ("all questions" if all_questions else "B"),
+            "interval_level": 1 - cfg.delta,
             "note": "descriptive only: the verdict covers the whole pool, not each group; "
                     "no multiplicity correction; small groups have wide intervals",
             "groups": out}
@@ -369,13 +386,14 @@ def to_markdown(rep: dict) -> str:
         r2 = rep["R2_estimates"]
         if r2.get("policy"):
             lo, hi = r2["risk_interval"]
-            L += ["## Risk and saving (tested half)", "",
+            L += ["## Risk and saving (" + ("all questions" if v.get("design") == "v3" else "tested half") + ")", "",
                   f"- served {r2['served']}, wrong {r2['errors']}: risk {r2['risk']} "
                   f"(interval {lo} to {hi} at level {r2['interval_level']})",
                   f"- answered {r2['coverage']} of the tested questions; saving vs big model only: {r2['saving']}", ""]
         bg = r2.get("by_group")
         if bg:
-            L += ["## Risk by group (tested half, descriptive, not certified)", ""]
+            L += ["## Risk by group (" + ("all questions" if v.get("design") == "v3" else "tested half")
+                  + ", descriptive, not certified)", ""]
             for g, x in bg["groups"].items():
                 if "risk" in x:
                     flag = " **lower bound above alpha**" if x["lower_bound_above_alpha"] else ""

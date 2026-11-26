@@ -328,8 +328,8 @@ def _check3(inp: AuditInput) -> None:
         if b > inp.big_max * (1 + tol):
             raise ValueError(f"big-only cost {b} above big_max {inp.big_max}")
     for p in inp.policies:
-        if p.small_part is None:
-            raise ValueError(f"policy {p.name}: design v3 needs small_part")
+        if p.small_part is None or len(p.small_part) != len(inp.qids):
+            raise ValueError(f"policy {p.name}: design v3 needs small_part, one value per question")
         for i, (c, a) in enumerate(zip(p.cost, p.small_part)):
             if a < -tol or a > inp.small_max * (1 + tol):
                 raise ValueError(f"policy {p.name}: small part {a} outside [0, {inp.small_max}]")

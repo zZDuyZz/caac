@@ -2,7 +2,7 @@
  "format": "caac-lock",
  "version": "3",
  "status": "draft",
- "note": "v3: same claim, same candidate set, same thresholds as v2. Amended AFTER v2 results were seen; candidate chosen by simulation with criteria and hashes recorded before real data (cpu1126/DECISION_before_real.md).",
+ "note": "v3: same claim, same candidate set, same thresholds as v2. Amended AFTER v2 results were seen; the candidate was chosen by simulation, with its criteria and file hashes recorded before it was run on real data (protocols/v3_decision/DECISION_before_real.md).",
  "audit": {
   "alpha": 0.1,
   "delta": 0.1,
@@ -204,7 +204,7 @@
   "a": "fraction of configurations with verdict GO",
   "b": "number of configurations where the point-estimate rule (cheapest policy with empirical risk <= alpha and empirical saving >= s on all data) says GO but the audit does not",
   "c": "number of configurations whose verdict changes between cost measures (R3)",
-  "d": "questions needed (R4) in the INCONCLUSIVE configurations: median and range",
+  "d": "evidence gap (R4) in the INCONCLUSIVE configurations: questions needed for BOTH legs at power 0.8 (median and range), and the number unreachable with these candidates",
   "if_not_notable": "report as is; most-INCONCLUSIVE is itself a finding; no threshold changes after seeing results; findings after looking are labelled exploratory with the number of comparisons tried",
   "b_naive_rule": "naive GO iff some candidate policy has empirical risk <= alpha and empirical saving >= s on ALL data (no split, no interval, no correction)"
  },
@@ -236,7 +236,7 @@
   "answer_equivalence_exact": "exact = whitespace collapsed, case folded, $...$ / \\\\boxed{...} / a final period removed, plain decimal numbers written canonically (18 = 18.0; 1,000 = 1000); applied when votes are counted"
  },
  "run": {
-  "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v2.json --out map_v2/   (default --tier both)",
+  "command": "python -m caac.pool_v1.crossmap POOLS --lock protocols/audit_lock_v3.json --out map_v3/   (default --tier both)",
   "primary_claims": "tier primary only; secondary and excluded are reported as supporting / exploratory"
  },
  "sensitivity": {
@@ -265,8 +265,8 @@
   "v1_and_v2": "v1 = the run registered first (reported in full, as is); v2 = amended after v1 was seen, reported beside it with the amendment list; claims of the paper rest on v2 for public sources and on the single opening of our test split",
   "v1_v2_v3": "v1 = registered first, v2 = amended after v1, v3 = amended after v2 (see amendments v3-1..v3-4); all three reported side by side; claims of the paper rest on v3 for public sources and on the single opening of our test split"
  },
- "frozen_on": "2026-11-25",
- "supersedes": "audit_lock_v1.json (tag audit-lock-v1, commit 8a4177b); v1 results stay reported as the registered run ; v2 (hash 5a542f87...) for the verdict procedure only",
+ "frozen_on": null,
+ "supersedes": "audit_lock_v2.json (tag audit-lock-v2-final, commit 35f3706, hash 5a542f87...) for the verdict procedure; v1 and v2 results stay reported beside v3",
  "amendments": [
   {
    "id": "v2-1",
@@ -335,5 +335,6 @@
    "seen_v2_results": true
   }
  ],
- "revision": 1
+ "revision": 1,
+ "freeze_rule": "status becomes 'frozen' and frozen_on is set in the commit tagged audit-lock-v3, before our Qwen test split is opened"
 }

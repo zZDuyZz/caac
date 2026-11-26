@@ -95,3 +95,29 @@ def test_config_design_key():
     assert config_from_dict({**base, "design": "v3"}).design == "v3"
     with pytest.raises(ValueError):
         config_from_dict({**base, "design": "v9"})
+
+
+# ------------------------------------------------------------------ review 26/11 (follow-up patch)
+def _cfg(design):
+    base = {"small": "a", "big": "b", "cost": {"measure": "usd", "c_max": 1.0, "c_max_big": 0.6,
+                                                "also": [{"measure": "tokens"}]},
+            "policies": {"k": [1], "tau": [1.0], "cut": [None], "on_unsure": ["escalate"]}}
+    if design:
+        base["design"] = design
+    return config_from_dict(base)
+
+
+def test_v2_config_serializes_as_before_v3():
+    """v2 report bytes must not change: no 'design' / 'c_max_big' keys in a v2 config dict."""
+    d = _cfg(None).to_dict()
+    assert "design" not in d and "c_max_big" not in d["cost"]
+    assert all("c_max_big" not in a for a in d["cost"]["also"])
+    d3 = _cfg("v3").to_dict()
+    assert d3["design"] == "v3" and d3["cost"]["c_max_big"] == 0.6
+
+
+def test_v3_small_part_length_checked():
+    inp = make(n=60)
+    inp.policies[1].small_part = inp.policies[1].small_part[:-1]
+    with pytest.raises(ValueError):
+        audit3(inp, alpha=0.1, delta=0.1, s=0.2)

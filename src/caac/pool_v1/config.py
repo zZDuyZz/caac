@@ -75,16 +75,25 @@ class Config:
     design: str = "v2"                  # "v2" = split A/B (lock v2); "v3" = no split, Bonferroni, structural range
 
     def to_dict(self) -> dict:
+        """Design v2 configs serialize exactly as before v3 existed (same report bytes);
+        'design' and 'c_max_big' appear only in design v3."""
         c, p = self.cost, self.policies
-        return {"small": self.small, "big": self.big, "alpha": self.alpha, "delta": self.delta,
+        d = {"small": self.small, "big": self.big, "alpha": self.alpha, "delta": self.delta,
                 "s": self.s, "salt": self.salt, "audit_split": self.audit_split,
                 "cost": {"measure": c.measure, "lambda": c.lam,
                          "price_out": {"small": c.price_out_small, "big": c.price_out_big},
                          "price_in": {"small": c.price_in_small, "big": c.price_in_big},
-                         "c_max": c.c_max, "c_max_big": c.c_max_big, "also": list(c.also)},
+                         "c_max": c.c_max, "also": [dict(a) for a in c.also]},
                 "policies": {"k": list(p.k), "tau": list(p.tau), "cut": list(p.cut),
                              "on_unsure": list(p.on_unsure)},
-                "cost_test": self.cost_test, "serving_mode": self.serving_mode, "design": self.design}
+                "cost_test": self.cost_test, "serving_mode": self.serving_mode}
+        if self.design != "v2":
+            d["design"] = self.design
+            d["cost"]["c_max_big"] = c.c_max_big
+        else:
+            for a in d["cost"]["also"]:
+                a.pop("c_max_big", None)
+        return d
 
 
 def _num(d, k, lo=None, hi=None, default=None):
@@ -130,7 +139,10 @@ def config_from_dict(d: dict) -> Config:
             raise ValueError(f"config: cost.also measure must be one of {MEASURES}")
         if a["measure"] in ("usd", "gpu_s") and not isinstance(a.get("c_max"), (int, float)):
             raise ValueError("config: cost.also entries for usd / gpu_s need c_max")
-        cost.also.append({"measure": a["measure"], "c_max": a.get("c_max"), "c_max_big": a.get("c_max_big")})
+        e = {"measure": a["measure"], "c_max": a.get("c_max")}
+        if "c_max_big" in a:
+            e["c_max_big"] = a["c_max_big"]
+        cost.also.append(e)
     if cost.price_in_small < 0 or cost.price_in_big < 0:
         raise ValueError("config: prices must be >= 0")
     if measure in ("usd", "gpu_s") and cost.c_max is None:

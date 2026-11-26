@@ -1,0 +1,6 @@
+feasible|150 {"pilots": 150, "old": {"pilots_with_number": 99, "median_N": 130, "GO_rate_when_followed": 0.278}, "new": {"pilots_with_number": 150, "median_N": 232, "GO_rate_when_followed": 0.807}, "new_blocking_saving": 34}
+feasible|400 {"pilots": 150, "old": {"pilots_with_number": 124, "median_N": 130, "GO_rate_when_followed": 0.198}, "new": {"pilots_with_number": 150, "median_N": 276, "GO_rate_when_followed": 0.747}, "new_blocking_saving": 8}
+tight|150 {"pilots": 150, "old": {"pilots_with_number": 96, "median_N": 232, "GO_rate_when_followed": 0.194}, "new": {"pilots_with_number": 130, "median_N": 1856, "GO_rate_when_followed": 0.797}, "new_blocking_saving": 62}
+tight|400 {"pilots": 150, "old": {"pilots_with_number": 113, "median_N": 256, "GO_rate_when_followed": 0.252}, "new": {"pilots_with_number": 144, "median_N": 1536, "GO_rate_when_followed": 0.787}, "new_blocking_saving": 62}
+usd_feasible|150 {"pilots": 150, "old": {"pilots_with_number": 111, "median_N": 130, "GO_rate_when_followed": 0.064}, "new": {"pilots_with_number": 144, "median_N": 560, "GO_rate_when_followed": 0.761}, "new_blocking_saving": 100}
+usd_feasible|400 {"pilots": 150, "old": {"pilots_with_number": 128, "median_N": 130, "GO_rate_when_followed": 0.039}, "new": {"pilots_with_number": 150, "median_N": 528, "GO_rate_when_followed": 0.84}, "new_blocking_saving": 120}
