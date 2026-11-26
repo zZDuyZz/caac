@@ -9,7 +9,14 @@
   "s": 0.2,
   "salt": "caac-audit-v1",
   "cost_test": "betting",
-  "design": "v3"
+  "design": "v3",
+  "claims": [
+   "relative",
+   "absolute"
+  ],
+  "claim_main": "relative",
+  "eps": 0.02,
+  "rel_test": "bet"
  },
  "policies": {
   "k": [
@@ -206,7 +213,8 @@
   "c": "number of configurations whose verdict changes between cost measures (R3)",
   "d": "evidence gap (R4) in the INCONCLUSIVE configurations: questions needed for BOTH legs at power 0.8 (median and range), and the number unreachable with these candidates",
   "if_not_notable": "report as is; most-INCONCLUSIVE is itself a finding; no threshold changes after seeing results; findings after looking are labelled exploratory with the number of comparisons tried",
-  "b_naive_rule": "naive GO iff some candidate policy has empirical risk <= alpha and empirical saving >= s on ALL data (no split, no interval, no correction)"
+  "b_naive_rule": "naive GO iff some candidate policy has empirical risk <= alpha and empirical saving >= s on ALL data (no split, no interval, no correction)",
+  "relative": "criteria a-d computed for the relative claim as for the absolute one (share GO; naive point-estimate rule (empirical R_pi - R_big <= eps and saving >= s) vs audit; verdict change with the measure; evidence gap of INCONCLUSIVE); plus the absolute NO-GO split into 'big-only error above alpha' vs the rest"
  },
  "test_split": "our Qwen test split is opened once, after the tag protocol-freeze (15/12/2026)",
  "benchmarks": {
@@ -254,7 +262,13 @@
   "tiers": [
    "primary"
   ],
-  "rule": "every primary configuration is also audited at each (alpha, s) cell; all cells are reported, whatever their verdict; the main result is the cell (audit.alpha, audit.s) and is never replaced by another cell"
+  "rule": "every primary configuration is also audited at each (alpha, s) cell; all cells are reported, whatever their verdict; the main result is the cell (audit.alpha, audit.s) and is never replaced by another cell",
+  "eps": [
+   0.0,
+   0.01,
+   0.02,
+   0.05
+  ]
  },
  "reporting": {
   "primary": "one row per configuration (pool x pair x cost measure): verdict, chosen policy, naive verdict, questions needed; plus the sensitivity grid",
@@ -263,7 +277,8 @@
   "multiplicity": "each verdict carries its own guarantee at level delta; no family-wise correction across configurations; the number of configurations is always reported next to any count of GO",
   "dry_run_25_11": "structure-only listing before freezing: 13,126 configurations = 80 primary (10 pairs, 40 pair-pool cells, 2 measures each), 9,666 secondary, 3,380 excluded; lurume_aime dropped (22 questions < n_min)",
   "v1_and_v2": "v1 = the run registered first (reported in full, as is); v2 = amended after v1 was seen, reported beside it with the amendment list; claims of the paper rest on v2 for public sources and on the single opening of our test split",
-  "v1_v2_v3": "v1 = registered first, v2 = amended after v1, v3 = amended after v2 (see amendments v3-1..v3-4); all three reported side by side; claims of the paper rest on v3 for public sources and on the single opening of our test split"
+  "v1_v2_v3": "v1 = registered first, v2 = amended after v1, v3 = amended after v2 (see amendments v3-1..v3-4); all three reported side by side; claims of the paper rest on v3 for public sources and on the single opening of our test split",
+  "claims": "relative = the paper's answer to 'is small-first worth deploying instead of big-only'; absolute = SLA option; each verdict controls its own error at delta (no joint guarantee)"
  },
  "frozen_on": null,
  "supersedes": "audit_lock_v2.json (tag audit-lock-v2-final, commit 35f3706, hash 5a542f87...) for the verdict procedure; v1 and v2 results stay reported beside v3",
@@ -333,6 +348,22 @@
    "what": "certified frontier reported as supplementary: per policy one-sided Clopper-Pearson risk bound and betting saving bound over a fixed s grid, each at delta/(2|Pi|)",
    "why": "gives the largest certified saving at each alpha; does not enter the verdict",
    "seen_v2_results": true
+  },
+  {
+   "id": "v3-5",
+   "what": "relative claim (main): exists pi with R_pi - R_big <= eps (paired with the big model's draw 0 on the same questions) AND saving >= s; risk leg by betting on eps - D, D = e_pi - e_big in {-1,0,1}; NO-GO by betting on D - eps; eps = 0.02 (grid 0, .01, .02, .05); the absolute claim (alpha) stays, reported beside it",
+   "why": "the big model alone errs above alpha = 0.10 in 31/32 primary pairs (median 0.21) and 96% of secondary pairs, so absolute NO-GO mostly measured task difficulty, not whether small-first is worth deploying instead of big-only; every primary NO-GO (60/60) is in such a pair",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_descriptive_big_only_error": true,
+   "evidence": "protocols/v3_decision/relative/ (design + criteria hashed before any run; simulation: validity <= 0.021)"
+  },
+  {
+   "id": "v3-6",
+   "what": "risk-leg test of the relative claim chosen by a rule written before the run: betting (mean power .041) over the exact harm-count test (0) and their Bonferroni mix (.028); the two-direction fixed sequence (M1) did not meet its criterion and is not used",
+   "why": "pre-registered choice rule (DECISION_rel_before_real.md, revision 2)",
+   "seen_v2_results": true,
+   "seen_v3_results": true
   }
  ],
  "revision": 1,

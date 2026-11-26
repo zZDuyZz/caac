@@ -28,7 +28,8 @@ from pathlib import Path
 
 from caac.pool_v1.config import config_from_dict
 from caac.pool_v1.io import load_pool_v1
-from caac.pool_v1.lock import allowed_cuts, check_config_against_lock, load_lock, lock_hash, sensitivity_cells
+from caac.pool_v1.lock import (allowed_cuts, check_config_against_lock, load_lock, lock_hash, sensitivity_cells,
+                               sensitivity_cells_relative)
 from caac.pool_v1.replay import replay
 from caac.pool_v1.report import dumps, make_report
 
@@ -179,6 +180,25 @@ def naive_go(rr, alpha, s) -> tuple[bool, str | None]:
     return (best is not None), (best[1] if best else None)
 
 
+def naive_go_relative(rr, eps, s) -> tuple[bool, str | None]:
+    """Point-estimate rule for the relative claim: GO iff some policy has empirical error at most eps above
+    big-only (same questions) and empirical saving >= s (the cheapest such policy is named)."""
+    inp = rr.audit_input
+    B = sum(inp.big_cost)
+    n = len(inp.qids)
+    eb = sum(bool(x) for x in inp.big_error) / n if n else None
+    best = None
+    for p in inp.policies:
+        if n == 0 or B <= 0:
+            continue
+        diff = sum(bool(x) for x in p.error) / n - eb
+        saving = 1 - sum(p.cost) / B
+        if diff <= eps and saving >= s:
+            if best is None or saving > best[0]:
+                best = (saving, p.name)
+    return (best is not None), (best[1] if best else None)
+
+
 # ------------------------------------------------------------------ run
 DEFAULT_TIERS = ("primary", "secondary")
 
@@ -210,7 +230,7 @@ def list_configs(pools_dir, lock_path, only_pools=None, tiers=None) -> list[dict
     return out
 
 
-def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log=print) -> dict:
+def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log=print, claim=None) -> dict:
     """Audit every configuration of the given tiers. LLM-judged benchmarks form the tier
     'excluded' and are audited only when asked (tiers including "excluded"): the lock lists
     them with counts, their labels carry the judge's error. Primary configurations are also
@@ -218,6 +238,11 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
     L = load_lock(lock_path)
     lh = lock_hash(lock_path)
     status = L["status"]
+    a0 = L["audit"]
+    claim = claim or a0.get("claim_main", "absolute")
+    rel = claim == "relative"
+    if rel and a0.get("design") != "v3":
+        raise ValueError("the relative claim needs a design v3 lock")
     out = Path(out_dir)
     (out / "reports").mkdir(parents=True, exist_ok=True)
     lines = []
@@ -241,6 +266,8 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
                 cfgd = {"small": pair["small"], "big": pair["big"], "alpha": a["alpha"], "delta": a["delta"],
                         "s": a["s"], "salt": a["salt"], "cost_test": a["cost_test"], "cost": ms["cost"],
                         "policies": grid, "design": a.get("design", "v2")}
+                if rel:
+                    cfgd.update({"claim": "relative", "eps": a["eps"]})
                 cfg = config_from_dict(cfgd)
                 bad = check_config_against_lock(cfg, lock_path, caps=meta.caps)
                 if bad:
@@ -254,23 +281,23 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
                 ng, npol, rr = None, None, None
                 if v != "NOT RUN":
                     rr = replay(sub, meta, cfg)
-                    ng, npol = naive_go(rr, cfg.alpha, cfg.s)
+                    ng, npol = naive_go_relative(rr, cfg.eps, cfg.s) if rel else naive_go(rr, cfg.alpha, cfg.s)
                 sens = None
                 if tier == "primary" and v != "NOT RUN":
                     sens = {}
-                    for al, sv in sensitivity_cells(L):
-                        cg = config_from_dict(dict(cfgd, alpha=al, s=sv))
+                    for al, sv in (sensitivity_cells_relative(L) if rel else sensitivity_cells(L)):
+                        cg = config_from_dict(dict(cfgd, eps=al, s=sv) if rel else dict(cfgd, alpha=al, s=sv))
                         bad = check_config_against_lock(cg, lock_path, caps=meta.caps, sensitivity=True)
                         if bad:
                             raise ValueError(f"{d.name} {pair} sensitivity: {bad}")
                         rp = make_report(sub, meta, cg, input_info={"pool": d.name, "lock": lh, "lock_status": status,
                                                                     "sensitivity_cell": True})
                         tx = dumps(rp)
-                        sf = fn[:-5] + f"__a{al}_s{sv}.json"
+                        sf = fn[:-5] + (f"__e{al}_s{sv}.json" if rel else f"__a{al}_s{sv}.json")
                         (out / "reports" / "sensitivity").mkdir(exist_ok=True)
                         (out / "reports" / "sensitivity" / sf).write_text(tx, encoding="utf-8", newline="\n")
-                        sng, _ = naive_go(rr, al, sv)
-                        sens[f"alpha={al},s={sv}"] = {"verdict": rp["R1_verdict"]["verdict"], "naive_go": sng,
+                        sng, _ = naive_go_relative(rr, al, sv) if rel else naive_go(rr, al, sv)
+                        sens[(f"eps={al},s={sv}" if rel else f"alpha={al},s={sv}")] = {"verdict": rp["R1_verdict"]["verdict"], "naive_go": sng,
                                                      "report_sha16": hashlib.sha256(tx.encode("utf-8")).hexdigest()[:16]}
                 cert = (rep.get("R4_break_even") or {}).get("certification") or {}
                 lines.append({"pool": d.name, "source": source_of(d.name), "benchmark": benchmark_of(d.name),
@@ -283,12 +310,19 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
                               "cost_bound_ratio": (rep.get("R5_data_quality") or {}).get("cost_bound_ratio"),
                               "report": fn, "report_sha16": rid, "lock_status": status,
                               "sensitivity": sens})
+                if a.get("design") == "v3":
+                    lines[-1]["claim"] = claim
+                    lines[-1]["big_only_error"] = rep["R1_verdict"].get("big_only_error")
         log(f"{d.name}: done")
     lines.sort(key=lambda x: (x["source"], x["benchmark"], x["tier"], x["small"], x["big"], x["measure"]))
     with open(out / "map.jsonl", "w", encoding="utf-8", newline="\n") as f:
         for x in lines:
             f.write(json.dumps(x, sort_keys=True, ensure_ascii=False) + "\n")
     summ = summarize(lines, L, lh)
+    if a0.get("design") == "v3":
+        summ["claim"] = claim
+        if rel:
+            summ["eps"] = a0["eps"]
     (out / "summary.json").write_text(json.dumps(summ, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     return summ
 
@@ -325,6 +359,13 @@ def summarize(lines, L, lh) -> dict:
                                                          "unreachable_with_these_candidates":
                                                              sum(1 for x in inc_ if x.get("reachable") is False)},
                      "models": len({x["small"] for x in X} | {x["big"] for x in X}),
+                     **({"nogo_where_big_only_error_above_alpha":
+                         sum(1 for x in run_ if x["verdict"] == "NO-GO" and x.get("big_only_error") is not None
+                             and x["big_only_error"] > L["audit"]["alpha"]),
+                         "pairs_big_only_error_above_alpha":
+                         len({(x["pool"], x["small"], x["big"]) for x in run_ if x.get("big_only_error") is not None
+                              and x["big_only_error"] > L["audit"]["alpha"]})}
+                        if any(x.get("claim") == "absolute" for x in X) else {}),
                      "benchmarks": len({x["pool"] for x in X})}
         bys = defaultdict(lambda: defaultdict(int))
         for x in X:
@@ -354,6 +395,8 @@ def main(argv=None) -> int:
                     help="both = primary + secondary (default); excluded = LLM-judged benchmarks only (exploratory)")
     ap.add_argument("--pool", action="append", help="only these pool folders (repeatable)")
     ap.add_argument("--dry-run", action="store_true", help="list the configurations only (no audit)")
+    ap.add_argument("--claim", choices=["absolute", "relative"],
+                    help="design v3 locks: which claim to map (default: the lock's main claim)")
     a = ap.parse_args(argv)
     if a.dry_run:
         cf = list_configs(a.pools, a.lock, only_pools=a.pool, tiers=_tiers(a.tier))
@@ -369,7 +412,7 @@ def main(argv=None) -> int:
     L = load_lock(a.lock)
     if L["status"] != "frozen":
         print("WARNING: the lock is a DRAFT: results are NOT pre-registered", file=sys.stderr)
-    s = run(a.pools, a.lock, a.out, tiers=_tiers(a.tier), only_pools=a.pool)
+    s = run(a.pools, a.lock, a.out, tiers=_tiers(a.tier), only_pools=a.pool, claim=a.claim)
     print(json.dumps(s, indent=1, sort_keys=True))
     return 0
 

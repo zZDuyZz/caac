@@ -13,7 +13,7 @@ import json
 import math
 
 from caac.pool_v1.audit import audit, audit3, binom_cdf, certified_frontier, in_half_a, served_needed, structural_range
-from caac.pool_v1.gap import gap as evidence_gap
+from caac.pool_v1.gap import gap as evidence_gap, gap_relative
 from caac.pool_v1.config import Config
 from caac.pool_v1.replay import replay
 from caac.pool_v1.schema import Meta, Row
@@ -54,11 +54,19 @@ def clopper_pearson(k: int, n: int, conf: float) -> tuple[float, float]:
 
 def _run_audit(inp, cfg: Config):
     if cfg.design == "v3":
-        return audit3(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt)
+        return audit3(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt,
+                      claim=cfg.claim, eps=cfg.eps)
     return audit(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt, cost_test=cfg.cost_test)
 
 
 def _guarantee(cfg: Config) -> str:
+    if cfg.design == "v3" and cfg.claim == "relative":
+        return (f"Each verdict is wrong with probability <= {cfg.delta}: GO means the chosen policy's error rate "
+                f"exceeds the big model's alone (same questions, the big model's first answer) by at most "
+                f"{cfg.eps} AND it saves >= {cfg.s:.0%} of the big-model-only cost, both tested on all questions at "
+                f"level delta/|Pi| (Bonferroni over the candidate set); NO-GO means every candidate policy fails "
+                f"one of the two claims. Assumes questions exchangeable with the deployment, costs bounded "
+                f"(structural range), candidates fixed in advance.")
     if cfg.design == "v3":
         return (f"Each verdict is wrong with probability <= {cfg.delta}: GO means the chosen policy has "
                 f"risk (error rate among served answers) <= {cfg.alpha} AND saves >= {cfg.s:.0%} of the "
@@ -123,6 +131,11 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                              "n_policies": len(rr.policies), "policies": [p.name for p in rr.policies],
                              "level_each_leg": _f(res.go["level_each_leg"]), "chosen": res.chosen,
                              "policies_passing": res.go["policies_passing"], "conflict": res.conflict}
+        inp0 = rr.audit_input
+        if inp0.big_error is not None and inp0.qids:
+            rep["R1_verdict"]["big_only_error"] = _f(sum(bool(x) for x in inp0.big_error) / len(inp0.qids))
+        if cfg.claim == "relative":
+            rep["R1_verdict"].update({"claim": "relative", "eps": cfg.eps, "rel_test": res.go.get("rel_test")})
     else:
       rep["R1_verdict"] = {"verdict": res.verdict, "guarantee": _guarantee(cfg), "alpha": cfg.alpha,
                          "delta": cfg.delta, "s": cfg.s, "salt": cfg.salt, "cost_test": cfg.cost_test,
@@ -142,6 +155,9 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                                    "coverage": _f(g["served"] / res.n_questions),
                                    "saving": _f(g["saving"]), "p_risk": _f(g["p_risk"]),
                                    "p_saving": _f(g["p_saving"])}
+            if cfg.claim == "relative":
+                rep["R2_estimates"]["delta_hat"] = _f(g.get("delta_hat"))
+                rep["R2_estimates"]["big_only_error"] = _f(g.get("big_only_error"))
         else:
             rep["R2_estimates"] = {"policy": None, "closest_to_go": res.go.get("closest_policy")}
     elif res.chosen is not None:
@@ -263,7 +279,15 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                              "more_questions_needed": max(0, total - len(inp.qids)) if total else None})
         cert["note"] = "ESTIMATE for the risk leg only, if the observed rate holds; the cost leg may need more"
         r4["certification"] = cert
-    if v3:
+    if v3 and cfg.claim == "relative":
+        m = len(rr.policies)
+        floor = certification_floor(cfg.eps, cfg.delta / m) if cfg.eps > 0 else None
+        r4["minimum_questions_zero_errors"] = floor
+        r4["minimum_note"] = (f"even with zero harm (the policy never wrong where big-only is right), GO needs >= "
+                              f"{floor} questions with the exact harm-count test (more with the betting test) at "
+                              f"level delta/{m}" if floor else "eps = 0: GO needs the policy to be strictly better")
+        r4["certified_frontier"] = None
+    elif v3:
         m = len(rr.policies)
         floor = certification_floor(cfg.alpha, cfg.delta / m)
         r4["minimum_questions_zero_errors"] = floor
@@ -293,6 +317,8 @@ def _evidence_gap(inp, cfg: Config) -> dict:
     the best-looking candidate (observed risk < alpha and mean d > 0). Never a verdict."""
     n, m = len(inp.qids), len(inp.policies)
     lo, _ = structural_range(inp.small_max, inp.big_max, cfg.s)
+    if cfg.claim == "relative":
+        return _evidence_gap_relative(inp, cfg, lo)
     best = None
     seen_any = False
     for p in inp.policies:
@@ -316,6 +342,36 @@ def _evidence_gap(inp, cfg: Config) -> dict:
                    more_questions_needed=max(0, best["questions_needed"] - n), blocking=best["blocking"],
                    m_risk_served=best["m_risk_served"], m_saving_questions=best["m_saving_questions"],
                    risk=_f(best["rate"]), coverage=_f(best["coverage"]), mean_d=_f(best["mean_d"]))
+    out["note"] = "PLANNING estimate, plug-in from the observed data; it never changes the verdict"
+    return out
+
+
+def _evidence_gap_relative(inp, cfg: Config, lo: float) -> dict:
+    """Relative claim: plan on the best-looking candidate (observed R_pi - R_big < eps and mean d > 0)."""
+    from caac.pool_v1.audit import REL_TEST
+    n, m = len(inp.qids), len(inp.policies)
+    best, seen_any = None, False
+    for p in inp.policies:
+        D = [int(bool(p.error[i])) - int(bool(inp.big_error[i])) for i in range(n)]
+        d = [(1 - cfg.s) * inp.big_cost[i] - p.cost[i] for i in range(n)]
+        if sum(D) / n >= cfg.eps or sum(d) <= 0:
+            continue
+        seen_any = True
+        g = gap_relative(D, n, d, lo, cfg.eps, cfg.delta / m, 0.8, test=REL_TEST)
+        if g["reachable"] and (best is None or g["questions_needed"] < best["questions_needed"]):
+            best = dict(g, policy=p.name)
+    out = {"basis": "best-looking candidate (R_pi - R_big < eps and mean d > 0), power 0.8, tests at level "
+                    "delta/|Pi|", "questions_available": n, "claim": "relative", "eps": cfg.eps}
+    if best is None:
+        out.update(reachable=False, questions_needed=None,
+                   reason=("no candidate has an observed error within eps of big-only and a positive mean of d: "
+                           "more questions of the same kind will not give GO" if not seen_any else
+                           "no such candidate reaches power 0.8 within 200000 questions"))
+    else:
+        out.update(reachable=True, policy=best["policy"], questions_needed=best["questions_needed"],
+                   more_questions_needed=max(0, best["questions_needed"] - n), blocking=best["blocking"],
+                   m_risk_questions=best["m_risk_questions"], m_saving_questions=best["m_saving_questions"],
+                   delta_hat=_f(best["delta_hat"]), harm_rate=_f(best["harm_rate"]), mean_d=_f(best["mean_d"]))
     out["note"] = "PLANNING estimate, plug-in from the observed data; it never changes the verdict"
     return out
 
@@ -376,7 +432,9 @@ def to_markdown(rep: dict) -> str:
     else:
         L += [f"**Verdict: {v['verdict']}**" + (" (GO and NO-GO both fired; reported as INCONCLUSIVE)"
                                                if v.get("conflict") else ""), "", v["guarantee"], "",
-              ] + ([f"- questions: {v['n_questions']} (all questions test every policy; design v3)",
+              ] + ([f"- claim: relative, error within {v['eps']} of big-only ({v.get('rel_test')} test); "
+                    f"big-only error {v.get('big_only_error')}"] if v.get("claim") == "relative" else []) + (
+                   [f"- questions: {v['n_questions']} (all questions test every policy; design v3)",
                     f"- candidate policies: {v['n_policies']}; each leg at level {v['level_each_leg']}; "
                     f"chosen (cheapest passing): {v['chosen']}",
                     f"- cost test: {v['cost_test']}", ""] if v.get("design") == "v3" else

@@ -259,5 +259,6 @@ def replay(rows: list[Row], meta: Meta | None, cfg: Config) -> ReplayResult:
         notes.append(f"{m}: cost of early-stopped draws is ESTIMATED in proportion to tokens used")
     small_max = (c_max - big_max) if big_max is not None else None
     inp = AuditInput(qids=qids, big_cost=big_cost, policies=pdata, c_max=c_max,
-                     small_max=small_max, big_max=big_max)
+                     small_max=small_max, big_max=big_max,
+                     big_error=[not Bq[q][0].correct for q in qids])
     return ReplayResult(inp, pols, qids, notes, stok, btok, big_tok, ssmall)

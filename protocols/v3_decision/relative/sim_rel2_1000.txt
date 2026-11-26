@@ -1,0 +1,69 @@
+criterion (d): max |vectorised - _betting_p| over 200 checks = 1.1102230246251565e-16
+S1_rel_feasible claim True
+  n=  150 | bet: GO 0.004 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.001 wr 0.000
+  n=  300 | bet: GO 0.030 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.014 wr 0.000
+  n=  600 | bet: GO 0.080 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.051 wr 0.000
+  n= 1200 | bet: GO 0.138 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.098 wr 0.000
+  n= 2400 | bet: GO 0.315 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.254 wr 0.000
+S2_rel_tight claim True
+  n=  150 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.001 wr 0.001 | harm: GO 0.000 wr 0.001 | mix: GO 0.001 wr 0.001
+  n=  600 | bet: GO 0.007 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.003 wr 0.000
+  n= 1200 | bet: GO 0.016 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.010 wr 0.000
+  n= 2400 | bet: GO 0.033 wr 0.001 | harm: GO 0.000 wr 0.001 | mix: GO 0.021 wr 0.001
+S3_rel_bound_false claim False
+  n=  150 | bet: GO 0.002 wr 0.002 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.004 wr 0.004 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.009 wr 0.009 | harm: GO 0.000 wr 0.000 | mix: GO 0.004 wr 0.004
+  n= 1200 | bet: GO 0.006 wr 0.006 | harm: GO 0.000 wr 0.000 | mix: GO 0.002 wr 0.002
+  n= 2400 | bet: GO 0.006 wr 0.006 | harm: GO 0.000 wr 0.000 | mix: GO 0.003 wr 0.003
+S4_rel_bound_true claim True
+  n=  150 | bet: GO 0.002 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.011 wr 0.004 | harm: GO 0.000 wr 0.004 | mix: GO 0.004 wr 0.004
+  n=  600 | bet: GO 0.017 wr 0.008 | harm: GO 0.000 wr 0.008 | mix: GO 0.004 wr 0.008
+  n= 1200 | bet: GO 0.023 wr 0.020 | harm: GO 0.000 wr 0.020 | mix: GO 0.008 wr 0.020
+  n= 2400 | bet: GO 0.012 wr 0.021 | harm: GO 0.000 wr 0.021 | mix: GO 0.005 wr 0.021
+S5_rel_false_risk claim False
+  n=  150 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n= 1200 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n= 2400 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+S6_rel_false_saving claim False
+  n=  150 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n= 1200 | bet: GO 0.001 wr 0.001 | harm: GO 0.000 wr 0.000 | mix: GO 0.001 wr 0.001
+  n= 2400 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+S7_rel_heavy claim True
+  n=  150 | bet: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.001 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.049 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.029 wr 0.000
+  n= 1200 | bet: GO 0.151 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.105 wr 0.000
+  n= 2400 | bet: GO 0.313 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.236 wr 0.000
+S8_rel_discordant claim True
+  n=  150 | bet: GO 0.005 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.001 wr 0.000
+  n=  300 | bet: GO 0.022 wr 0.000 | harm: GO 0.000 wr 0.000 | mix: GO 0.014 wr 0.000
+  n=  600 | bet: GO 0.031 wr 0.001 | harm: GO 0.000 wr 0.001 | mix: GO 0.013 wr 0.001
+  n= 1200 | bet: GO 0.033 wr 0.001 | harm: GO 0.000 wr 0.001 | mix: GO 0.020 wr 0.001
+  n= 2400 | bet: GO 0.043 wr 0.003 | harm: GO 0.000 wr 0.003 | mix: GO 0.024 wr 0.003
+S9_rel_chains_true claim True
+  n=  150 | bet: GO 0.000 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.000 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.005 wr 0.000 | bet+fs2: GO 0.001 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.001 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n= 1200 | bet: GO 0.017 wr 0.000 | bet+fs2: GO 0.013 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.010 wr 0.000 | mix+fs2: GO 0.009 wr 0.000
+  n= 2400 | bet: GO 0.018 wr 0.000 | bet+fs2: GO 0.026 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.011 wr 0.000 | mix+fs2: GO 0.012 wr 0.000
+S10_rel_chains_false claim False
+  n=  150 | bet: GO 0.000 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.000 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.001 wr 0.001 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.001 wr 0.001 | mix+fs2: GO 0.000 wr 0.000
+  n= 1200 | bet: GO 0.001 wr 0.001 | bet+fs2: GO 0.001 wr 0.001 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n= 2400 | bet: GO 0.000 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+S11_rel_nonmono claim True
+  n=  150 | bet: GO 0.000 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n=  300 | bet: GO 0.001 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.000 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n=  600 | bet: GO 0.005 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.002 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n= 1200 | bet: GO 0.021 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.012 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+  n= 2400 | bet: GO 0.019 wr 0.000 | bet+fs2: GO 0.000 wr 0.000 | harm: GO 0.000 wr 0.000 | harm+fs2: GO 0.000 wr 0.000 | mix: GO 0.011 wr 0.000 | mix+fs2: GO 0.000 wr 0.000
+seconds 950
+REV2DONE

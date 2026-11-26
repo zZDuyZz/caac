@@ -45,6 +45,13 @@ def sensitivity_cells(L: dict) -> list[tuple[float, float]]:
     return [(al, s) for al in g.get("alpha", []) for s in g.get("s", []) if (al, s) != main]
 
 
+def sensitivity_cells_relative(L: dict) -> list[tuple[float, float]]:
+    """(eps, s) cells of the relative claim's sensitivity grid, main cell excluded."""
+    g = L.get("sensitivity") or {}
+    main = (L["audit"].get("eps"), L["audit"]["s"])
+    return [(e, s) for e in g.get("eps", []) for s in g.get("s", []) if (e, s) != main]
+
+
 def check_config_against_lock(cfg: Config, path, caps: dict | None = None,
                               sensitivity: bool = False) -> list[str]:
     """Return a list of mismatches (empty = the config is inside the lock).
@@ -63,6 +70,19 @@ def check_config_against_lock(cfg: Config, path, caps: dict | None = None,
         want = a.get(k, "v2") if k == "design" else a[k]
         if getattr(cfg, k) != want:
             bad.append(f"{k}: config {getattr(cfg, k)!r} != lock {want!r}")
+    claims = a.get("claims", ["absolute"])
+    if "rel_test" in a:
+        from caac.pool_v1.audit import REL_TEST
+        if a["rel_test"] != REL_TEST:
+            bad.append(f"rel_test: code {REL_TEST!r} != lock {a['rel_test']!r}")
+    if cfg.claim not in claims:
+        bad.append(f"claim {cfg.claim!r} not in lock claims {claims}")
+    if cfg.claim == "relative":
+        if sensitivity:
+            if cfg.eps not in (L.get("sensitivity") or {}).get("eps", []):
+                bad.append(f"eps {cfg.eps} not in the lock's sensitivity grid")
+        elif cfg.eps != a.get("eps"):
+            bad.append(f"eps: config {cfg.eps!r} != lock {a.get('eps')!r}")
     g = cfg.policies
     if not set(g.k) <= set(pol["k"]):
         bad.append(f"policies.k {g.k} not within lock {pol['k']}")

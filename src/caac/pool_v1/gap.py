@@ -93,3 +93,39 @@ def gap(errors, served, n_tested, d, lo, alpha, delta_each, target=0.8):
     out.update(reachable=True, questions_needed=round_up_2sig(max(qr, qs)),
                blocking="risk" if qr >= qs else "saving")
     return out
+
+
+def gap_relative(D, n_tested, d, lo_d, eps, delta_each, target=0.8, test="bet"):
+    """Relative claim, both legs, same tests as the audit (planning only).
+      risk leg  bet: bootstrap of x = eps - D (range [eps - 1, eps + 1]);
+                harm: exact binomial power of the harm count at the observed harm rate;
+                mix: the better of the two at level delta_each / 2.
+      cost leg  bootstrap of d (structural range), as for the absolute claim.
+    Unreachable if mean(D) >= eps (bet), harm rate >= eps (harm), or mean(d) <= 0."""
+    D = np.asarray(D, float)
+    n = len(D)
+    mean_D = float(D.mean()) if n else None
+    h = float((D > 0).mean()) if n else None
+
+    def m_bet(level):
+        return m_saving(eps - D, eps - 1.0, level, target) if (mean_D is not None and mean_D < eps) else None
+
+    def m_harm(level):
+        return m_risk(h, eps, level, target) if (h is not None and eps > 0) else None
+
+    if test == "bet":
+        mr = m_bet(delta_each)
+    elif test == "harm":
+        mr = m_harm(delta_each)
+    else:
+        c = [m for m in (m_bet(delta_each / 2), m_harm(delta_each / 2)) if m is not None]
+        mr = min(c) if c else None
+    ms = m_saving(d, lo_d, delta_each, target)
+    out = {"delta_hat": mean_D, "harm_rate": h, "eps": eps, "rel_test": test,
+           "mean_d": float(np.mean(d)) if len(d) else None, "m_risk_questions": mr, "m_saving_questions": ms}
+    if mr is None or ms is None:
+        out.update(reachable=False, questions_needed=None, blocking="risk" if mr is None else "saving")
+        return out
+    out.update(reachable=True, questions_needed=round_up_2sig(max(mr, ms)),
+               blocking="risk" if mr >= ms else "saving")
+    return out

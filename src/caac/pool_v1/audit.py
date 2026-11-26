@@ -166,6 +166,7 @@ class AuditInput:
     c_max: float             # upper bound of every cost (e.g. cap x price per token)
     small_max: float | None = None   # v3: bound of the small part (c_max = small_max + big_max)
     big_max: float | None = None     # v3: bound of the big-only cost of one question
+    big_error: list[bool] | None = None  # relative claim: big model's draw 0 wrong (the big-only baseline)
 
 
 @dataclass
@@ -338,8 +339,53 @@ def _check3(inp: AuditInput) -> None:
                 raise ValueError(f"policy {p.name}: cost is not small part (+ big-only cost) at question {i}")
 
 
+REL_TESTS = ("bet", "harm", "mix")
+REL_TEST = "bet"          # GO risk leg of the relative claim; FIXED by the simulation rule (DECISION rev. 2)
+
+
+def rel_risk_p(D: list[int], eps: float, order: list[int], test: str) -> float:
+    """p-value against H0: R_pi - R_big > eps (small = evidence for the relative claim).
+      bet   test by betting on x = eps - D, x in [eps - 1, eps + 1]
+      harm  exact one-sided binomial on the harm count #{D = +1} vs eps (valid: R_pi - R_big <= P(D = +1))
+      mix   min(1, 2 min(p_bet, p_harm))"""
+    if test not in REL_TESTS:
+        raise ValueError(f"relative test must be one of {REL_TESTS}")
+    n = len(D)
+    pb = ph = 1.0
+    if test in ("bet", "mix"):
+        pb = _betting_p([eps - v for v in D], eps - 1.0, eps + 1.0, order)
+    if test in ("harm", "mix"):
+        ph = p_risk_below(sum(1 for v in D if v > 0), n, eps) if eps > 0 else 1.0
+    if test == "bet":
+        return pb
+    if test == "harm":
+        return ph
+    return min(1.0, 2.0 * min(pb, ph))
+
+
+RELATIVE_NOTE = ("relative claim: R_pi - R_big <= eps (paired with the big model's draw 0, the answer an "
+                 "escalated question receives) and saving >= s")
+
+
+def _check_relative(inp: AuditInput) -> None:
+    """The relative claim pairs every question with the big-only baseline: every question must be served,
+    and an escalated question must carry exactly the big model's correctness (D_i = 0)."""
+    if inp.big_error is None or len(inp.big_error) != len(inp.qids):
+        raise ValueError("relative claim needs big_error, one value per question")
+    tol = 1e-9
+    for p in inp.policies:
+        if not all(p.served):
+            raise ValueError(f"policy {p.name}: relative claim needs every question served (on_unsure = escalate)")
+        for i in range(len(inp.qids)):
+            b = inp.big_cost[i]
+            if b > 0 and abs((p.cost[i] - p.small_part[i]) - b) <= tol * max(1.0, abs(p.cost[i])):
+                if bool(p.error[i]) != bool(inp.big_error[i]):
+                    raise ValueError(f"policy {p.name}: escalated question {i} does not carry the big-only answer")
+
+
 def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float = 0.20,
-           salt: str = DEFAULT_SALT) -> AuditResult:
+           salt: str = DEFAULT_SALT, claim: str = "absolute", eps: float = 0.02,
+           rel_test: str | None = None) -> AuditResult:
     """Design v3. Guarantee: each verdict is wrong with probability <= delta.
       GO       some policy passes BOTH legs on all questions, each at delta/|Pi|: exact binomial
                rejecting "R > alpha" and betting rejecting "E[d] < 0". By a union bound over the
@@ -347,8 +393,18 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
                the cheapest policy among those that pass (all of them hold jointly).
       NO-GO    for EVERY policy, "R <= alpha" is rejected by the binomial test OR "E[d] >= 0" by
                betting, each at delta/2 (unchanged from v2; no correction over Pi needed).
-      else INCONCLUSIVE (also when both fire: flagged conflict)."""
+      else INCONCLUSIVE (also when both fire: flagged conflict).
+    claim = "relative": the risk leg becomes R_pi - R_big <= eps, tested by betting on
+      x_i = eps - D_i with D_i = e_pi,i - e_big,i in {-1, 0, 1} (range [eps - 1, eps + 1]), at the same
+      levels; NO-GO rejects "R_pi - R_big <= eps" by betting on D_i - eps. Same guarantee."""
+    if claim not in ("absolute", "relative"):
+        raise ValueError("claim must be 'absolute' or 'relative'")
     _check3(inp)
+    rel = claim == "relative"
+    if rel:
+        if not (0.0 <= eps < 1.0):
+            raise ValueError("eps must be in [0, 1)")
+        _check_relative(inp)
     n, m = len(inp.qids), len(inp.policies)
     lo, hi = structural_range(inp.small_max, inp.big_max, s)
     order = _order(inp.qids, salt)
@@ -356,12 +412,20 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
     lvl = delta / m
     rows, passing, all_rej = [], [], True
     mean_b = sum(inp.big_cost) / n
+    eb = sum(bool(x) for x in inp.big_error) if rel else None
     for j, p in enumerate(inp.policies):
         sv, e = sum(p.served), sum(p.error)
         d = [(1.0 - s) * inp.big_cost[i] - p.cost[i] for i in range(n)]
-        pr_go = p_risk_below(e, sv, alpha)
-        ps_go = _betting_p(d, lo, hi, order) if (sv and e / sv <= alpha) else 1.0
-        pr_ng = p_risk_above(e, sv, alpha)
+        if rel:
+            D = [int(bool(p.error[i])) - int(bool(inp.big_error[i])) for i in range(n)]
+            dh = sum(D) / n
+            pr_go = rel_risk_p(D, eps, order, rel_test or REL_TEST)
+            ps_go = _betting_p(d, lo, hi, order) if dh <= eps else 1.0
+            pr_ng = _betting_p([v - eps for v in D], -1.0 - eps, 1.0 - eps, order)
+        else:
+            pr_go = p_risk_below(e, sv, alpha)
+            ps_go = _betting_p(d, lo, hi, order) if (sv and e / sv <= alpha) else 1.0
+            pr_ng = p_risk_above(e, sv, alpha)
         ps_ng = _betting_p([-v for v in d], -hi, -lo, order)
         ok = pr_go <= lvl and ps_go <= lvl
         rej = pr_ng <= delta / 2 or ps_ng <= delta / 2
@@ -373,6 +437,9 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
                      "coverage": round(sv / n, 6),
                      "p_risk_go": pr_go, "p_saving_go": ps_go, "go_pass": ok,
                      "p_risk_above": pr_ng, "p_saving_below": ps_ng, "rejected": rej})
+        if rel:
+            rows[-1]["delta_hat"] = round(dh, 6)
+            rows[-1]["big_errors"] = eb
         if ok:
             passing.append((mc, j))
     go = bool(passing)
@@ -390,6 +457,12 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
         res.go["closest_policy"] = rows[cl]["policy"]
     res.nogo = {"level_each_leg": delta / 2, "policies": rows, "passed": all_rej}
     res.notes.append("design v3: no split; Bonferroni over the candidate set; structural cost range")
+    if rel:
+        res.notes.append(RELATIVE_NOTE + f" (eps = {eps})")
+        res.go["claim"], res.go["eps"], res.go["rel_test"] = "relative", eps, rel_test or REL_TEST
+        res.go["big_only_error"] = round(eb / n, 6)
+        if go:
+            res.go["delta_hat"] = rows[j]["delta_hat"]
     if go and all_rej:
         res.verdict, res.conflict = "INCONCLUSIVE", True
         res.notes.append("GO and NO-GO both fired (probability <= delta): reported as INCONCLUSIVE")

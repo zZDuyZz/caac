@@ -1,0 +1,7 @@
+# written 2026-11-26T17:15:38+07:00, BEFORE sim_rel.py run and before any real-data run of the relative claim
+1cb0bf2ee78b4857bba375c871093c9ee040328e14afb758238cfa2095895995  DECISION_rel_before_real.md
+f6fca381d3a9a0cea955598a99f3548fd1e3cadb12fa91d8382ebf75b9fac4f2  sim_rel.py
+# revision 2 written 2026-11-26T17:18:36+07:00, BEFORE reading any output of the revision-1 run and before any real-data run
+796ab9302cb772247efbc1b099dc455bb842f8ceec0dd69d841d9d50f3678ff8  DECISION_rel_before_real.md
+f6fca381d3a9a0cea955598a99f3548fd1e3cadb12fa91d8382ebf75b9fac4f2  sim_rel.py
+6807648ef0c3a1fd9b83744201732a047e90db95674d4cf4806bda1e0163c127  sim_rel2.py

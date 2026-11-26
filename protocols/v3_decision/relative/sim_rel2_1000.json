@@ -1,0 +1,1091 @@
+{
+ "reps": 1000,
+ "rates": {
+  "S1_rel_feasible|150|bet": {
+   "GO": 4,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 996
+  },
+  "S1_rel_feasible|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S1_rel_feasible|150|mix": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S1_rel_feasible|300|bet": {
+   "GO": 30,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 970
+  },
+  "S1_rel_feasible|300|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S1_rel_feasible|300|mix": {
+   "GO": 14,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 986
+  },
+  "S1_rel_feasible|600|bet": {
+   "GO": 80,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 920
+  },
+  "S1_rel_feasible|600|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S1_rel_feasible|600|mix": {
+   "GO": 51,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 949
+  },
+  "S1_rel_feasible|1200|bet": {
+   "GO": 138,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 862
+  },
+  "S1_rel_feasible|1200|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S1_rel_feasible|1200|mix": {
+   "GO": 98,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 902
+  },
+  "S1_rel_feasible|2400|bet": {
+   "GO": 315,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 685
+  },
+  "S1_rel_feasible|2400|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S1_rel_feasible|2400|mix": {
+   "GO": 254,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 746
+  },
+  "S2_rel_tight|150|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S2_rel_tight|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S2_rel_tight|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S2_rel_tight|300|bet": {
+   "GO": 1,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 998
+  },
+  "S2_rel_tight|300|harm": {
+   "GO": 0,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 999
+  },
+  "S2_rel_tight|300|mix": {
+   "GO": 1,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 998
+  },
+  "S2_rel_tight|600|bet": {
+   "GO": 7,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 993
+  },
+  "S2_rel_tight|600|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S2_rel_tight|600|mix": {
+   "GO": 3,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 997
+  },
+  "S2_rel_tight|1200|bet": {
+   "GO": 16,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 984
+  },
+  "S2_rel_tight|1200|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S2_rel_tight|1200|mix": {
+   "GO": 10,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 990
+  },
+  "S2_rel_tight|2400|bet": {
+   "GO": 33,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 966
+  },
+  "S2_rel_tight|2400|harm": {
+   "GO": 0,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 999
+  },
+  "S2_rel_tight|2400|mix": {
+   "GO": 21,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 978
+  },
+  "S3_rel_bound_false|150|bet": {
+   "GO": 2,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 998
+  },
+  "S3_rel_bound_false|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S3_rel_bound_false|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S3_rel_bound_false|300|bet": {
+   "GO": 4,
+   "NO-GO": 11,
+   "INCONCLUSIVE": 985
+  },
+  "S3_rel_bound_false|300|harm": {
+   "GO": 0,
+   "NO-GO": 11,
+   "INCONCLUSIVE": 989
+  },
+  "S3_rel_bound_false|300|mix": {
+   "GO": 0,
+   "NO-GO": 11,
+   "INCONCLUSIVE": 989
+  },
+  "S3_rel_bound_false|600|bet": {
+   "GO": 9,
+   "NO-GO": 30,
+   "INCONCLUSIVE": 961
+  },
+  "S3_rel_bound_false|600|harm": {
+   "GO": 0,
+   "NO-GO": 30,
+   "INCONCLUSIVE": 970
+  },
+  "S3_rel_bound_false|600|mix": {
+   "GO": 4,
+   "NO-GO": 30,
+   "INCONCLUSIVE": 966
+  },
+  "S3_rel_bound_false|1200|bet": {
+   "GO": 6,
+   "NO-GO": 56,
+   "INCONCLUSIVE": 938
+  },
+  "S3_rel_bound_false|1200|harm": {
+   "GO": 0,
+   "NO-GO": 56,
+   "INCONCLUSIVE": 944
+  },
+  "S3_rel_bound_false|1200|mix": {
+   "GO": 2,
+   "NO-GO": 56,
+   "INCONCLUSIVE": 942
+  },
+  "S3_rel_bound_false|2400|bet": {
+   "GO": 6,
+   "NO-GO": 87,
+   "INCONCLUSIVE": 907
+  },
+  "S3_rel_bound_false|2400|harm": {
+   "GO": 0,
+   "NO-GO": 87,
+   "INCONCLUSIVE": 913
+  },
+  "S3_rel_bound_false|2400|mix": {
+   "GO": 3,
+   "NO-GO": 87,
+   "INCONCLUSIVE": 910
+  },
+  "S4_rel_bound_true|150|bet": {
+   "GO": 2,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 998
+  },
+  "S4_rel_bound_true|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S4_rel_bound_true|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S4_rel_bound_true|300|bet": {
+   "GO": 11,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 985
+  },
+  "S4_rel_bound_true|300|harm": {
+   "GO": 0,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 996
+  },
+  "S4_rel_bound_true|300|mix": {
+   "GO": 4,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 992
+  },
+  "S4_rel_bound_true|600|bet": {
+   "GO": 17,
+   "NO-GO": 8,
+   "INCONCLUSIVE": 975
+  },
+  "S4_rel_bound_true|600|harm": {
+   "GO": 0,
+   "NO-GO": 8,
+   "INCONCLUSIVE": 992
+  },
+  "S4_rel_bound_true|600|mix": {
+   "GO": 4,
+   "NO-GO": 8,
+   "INCONCLUSIVE": 988
+  },
+  "S4_rel_bound_true|1200|bet": {
+   "GO": 23,
+   "NO-GO": 20,
+   "INCONCLUSIVE": 957
+  },
+  "S4_rel_bound_true|1200|harm": {
+   "GO": 0,
+   "NO-GO": 20,
+   "INCONCLUSIVE": 980
+  },
+  "S4_rel_bound_true|1200|mix": {
+   "GO": 8,
+   "NO-GO": 20,
+   "INCONCLUSIVE": 972
+  },
+  "S4_rel_bound_true|2400|bet": {
+   "GO": 12,
+   "NO-GO": 21,
+   "INCONCLUSIVE": 967
+  },
+  "S4_rel_bound_true|2400|harm": {
+   "GO": 0,
+   "NO-GO": 21,
+   "INCONCLUSIVE": 979
+  },
+  "S4_rel_bound_true|2400|mix": {
+   "GO": 5,
+   "NO-GO": 21,
+   "INCONCLUSIVE": 974
+  },
+  "S5_rel_false_risk|150|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S5_rel_false_risk|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S5_rel_false_risk|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S5_rel_false_risk|300|bet": {
+   "GO": 0,
+   "NO-GO": 16,
+   "INCONCLUSIVE": 984
+  },
+  "S5_rel_false_risk|300|harm": {
+   "GO": 0,
+   "NO-GO": 16,
+   "INCONCLUSIVE": 984
+  },
+  "S5_rel_false_risk|300|mix": {
+   "GO": 0,
+   "NO-GO": 16,
+   "INCONCLUSIVE": 984
+  },
+  "S5_rel_false_risk|600|bet": {
+   "GO": 0,
+   "NO-GO": 74,
+   "INCONCLUSIVE": 926
+  },
+  "S5_rel_false_risk|600|harm": {
+   "GO": 0,
+   "NO-GO": 74,
+   "INCONCLUSIVE": 926
+  },
+  "S5_rel_false_risk|600|mix": {
+   "GO": 0,
+   "NO-GO": 74,
+   "INCONCLUSIVE": 926
+  },
+  "S5_rel_false_risk|1200|bet": {
+   "GO": 0,
+   "NO-GO": 343,
+   "INCONCLUSIVE": 657
+  },
+  "S5_rel_false_risk|1200|harm": {
+   "GO": 0,
+   "NO-GO": 343,
+   "INCONCLUSIVE": 657
+  },
+  "S5_rel_false_risk|1200|mix": {
+   "GO": 0,
+   "NO-GO": 343,
+   "INCONCLUSIVE": 657
+  },
+  "S5_rel_false_risk|2400|bet": {
+   "GO": 0,
+   "NO-GO": 824,
+   "INCONCLUSIVE": 176
+  },
+  "S5_rel_false_risk|2400|harm": {
+   "GO": 0,
+   "NO-GO": 824,
+   "INCONCLUSIVE": 176
+  },
+  "S5_rel_false_risk|2400|mix": {
+   "GO": 0,
+   "NO-GO": 824,
+   "INCONCLUSIVE": 176
+  },
+  "S6_rel_false_saving|150|bet": {
+   "GO": 0,
+   "NO-GO": 8,
+   "INCONCLUSIVE": 992
+  },
+  "S6_rel_false_saving|150|harm": {
+   "GO": 0,
+   "NO-GO": 8,
+   "INCONCLUSIVE": 992
+  },
+  "S6_rel_false_saving|150|mix": {
+   "GO": 0,
+   "NO-GO": 8,
+   "INCONCLUSIVE": 992
+  },
+  "S6_rel_false_saving|300|bet": {
+   "GO": 0,
+   "NO-GO": 21,
+   "INCONCLUSIVE": 979
+  },
+  "S6_rel_false_saving|300|harm": {
+   "GO": 0,
+   "NO-GO": 21,
+   "INCONCLUSIVE": 979
+  },
+  "S6_rel_false_saving|300|mix": {
+   "GO": 0,
+   "NO-GO": 21,
+   "INCONCLUSIVE": 979
+  },
+  "S6_rel_false_saving|600|bet": {
+   "GO": 0,
+   "NO-GO": 78,
+   "INCONCLUSIVE": 922
+  },
+  "S6_rel_false_saving|600|harm": {
+   "GO": 0,
+   "NO-GO": 78,
+   "INCONCLUSIVE": 922
+  },
+  "S6_rel_false_saving|600|mix": {
+   "GO": 0,
+   "NO-GO": 78,
+   "INCONCLUSIVE": 922
+  },
+  "S6_rel_false_saving|1200|bet": {
+   "GO": 1,
+   "NO-GO": 182,
+   "INCONCLUSIVE": 817
+  },
+  "S6_rel_false_saving|1200|harm": {
+   "GO": 0,
+   "NO-GO": 182,
+   "INCONCLUSIVE": 818
+  },
+  "S6_rel_false_saving|1200|mix": {
+   "GO": 1,
+   "NO-GO": 182,
+   "INCONCLUSIVE": 817
+  },
+  "S6_rel_false_saving|2400|bet": {
+   "GO": 0,
+   "NO-GO": 412,
+   "INCONCLUSIVE": 588
+  },
+  "S6_rel_false_saving|2400|harm": {
+   "GO": 0,
+   "NO-GO": 412,
+   "INCONCLUSIVE": 588
+  },
+  "S6_rel_false_saving|2400|mix": {
+   "GO": 0,
+   "NO-GO": 412,
+   "INCONCLUSIVE": 588
+  },
+  "S7_rel_heavy|150|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|300|bet": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S7_rel_heavy|300|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|300|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|600|bet": {
+   "GO": 49,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 951
+  },
+  "S7_rel_heavy|600|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|600|mix": {
+   "GO": 29,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 971
+  },
+  "S7_rel_heavy|1200|bet": {
+   "GO": 151,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 849
+  },
+  "S7_rel_heavy|1200|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|1200|mix": {
+   "GO": 105,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 895
+  },
+  "S7_rel_heavy|2400|bet": {
+   "GO": 313,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 687
+  },
+  "S7_rel_heavy|2400|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S7_rel_heavy|2400|mix": {
+   "GO": 236,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 764
+  },
+  "S8_rel_discordant|150|bet": {
+   "GO": 5,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 995
+  },
+  "S8_rel_discordant|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S8_rel_discordant|150|mix": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S8_rel_discordant|300|bet": {
+   "GO": 22,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 978
+  },
+  "S8_rel_discordant|300|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S8_rel_discordant|300|mix": {
+   "GO": 14,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 986
+  },
+  "S8_rel_discordant|600|bet": {
+   "GO": 31,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 968
+  },
+  "S8_rel_discordant|600|harm": {
+   "GO": 0,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 999
+  },
+  "S8_rel_discordant|600|mix": {
+   "GO": 13,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 986
+  },
+  "S8_rel_discordant|1200|bet": {
+   "GO": 33,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 966
+  },
+  "S8_rel_discordant|1200|harm": {
+   "GO": 0,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 999
+  },
+  "S8_rel_discordant|1200|mix": {
+   "GO": 20,
+   "NO-GO": 1,
+   "INCONCLUSIVE": 979
+  },
+  "S8_rel_discordant|2400|bet": {
+   "GO": 43,
+   "NO-GO": 3,
+   "INCONCLUSIVE": 954
+  },
+  "S8_rel_discordant|2400|harm": {
+   "GO": 0,
+   "NO-GO": 3,
+   "INCONCLUSIVE": 997
+  },
+  "S8_rel_discordant|2400|mix": {
+   "GO": 24,
+   "NO-GO": 3,
+   "INCONCLUSIVE": 973
+  },
+  "S9_rel_chains_true|150|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|150|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|150|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|150|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|300|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|300|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|300|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|300|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|300|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|300|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|600|bet": {
+   "GO": 5,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 995
+  },
+  "S9_rel_chains_true|600|bet+fs2": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S9_rel_chains_true|600|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|600|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|600|mix": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S9_rel_chains_true|600|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|1200|bet": {
+   "GO": 17,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 983
+  },
+  "S9_rel_chains_true|1200|bet+fs2": {
+   "GO": 13,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 987
+  },
+  "S9_rel_chains_true|1200|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|1200|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|1200|mix": {
+   "GO": 10,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 990
+  },
+  "S9_rel_chains_true|1200|mix+fs2": {
+   "GO": 9,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 991
+  },
+  "S9_rel_chains_true|2400|bet": {
+   "GO": 18,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 982
+  },
+  "S9_rel_chains_true|2400|bet+fs2": {
+   "GO": 26,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 974
+  },
+  "S9_rel_chains_true|2400|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|2400|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S9_rel_chains_true|2400|mix": {
+   "GO": 11,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 989
+  },
+  "S9_rel_chains_true|2400|mix+fs2": {
+   "GO": 12,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 988
+  },
+  "S10_rel_chains_false|150|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|150|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|150|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|150|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|300|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|300|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|300|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|300|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|300|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|300|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|600|bet": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S10_rel_chains_false|600|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|600|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|600|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|600|mix": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S10_rel_chains_false|600|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S10_rel_chains_false|1200|bet": {
+   "GO": 1,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 995
+  },
+  "S10_rel_chains_false|1200|bet+fs2": {
+   "GO": 1,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 995
+  },
+  "S10_rel_chains_false|1200|harm": {
+   "GO": 0,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 996
+  },
+  "S10_rel_chains_false|1200|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 996
+  },
+  "S10_rel_chains_false|1200|mix": {
+   "GO": 0,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 996
+  },
+  "S10_rel_chains_false|1200|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 4,
+   "INCONCLUSIVE": 996
+  },
+  "S10_rel_chains_false|2400|bet": {
+   "GO": 0,
+   "NO-GO": 52,
+   "INCONCLUSIVE": 948
+  },
+  "S10_rel_chains_false|2400|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 52,
+   "INCONCLUSIVE": 948
+  },
+  "S10_rel_chains_false|2400|harm": {
+   "GO": 0,
+   "NO-GO": 52,
+   "INCONCLUSIVE": 948
+  },
+  "S10_rel_chains_false|2400|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 52,
+   "INCONCLUSIVE": 948
+  },
+  "S10_rel_chains_false|2400|mix": {
+   "GO": 0,
+   "NO-GO": 52,
+   "INCONCLUSIVE": 948
+  },
+  "S10_rel_chains_false|2400|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 52,
+   "INCONCLUSIVE": 948
+  },
+  "S11_rel_nonmono|150|bet": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|150|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|150|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|150|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|150|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|150|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|300|bet": {
+   "GO": 1,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 999
+  },
+  "S11_rel_nonmono|300|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|300|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|300|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|300|mix": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|300|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|600|bet": {
+   "GO": 5,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 995
+  },
+  "S11_rel_nonmono|600|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|600|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|600|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|600|mix": {
+   "GO": 2,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 998
+  },
+  "S11_rel_nonmono|600|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|1200|bet": {
+   "GO": 21,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 979
+  },
+  "S11_rel_nonmono|1200|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|1200|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|1200|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|1200|mix": {
+   "GO": 12,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 988
+  },
+  "S11_rel_nonmono|1200|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|2400|bet": {
+   "GO": 19,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 981
+  },
+  "S11_rel_nonmono|2400|bet+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|2400|harm": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|2400|harm+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  },
+  "S11_rel_nonmono|2400|mix": {
+   "GO": 11,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 989
+  },
+  "S11_rel_nonmono|2400|mix+fs2": {
+   "GO": 0,
+   "NO-GO": 0,
+   "INCONCLUSIVE": 1000
+  }
+ },
+ "truth": {
+  "S1_rel_feasible": {
+   "claim_true": true
+  },
+  "S2_rel_tight": {
+   "claim_true": true
+  },
+  "S3_rel_bound_false": {
+   "claim_true": false
+  },
+  "S4_rel_bound_true": {
+   "claim_true": true
+  },
+  "S5_rel_false_risk": {
+   "claim_true": false
+  },
+  "S6_rel_false_saving": {
+   "claim_true": false
+  },
+  "S7_rel_heavy": {
+   "claim_true": true
+  },
+  "S8_rel_discordant": {
+   "claim_true": true
+  },
+  "S9_rel_chains_true": {
+   "claim_true": true
+  },
+  "S10_rel_chains_false": {
+   "claim_true": false
+  },
+  "S11_rel_nonmono": {
+   "claim_true": true
+  }
+ },
+ "seconds": 950
+}
