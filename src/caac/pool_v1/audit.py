@@ -155,6 +155,7 @@ class PolicyData:
     served: list[bool]
     error: list[bool]        # True only if served and wrong
     cost: list[float]
+    small_part: list[float] | None = None   # v3: cost of the small model's draws (cost - small_part is 0 or the big-only cost)
 
 
 @dataclass
@@ -163,6 +164,8 @@ class AuditInput:
     big_cost: list[float]    # cost of answering every question with the big model only
     policies: list[PolicyData]
     c_max: float             # upper bound of every cost (e.g. cap x price per token)
+    small_max: float | None = None   # v3: bound of the small part (c_max = small_max + big_max)
+    big_max: float | None = None     # v3: bound of the big-only cost of one question
 
 
 @dataclass
@@ -298,3 +301,152 @@ def served_needed(rate: float, alpha: float, delta: float, n_max: int = 200_000)
         else:
             lo = mid + 1
     return hi
+
+
+# =============================================================================== design v3
+# Amendment v3 (see protocols/audit_lock_v3.json). Same claim, same candidate set, same tests;
+# three changes: (U1) no A/B split: every policy is tested on ALL questions, each leg at delta/|Pi|
+# (Bonferroni over Pi, i.e. Learn-then-Test with two risks per policy: the selective risk and the
+# mean of d); (U2) d lives in a STRUCTURAL range: an escalated question costs its small part plus
+# exactly its big-only cost, so d is in [-(a_max + s b_max), (1-s) b_max] instead of
+# [-c_max, (1-s) c_max]; (R4) planning gives the questions needed for BOTH legs (caac.pool_v1.gap).
+
+def structural_range(small_max: float, big_max: float, s: float) -> tuple[float, float]:
+    """Range of d = (1-s)B - C when C = (small part a in [0, small_max]) + (B if escalated) and
+    B in [0, big_max]: served by the small model d = (1-s)B - a; escalated d = -sB - a."""
+    if not (s < 1.0):
+        raise ValueError("s must be < 1")
+    return -(small_max + max(s, 0.0) * big_max), (1.0 - s) * big_max
+
+
+def _check3(inp: AuditInput) -> None:
+    _check(inp)
+    if inp.small_max is None or inp.big_max is None or not (inp.small_max > 0 and inp.big_max > 0):
+        raise ValueError("design v3 needs the split of the cost bound (small_max, big_max)")
+    tol = 1e-9
+    for i, b in enumerate(inp.big_cost):
+        if b > inp.big_max * (1 + tol):
+            raise ValueError(f"big-only cost {b} above big_max {inp.big_max}")
+    for p in inp.policies:
+        if p.small_part is None:
+            raise ValueError(f"policy {p.name}: design v3 needs small_part")
+        for i, (c, a) in enumerate(zip(p.cost, p.small_part)):
+            if a < -tol or a > inp.small_max * (1 + tol):
+                raise ValueError(f"policy {p.name}: small part {a} outside [0, {inp.small_max}]")
+            diff = c - a
+            if abs(diff) > tol * max(1.0, abs(c)) and abs(diff - inp.big_cost[i]) > tol * max(1.0, abs(c)):
+                raise ValueError(f"policy {p.name}: cost is not small part (+ big-only cost) at question {i}")
+
+
+def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float = 0.20,
+           salt: str = DEFAULT_SALT) -> AuditResult:
+    """Design v3. Guarantee: each verdict is wrong with probability <= delta.
+      GO       some policy passes BOTH legs on all questions, each at delta/|Pi|: exact binomial
+               rejecting "R > alpha" and betting rejecting "E[d] < 0". By a union bound over the
+               policies that violate the claim, P(some violating policy passes) <= delta; GO reports
+               the cheapest policy among those that pass (all of them hold jointly).
+      NO-GO    for EVERY policy, "R <= alpha" is rejected by the binomial test OR "E[d] >= 0" by
+               betting, each at delta/2 (unchanged from v2; no correction over Pi needed).
+      else INCONCLUSIVE (also when both fire: flagged conflict)."""
+    _check3(inp)
+    n, m = len(inp.qids), len(inp.policies)
+    lo, hi = structural_range(inp.small_max, inp.big_max, s)
+    order = _order(inp.qids, salt)
+    res = AuditResult("INCONCLUSIVE", alpha, delta, s, n, 0, n)
+    lvl = delta / m
+    rows, passing, all_rej = [], [], True
+    mean_b = sum(inp.big_cost) / n
+    for j, p in enumerate(inp.policies):
+        sv, e = sum(p.served), sum(p.error)
+        d = [(1.0 - s) * inp.big_cost[i] - p.cost[i] for i in range(n)]
+        pr_go = p_risk_below(e, sv, alpha)
+        ps_go = _betting_p(d, lo, hi, order) if (sv and e / sv <= alpha) else 1.0
+        pr_ng = p_risk_above(e, sv, alpha)
+        ps_ng = _betting_p([-v for v in d], -hi, -lo, order)
+        ok = pr_go <= lvl and ps_go <= lvl
+        rej = pr_ng <= delta / 2 or ps_ng <= delta / 2
+        all_rej &= rej
+        mc = sum(p.cost) / n
+        rows.append({"policy": p.name, "served": sv, "errors": e,
+                     "risk": round(e / sv, 6) if sv else None,
+                     "saving": round(1 - mc / mean_b, 6) if mean_b else None,
+                     "coverage": round(sv / n, 6),
+                     "p_risk_go": pr_go, "p_saving_go": ps_go, "go_pass": ok,
+                     "p_risk_above": pr_ng, "p_saving_below": ps_ng, "rejected": rej})
+        if ok:
+            passing.append((mc, j))
+    go = bool(passing)
+    res.go = {"level_each_leg": lvl, "n_policies": m, "passed": go,
+              "policies_passing": [rows[j]["policy"] for _, j in sorted(passing)]}
+    if go:
+        _, j = min(passing)
+        res.chosen = inp.policies[j].name
+        res.go.update({"policy": res.chosen, **{k: rows[j][k] for k in ("served", "errors", "risk", "saving")},
+                       "p_risk": rows[j]["p_risk_go"], "p_saving": rows[j]["p_saving_go"]})
+    else:
+        res.go["policy"] = None
+        # closest to GO (descriptive): smallest larger-of-the-two go p-values
+        cl = min(range(m), key=lambda j: max(rows[j]["p_risk_go"], rows[j]["p_saving_go"]))
+        res.go["closest_policy"] = rows[cl]["policy"]
+    res.nogo = {"level_each_leg": delta / 2, "policies": rows, "passed": all_rej}
+    res.notes.append("design v3: no split; Bonferroni over the candidate set; structural cost range")
+    if go and all_rej:
+        res.verdict, res.conflict = "INCONCLUSIVE", True
+        res.notes.append("GO and NO-GO both fired (probability <= delta): reported as INCONCLUSIVE")
+    elif go:
+        res.verdict = "GO"
+    elif all_rej:
+        res.verdict = "NO-GO"
+    return res
+
+
+# ----------------------------------------------------------- certified frontier (supplementary)
+S_GRID = tuple(round(0.02 * i, 2) for i in range(-25, 50))      # s from -0.50 to 0.96, fixed in advance
+
+
+def risk_upper_bound(errors: int, served: int, level: float) -> float:
+    """One-sided exact upper bound: smallest r with P(Bin(served, r) <= errors) <= level."""
+    if served == 0:
+        return 1.0
+    lo, hi = errors / served, 1.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if binom_cdf(errors, served, mid) <= level:
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def certified_frontier(inp: AuditInput, *, delta: float = 0.10, salt: str = DEFAULT_SALT,
+                       alphas=(0.05, 0.10, 0.20)) -> dict:
+    """Supplementary report. For every policy: an upper bound on its risk and a lower bound on its
+    saving, each at level delta/(2|Pi|); all 2|Pi| bounds hold jointly with probability >= 1 - delta.
+    The saving bound is the largest s of the fixed grid whose test (betting on d_s, structural range,
+    ascending s, stop at the first non-rejection: nested nulls need no correction) rejects
+    'saving < s'. Hence every (alpha, s) with some policy having UCB_risk <= alpha and
+    LCB_saving >= s is certified at once. frontier[alpha] = largest certified s (None if none)."""
+    _check3(inp)
+    n, m = len(inp.qids), len(inp.policies)
+    lvl = delta / (2 * m)
+    order = _order(inp.qids, salt)
+    per = []
+    for p in inp.policies:
+        sv, e = sum(p.served), sum(p.error)
+        u = risk_upper_bound(e, sv, lvl)
+        lcb = None
+        if u < 0.5:                        # a policy whose risk bound is >= .5 never matters below
+            for s in S_GRID:
+                lo = -(inp.small_max + max(s, 0.0) * inp.big_max)
+                hi = (1.0 - s) * inp.big_max
+                d = [(1.0 - s) * inp.big_cost[i] - p.cost[i] for i in range(n)]
+                if _betting_p(d, lo, hi, order) <= lvl:
+                    lcb = s
+                else:
+                    break
+        per.append({"policy": p.name, "risk_upper": round(u, 6), "saving_lower": lcb})
+    fr = {}
+    for a in alphas:
+        vals = [x["saving_lower"] for x in per if x["risk_upper"] <= a and x["saving_lower"] is not None]
+        fr[str(a)] = max(vals) if vals else None
+    return {"level_each_bound": lvl, "n_bounds": 2 * m, "frontier": fr, "policies": per}

@@ -12,7 +12,8 @@ import copy
 import json
 import math
 
-from caac.pool_v1.audit import audit, binom_cdf, in_half_a, served_needed
+from caac.pool_v1.audit import audit, audit3, binom_cdf, certified_frontier, in_half_a, served_needed, structural_range
+from caac.pool_v1.gap import gap as evidence_gap
 from caac.pool_v1.config import Config
 from caac.pool_v1.replay import replay
 from caac.pool_v1.schema import Meta, Row
@@ -51,7 +52,20 @@ def clopper_pearson(k: int, n: int, conf: float) -> tuple[float, float]:
     return lower, upper
 
 
+def _run_audit(inp, cfg: Config):
+    if cfg.design == "v3":
+        return audit3(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt)
+    return audit(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt, cost_test=cfg.cost_test)
+
+
 def _guarantee(cfg: Config) -> str:
+    if cfg.design == "v3":
+        return (f"Each verdict is wrong with probability <= {cfg.delta}: GO means the chosen policy has "
+                f"risk (error rate among served answers) <= {cfg.alpha} AND saves >= {cfg.s:.0%} of the "
+                f"big-model-only cost, both tested on all questions at level delta/|Pi| (Bonferroni over the "
+                f"candidate set); NO-GO means every candidate policy fails one of the two claims. Assumes "
+                f"questions exchangeable with the deployment, costs bounded (structural range), candidates "
+                f"fixed in advance.")
     return (f"Each verdict is wrong with probability <= {cfg.delta}: GO means the chosen policy has "
             f"risk (error rate among served answers) <= {cfg.alpha} AND saves >= {cfg.s:.0%} of the "
             f"big-model-only cost; NO-GO means no candidate policy does both. Assumes questions "
@@ -65,9 +79,10 @@ def _measure_status(rows: list[Row], cfg: Config, measure: str, notes: list[str]
     return f"measured per generation{' (early-stopped draws estimated)' if est else ''}"
 
 
-def _with_measure(cfg: Config, measure: str, c_max):
+def _with_measure(cfg: Config, measure: str, c_max, c_max_big=None):
     c = copy.deepcopy(cfg)
     c.cost.measure, c.cost.c_max = measure, c_max
+    c.cost.c_max_big = c_max_big
     return c
 
 
@@ -75,7 +90,7 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                 input_info: dict | None = None) -> dict:
     rows = sorted(rows, key=lambda r: (r.qid, r.model, r.draw))
     val = validate(rows, meta, row_errors=row_errors, meta_errors=meta_errors,
-                   alpha=cfg.alpha, delta=cfg.delta, pair=(cfg.small, cfg.big))
+                   alpha=cfg.alpha, delta=cfg.delta, pair=(cfg.small, cfg.big), design=cfg.design)
     rep = {"tool": {"name": "caac", "report_version": REPORT_VERSION},
            "input": input_info or {}, "config": cfg.to_dict()}
     issue_counts: dict[str, int] = {}
@@ -92,8 +107,8 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         return rep
 
     rr = replay(rows, meta, cfg)
-    res = audit(rr.audit_input, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt,
-                cost_test=cfg.cost_test)
+    v3 = cfg.design == "v3"
+    res = _run_audit(rr.audit_input, cfg)
     r5["replay_notes"] = list(rr.notes)
     mb = sum(rr.audit_input.big_cost) / len(rr.audit_input.big_cost)
     r5["cost_bound_ratio"] = _f(rr.audit_input.c_max / mb) if mb > 0 else "inf"
@@ -101,14 +116,35 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         r5["replay_notes"].append(
             f"cost bound c_max is {rr.audit_input.c_max / mb:.0f}x the mean big-model cost: the cost leg "
             "has little power at this sample size (a lower cap, or a per-question bound, would help)")
-    rep["R1_verdict"] = {"verdict": res.verdict, "guarantee": _guarantee(cfg), "alpha": cfg.alpha,
+    if v3:
+        rep["R1_verdict"] = {"verdict": res.verdict, "guarantee": _guarantee(cfg), "design": "v3",
+                             "alpha": cfg.alpha, "delta": cfg.delta, "s": cfg.s, "salt": cfg.salt,
+                             "cost_test": cfg.cost_test, "n_questions": res.n_questions,
+                             "n_policies": len(rr.policies), "policies": [p.name for p in rr.policies],
+                             "level_each_leg": _f(res.go["level_each_leg"]), "chosen": res.chosen,
+                             "policies_passing": res.go["policies_passing"], "conflict": res.conflict}
+    else:
+      rep["R1_verdict"] = {"verdict": res.verdict, "guarantee": _guarantee(cfg), "alpha": cfg.alpha,
                          "delta": cfg.delta, "s": cfg.s, "salt": cfg.salt, "cost_test": cfg.cost_test,
                          "n_questions": res.n_questions, "n_half_a": res.n_a, "n_half_b": res.n_b,
                          "n_policies": len(rr.policies), "policies": [p.name for p in rr.policies],
                          "chosen_on_half_a": res.chosen, "conflict": res.conflict}
 
     # ---- R2
-    if res.chosen is not None:
+    if v3:
+        if res.chosen is not None:
+            g = res.go
+            lo, hi = clopper_pearson(g["errors"], g["served"], 1 - cfg.delta / len(rr.policies))
+            rep["R2_estimates"] = {"policy": res.chosen, "tested": "all questions",
+                                   "served": g["served"], "errors": g["errors"], "risk": _f(g["risk"]),
+                                   "risk_interval": [_f(lo), _f(hi)],
+                                   "interval_level": _f(1 - cfg.delta / len(rr.policies)),
+                                   "coverage": _f(g["served"] / res.n_questions),
+                                   "saving": _f(g["saving"]), "p_risk": _f(g["p_risk"]),
+                                   "p_saving": _f(g["p_saving"])}
+        else:
+            rep["R2_estimates"] = {"policy": None, "closest_to_go": res.go.get("closest_policy")}
+    elif res.chosen is not None:
         g = res.go
         lo, hi = clopper_pearson(g["errors_b"], g["served_b"], 1 - cfg.delta)
         rep["R2_estimates"] = {"policy": res.chosen, "tested_half": "B",
@@ -119,13 +155,14 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                                "p_saving": _f(g["p_saving"])}
     else:
         rep["R2_estimates"] = {"policy": None, "reason": res.go.get("reason")}
-    grp = _by_group(rows, cfg, rr, res)
+    grp = _by_group(rows, cfg, rr, res) if not v3 else None
     if grp is not None:
         rep["R2_estimates"]["by_group"] = grp
     allp = []
     for row, pd in zip(res.nogo["policies"], rr.audit_input.policies):
         x = {k: _f(v) if isinstance(v, float) else v for k, v in row.items()}
-        x["coverage"] = _f(sum(pd.served) / len(pd.served))     # share of questions answered
+        if not v3:
+            x["coverage"] = _f(sum(pd.served) / len(pd.served))     # share of questions answered
         allp.append(x)
     rep["R2_estimates"]["all_policies"] = allp
     if any(p.on_unsure == "abstain" for p in rr.policies):
@@ -135,18 +172,17 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         r5_note = None
 
     # ---- R3
-    meas = [{"measure": cfg.cost.measure, "c_max": cfg.cost.c_max}] + list(cfg.cost.also)
+    meas = [{"measure": cfg.cost.measure, "c_max": cfg.cost.c_max, "c_max_big": cfg.cost.c_max_big}] + list(cfg.cost.also)
     r3 = {}
     for mdef in meas:
         m = mdef["measure"]
         if m in r3:
             continue
         try:
-            c2 = _with_measure(cfg, m, mdef.get("c_max"))
+            c2 = _with_measure(cfg, m, mdef.get("c_max"), mdef.get("c_max_big"))
             rr2 = replay(rows, meta, c2) if m != cfg.cost.measure else rr
-            res2 = audit(rr2.audit_input, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt,
-                         cost_test=cfg.cost_test) if m != cfg.cost.measure else res
-            r3[m] = {"verdict": res2.verdict, "chosen_on_half_a": res2.chosen,
+            res2 = _run_audit(rr2.audit_input, cfg) if m != cfg.cost.measure else res
+            r3[m] = {"verdict": res2.verdict, "chosen" if v3 else "chosen_on_half_a": res2.chosen,
                      "status": _measure_status(rows, cfg, m, rr2.notes), "c_max": _f(rr2.audit_input.c_max)}
         except ValueError as e:
             r3[m] = {"verdict": "NOT AVAILABLE", "reason": str(e)}
@@ -167,8 +203,8 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         r4["lambda_needed_for_saving_s"] = _f(sbar / need) if need > 0 else "inf"
         r4["note"] = ("on all audited questions, output tokens only (prompt tokens ignored); "
                       "small-first saves at a token price ratio lambda above break_even_lambda")
-        served, errors = res.go["served_b"], res.go["errors_b"]
-        n_b = res.n_b
+        served, errors = (res.go["served"], res.go["errors"]) if v3 else (res.go["served_b"], res.go["errors_b"])
+        n_b = res.n_questions if v3 else res.n_b
         rate = errors / served if served else None
         cert = {"risk_on_half_b": _f(rate), "served_share_half_b": _f(served / n_b) if n_b else None,
                 "questions_available": n}
@@ -187,6 +223,9 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
             cert["more_questions_needed"] = max(0, total - n) if total is not None else None
         cert["note"] = "ESTIMATE for the risk leg only, if the observed rates hold; the cost leg may need more"
         r4["certification"] = cert
+    elif v3:
+        r4["reason"] = "no policy passed both legs on all questions"
+        r4["certification"] = _evidence_gap(rr.audit_input, cfg)
     else:
         r4["reason"] = "no policy reached risk <= alpha on half A"
         # planning estimate (does not change the verdict): the candidate with the lowest risk on
@@ -219,15 +258,61 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
                              "more_questions_needed": max(0, total - len(inp.qids)) if total else None})
         cert["note"] = "ESTIMATE for the risk leg only, if the observed rate holds; the cost leg may need more"
         r4["certification"] = cert
-    floor = certification_floor(cfg.alpha, cfg.delta)
-    r4["minimum_questions_zero_errors"] = 2 * floor
-    r4["minimum_note"] = (f"even with zero errors, GO needs >= {floor} served answers on the tested half, "
-                          f"i.e. about {2 * floor} questions if every question is served")
+    if v3:
+        m = len(rr.policies)
+        floor = certification_floor(cfg.alpha, cfg.delta / m)
+        r4["minimum_questions_zero_errors"] = floor
+        r4["minimum_note"] = (f"even with zero errors, GO needs >= {floor} served answers on all questions "
+                              f"(level delta/{m} per leg, Bonferroni over {m} candidates)")
+        if (input_info or {}).get("sensitivity_cell"):
+            r4["certified_frontier"] = None
+        else:
+            r4["certified_frontier"] = certified_frontier(rr.audit_input, delta=cfg.delta, salt=cfg.salt)
+            r4["certified_frontier"]["note"] = ("supplementary: for each alpha, the largest saving s certified by some "
+                                                "candidate, all bounds hold jointly at level 1-delta; the verdict above "
+                                                "does not use it")
+    else:
+        floor = certification_floor(cfg.alpha, cfg.delta)
+        r4["minimum_questions_zero_errors"] = 2 * floor
+        r4["minimum_note"] = (f"even with zero errors, GO needs >= {floor} served answers on the tested half, "
+                              f"i.e. about {2 * floor} questions if every question is served")
     rep["R4_break_even"] = r4
     if r5_note:
         r5["replay_notes"].append(r5_note)
     rep["R5_data_quality"] = r5
     return rep
+
+
+def _evidence_gap(inp, cfg: Config) -> dict:
+    """Design v3 planning output: questions still needed for BOTH legs (power 0.8, same tests), planned on
+    the best-looking candidate (observed risk < alpha and mean d > 0). Never a verdict."""
+    n, m = len(inp.qids), len(inp.policies)
+    lo, _ = structural_range(inp.small_max, inp.big_max, cfg.s)
+    best = None
+    seen_any = False
+    for p in inp.policies:
+        sv, e = sum(p.served), sum(p.error)
+        d = [(1 - cfg.s) * inp.big_cost[i] - p.cost[i] for i in range(n)]
+        if not sv or e / sv >= cfg.alpha or sum(d) <= 0:
+            continue
+        seen_any = True
+        g = evidence_gap(e, sv, n, d, lo, cfg.alpha, cfg.delta / m, 0.8)
+        if g["reachable"] and (best is None or g["questions_needed"] < best["questions_needed"]):
+            best = dict(g, policy=p.name)
+    out = {"basis": "best-looking candidate (risk < alpha and mean d > 0), power 0.8, tests at level delta/|Pi|",
+           "questions_available": n}
+    if best is None:
+        out.update(reachable=False, questions_needed=None,
+                   reason=("no candidate has observed risk < alpha and a positive mean of d: more questions of "
+                           "the same kind will not give GO" if not seen_any else
+                           "no candidate with observed risk < alpha and mean d > 0 reaches power 0.8 within 200000 questions"))
+    else:
+        out.update(reachable=True, policy=best["policy"], questions_needed=best["questions_needed"],
+                   more_questions_needed=max(0, best["questions_needed"] - n), blocking=best["blocking"],
+                   m_risk_served=best["m_risk_served"], m_saving_questions=best["m_saving_questions"],
+                   risk=_f(best["rate"]), coverage=_f(best["coverage"]), mean_d=_f(best["mean_d"]))
+    out["note"] = "PLANNING estimate, plug-in from the observed data; it never changes the verdict"
+    return out
 
 
 def _by_group(rows: list[Row], cfg: Config, rr, res) -> dict | None:
@@ -274,9 +359,13 @@ def to_markdown(rep: dict) -> str:
     else:
         L += [f"**Verdict: {v['verdict']}**" + (" (GO and NO-GO both fired; reported as INCONCLUSIVE)"
                                                if v.get("conflict") else ""), "", v["guarantee"], "",
-              f"- questions: {v['n_questions']} (half A {v['n_half_a']} to choose, half B {v['n_half_b']} to test)",
-              f"- candidate policies: {v['n_policies']}; chosen on half A: {v['chosen_on_half_a']}",
-              f"- cost test: {v['cost_test']}; split salt: `{v['salt']}`", ""]
+              ] + ([f"- questions: {v['n_questions']} (all questions test every policy; design v3)",
+                    f"- candidate policies: {v['n_policies']}; each leg at level {v['level_each_leg']}; "
+                    f"chosen (cheapest passing): {v['chosen']}",
+                    f"- cost test: {v['cost_test']}", ""] if v.get("design") == "v3" else
+                   [f"- questions: {v['n_questions']} (half A {v['n_half_a']} to choose, half B {v['n_half_b']} to test)",
+                    f"- candidate policies: {v['n_policies']}; chosen on half A: {v['chosen_on_half_a']}",
+                    f"- cost test: {v['cost_test']}; split salt: `{v['salt']}`", ""])
         r2 = rep["R2_estimates"]
         if r2.get("policy"):
             lo, hi = r2["risk_interval"]
@@ -302,7 +391,13 @@ def to_markdown(rep: dict) -> str:
         L += [f"- verdict changes with the measure: {'yes' if r3['verdict_changes_with_measure'] else 'no'}", ""]
         r4 = rep["R4_break_even"]
         L += ["## Break-even and certification cost", ""]
-        if "break_even_lambda" in r4:
+        if rep["R1_verdict"].get("design") == "v3" and "break_even_lambda" not in r4:
+            c = r4.get("certification") or {}
+            L += [f"- {r4.get('reason')}",
+                  f"- evidence gap ({c.get('basis')}): questions needed {c.get('questions_needed')} "
+                  f"(have {c.get('questions_available')})" + (f"; blocking leg: {c['blocking']}" if c.get("blocking") else "")
+                  + (f"; {c['reason']}" if c.get("reason") else "")]
+        elif "break_even_lambda" in r4:
             c = r4["certification"]
             L += [f"- break-even lambda: {r4['break_even_lambda']} (configured lambda {r4['lambda']})",
                   f"- lambda needed for the required saving: {r4['lambda_needed_for_saving_s']}",

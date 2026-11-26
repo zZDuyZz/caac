@@ -35,6 +35,7 @@ from pathlib import Path
 MEASURES = ("tokens", "usd", "gpu_s")
 ON_UNSURE = ("escalate", "abstain")
 COST_TESTS = ("bernstein", "betting")
+DESIGNS = ("v2", "v3")
 
 
 @dataclass
@@ -45,6 +46,7 @@ class CostProfile:
     price_in_small: float = 0.0
     price_in_big: float = 0.0
     c_max: float | None = None
+    c_max_big: float | None = None      # v3: the part of c_max that bounds the big-only cost (usd, gpu_s)
     lam: float | None = None            # p_big / p_small (reported)
     also: list = field(default_factory=list)   # extra measures for R3: [{"measure", "c_max"}]
 
@@ -70,6 +72,7 @@ class Config:
     policies: PolicyGrid = field(default_factory=PolicyGrid)
     cost_test: str = "betting"
     serving_mode: str = "batch"
+    design: str = "v2"                  # "v2" = split A/B (lock v2); "v3" = no split, Bonferroni, structural range
 
     def to_dict(self) -> dict:
         c, p = self.cost, self.policies
@@ -78,10 +81,10 @@ class Config:
                 "cost": {"measure": c.measure, "lambda": c.lam,
                          "price_out": {"small": c.price_out_small, "big": c.price_out_big},
                          "price_in": {"small": c.price_in_small, "big": c.price_in_big},
-                         "c_max": c.c_max, "also": list(c.also)},
+                         "c_max": c.c_max, "c_max_big": c.c_max_big, "also": list(c.also)},
                 "policies": {"k": list(p.k), "tau": list(p.tau), "cut": list(p.cut),
                              "on_unsure": list(p.on_unsure)},
-                "cost_test": self.cost_test, "serving_mode": self.serving_mode}
+                "cost_test": self.cost_test, "serving_mode": self.serving_mode, "design": self.design}
 
 
 def _num(d, k, lo=None, hi=None, default=None):
@@ -121,13 +124,13 @@ def config_from_dict(d: dict) -> Config:
         ps = pb = 1.0
     cost = CostProfile(measure=measure, price_out_small=ps, price_out_big=pb,
                        price_in_small=float(pi.get("small", 0.0)), price_in_big=float(pi.get("big", 0.0)),
-                       c_max=cd.get("c_max"), lam=pb / ps)
+                       c_max=cd.get("c_max"), c_max_big=cd.get("c_max_big"), lam=pb / ps)
     for a in cd.get("also", []) or []:
         if a.get("measure") not in MEASURES:
             raise ValueError(f"config: cost.also measure must be one of {MEASURES}")
         if a["measure"] in ("usd", "gpu_s") and not isinstance(a.get("c_max"), (int, float)):
             raise ValueError("config: cost.also entries for usd / gpu_s need c_max")
-        cost.also.append({"measure": a["measure"], "c_max": a.get("c_max")})
+        cost.also.append({"measure": a["measure"], "c_max": a.get("c_max"), "c_max_big": a.get("c_max_big")})
     if cost.price_in_small < 0 or cost.price_in_big < 0:
         raise ValueError("config: prices must be >= 0")
     if measure in ("usd", "gpu_s") and cost.c_max is None:
@@ -147,14 +150,17 @@ def config_from_dict(d: dict) -> Config:
     ct = d.get("cost_test", "betting")
     if ct not in COST_TESTS:
         raise ValueError(f"config: cost_test must be one of {COST_TESTS}")
+    design = d.get("design", "v2")
+    if design not in DESIGNS:
+        raise ValueError(f"config: design must be one of {DESIGNS}")
     unknown = set(d) - {"small", "big", "alpha", "delta", "s", "salt", "audit_split", "cost",
-                        "policies", "cost_test", "serving_mode", "notes"}
+                        "policies", "cost_test", "serving_mode", "notes", "design"}
     if unknown:
         raise ValueError(f"config: unknown key(s) {sorted(unknown)}")
     return Config(small=d["small"], big=d["big"], alpha=alpha, delta=delta, s=s,
                   salt=str(d.get("salt", "caac-audit-v1")), audit_split=d.get("audit_split"),
                   cost=cost, policies=grid, cost_test=ct,
-                  serving_mode=str(d.get("serving_mode", "batch")))
+                  serving_mode=str(d.get("serving_mode", "batch")), design=design)
 
 
 def load_config(path: str | Path) -> Config:

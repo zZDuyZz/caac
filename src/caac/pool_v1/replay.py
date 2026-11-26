@@ -179,7 +179,7 @@ def replay(rows: list[Row], meta: Meta | None, cfg: Config) -> ReplayResult:
 
     pdata, stok, btok, ssmall = [], {}, {}, {}
     for p in pols:
-        served, error, cost, st, bt, sm = [], [], [], [], [], []
+        served, error, cost, st, bt, sm, sp = [], [], [], [], [], [], []
         for qi, q in enumerate(qids):
             draws = S[q][:p.k]
             used_cost, used_tok, keys, ans_rows = 0.0, 0, [], []
@@ -233,11 +233,15 @@ def replay(rows: list[Row], meta: Meta | None, cfg: Config) -> ReplayResult:
                     bt.append(0)
                 sm.append(False)
             st.append(used_tok)
-        pdata.append(PolicyData(p.name, served, error, cost))
+            sp.append(used_cost)
+        pdata.append(PolicyData(p.name, served, error, cost, small_part=sp))
         stok[p.name], btok[p.name], ssmall[p.name] = st, bt, sm
 
+    big_max = None
     if c.c_max is not None:
         c_max = float(c.c_max)
+        if c.c_max_big is not None:
+            big_max = float(c.c_max_big)
     else:  # tokens: the generation caps make the bound
         caps = (meta.caps if meta else {}) or {}
         if cfg.small not in caps or cfg.big not in caps:
@@ -249,8 +253,11 @@ def replay(rows: list[Row], meta: Meta | None, cfg: Config) -> ReplayResult:
             min(caps[cfg.small], p.cut or caps[cfg.small]) for p in pols)
         c_max = (kmax * cap_s * c.price_out_small + in_max_s * c.price_in_small
                  + caps[cfg.big] * c.price_out_big + in_max_b * c.price_in_big)
+        big_max = caps[cfg.big] * c.price_out_big + in_max_b * c.price_in_big
         notes.append("cost bound c_max from the generation caps in meta.json")
     if est:
         notes.append(f"{m}: cost of early-stopped draws is ESTIMATED in proportion to tokens used")
-    inp = AuditInput(qids=qids, big_cost=big_cost, policies=pdata, c_max=c_max)
+    small_max = (c_max - big_max) if big_max is not None else None
+    inp = AuditInput(qids=qids, big_cost=big_cost, policies=pdata, c_max=c_max,
+                     small_max=small_max, big_max=big_max)
     return ReplayResult(inp, pols, qids, notes, stok, btok, big_tok, ssmall)

@@ -162,7 +162,7 @@ def levels(rows: list[Row], meta: Meta | None = None) -> dict[str, tuple[str, li
 
 def validate(rows: list[Row], meta: Meta | None = None, *, row_errors=(), meta_errors=(),
              alpha: float = 0.10, delta: float = 0.10, pair: tuple[str, str] | None = None,
-             check_meta: bool = True) -> Report:
+             check_meta: bool = True, design: str = "v2") -> Report:
     rep = Report()
     if check_meta:
         rep.issues += _meta_issues(meta, list(meta_errors))
@@ -239,7 +239,12 @@ def validate(rows: list[Row], meta: Meta | None = None, *, row_errors=(), meta_e
         if first and (acc < ACC_EXTREME or acc > 1 - ACC_EXTREME):
             rep.issues.append(Issue("warning", "W_ACC_EXTREME", m,
                                     f"first-answer accuracy {acc:.3f}: risk is near 0 or 1, an audit says little"))
-        if n_q < 2 * floor:
+        if design == "v3" and n_q < floor:
+            rep.issues.append(Issue("warning", "W_N_FLOOR", m,
+                                    f"{n_q} questions < {floor}: GO tests on all questions at level delta/|Pi| and needs "
+                                    f">= {floor} served answers with zero errors even for one policy "
+                                    f"(alpha={alpha}, delta={delta}); more with several policies; expect INCONCLUSIVE"))
+        elif design != "v3" and n_q < 2 * floor:
             rep.issues.append(Issue("warning", "W_N_FLOOR", m,
                                     f"{n_q} questions < {2 * floor}: GO tests on half the data and needs >= {floor} "
                                     f"served answers with zero errors (alpha={alpha}, delta={delta}); expect INCONCLUSIVE"))

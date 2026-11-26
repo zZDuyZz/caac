@@ -53,15 +53,16 @@ def check_config_against_lock(cfg: Config, path, caps: dict | None = None,
     L = load_lock(path)
     a, pol = L["audit"], L["policies"]
     bad = []
-    keys = ("alpha", "delta", "s", "salt", "cost_test")
+    keys = ("alpha", "delta", "s", "salt", "cost_test", "design")
     if sensitivity:
         g = L.get("sensitivity") or {}
         if cfg.alpha not in g.get("alpha", []) or cfg.s not in g.get("s", []):
             bad.append(f"(alpha, s) = ({cfg.alpha}, {cfg.s}) not in the lock's sensitivity grid")
-        keys = ("delta", "salt", "cost_test")
+        keys = ("delta", "salt", "cost_test", "design")
     for k in keys:
-        if getattr(cfg, k) != a[k]:
-            bad.append(f"{k}: config {getattr(cfg, k)!r} != lock {a[k]!r}")
+        want = a.get(k, "v2") if k == "design" else a[k]
+        if getattr(cfg, k) != want:
+            bad.append(f"{k}: config {getattr(cfg, k)!r} != lock {want!r}")
     g = cfg.policies
     if not set(g.k) <= set(pol["k"]):
         bad.append(f"policies.k {g.k} not within lock {pol['k']}")

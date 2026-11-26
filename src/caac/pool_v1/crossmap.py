@@ -132,7 +132,8 @@ def measures_for(pool_name, rows, meta, pair, L) -> list[dict]:
             cap_s = max(caps[pair["small"]], max((r.out_tokens or 0) for r in rows if r.model == pair["small"]))
             cap_b = max(caps[pair["big"]], max((r.out_tokens or 0) for r in rows if r.model == pair["big"]))
             c_max = (cap_s + in_s) * ps + (cap_b + in_b) * pb
-            out.append({"name": "usd", "cost": {"measure": "usd", "c_max": c_max}})
+            out.append({"name": "usd", "cost": {"measure": "usd", "c_max": c_max,
+                                                "c_max_big": (cap_b + in_b) * pb}})
         elif m == "tokens_lambda1":
             out.append({"name": "tokens_lambda1", "cost": {"measure": "tokens", "lambda": 1.0}})
         elif m == "tokens_params":
@@ -239,7 +240,7 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
                 a = L["audit"]
                 cfgd = {"small": pair["small"], "big": pair["big"], "alpha": a["alpha"], "delta": a["delta"],
                         "s": a["s"], "salt": a["salt"], "cost_test": a["cost_test"], "cost": ms["cost"],
-                        "policies": grid}
+                        "policies": grid, "design": a.get("design", "v2")}
                 cfg = config_from_dict(cfgd)
                 bad = check_config_against_lock(cfg, lock_path, caps=meta.caps)
                 if bad:
@@ -275,7 +276,7 @@ def run(pools_dir, lock_path, out_dir, tiers=DEFAULT_TIERS, only_pools=None, log
                 lines.append({"pool": d.name, "source": source_of(d.name), "benchmark": benchmark_of(d.name),
                               "small": pair["small"], "big": pair["big"], "tier": tier, "excluded_reason": why or None,
                               "measure": ms["name"], "n": pair["n_common"], "verdict": v,
-                              "chosen": rep["R1_verdict"].get("chosen_on_half_a"),
+                              "chosen": rep["R1_verdict"].get("chosen", rep["R1_verdict"].get("chosen_on_half_a")),
                               "naive_go": ng, "naive_policy": npol,
                               "questions_needed": cert.get("questions_needed"),
                               "reachable": cert.get("reachable"),
