@@ -1,0 +1,17 @@
+{
+ "design_sha256": "d8ecdbc13f73f6dcaa50dd1dcca6691b07e8209dc2cec0a2062b495cb700589c",
+ "map_sha256": "f3032a97d1fe09674c25213cc084de145b6c98c3cb2bcd70eced6e23f6e007c2",
+ "n_configs": 2807,
+ "n_subs": [
+  250,
+  500,
+  1000
+ ],
+ "reps": 200,
+ "scripts": {
+  "v39_methods.py": "00030d3a28cf4199efc5a5a5b2351ec70799b36f61dfb9fce0452bcbc7df6ea2",
+  "v39_ref.py": "5fd0dae0498619e52a4a4895feea86fffbfef95812429c812ab71e736a730af4",
+  "v39_w1.py": "31fde0f29ecd671a127242b04806f0383e14739f2d077a9e99e767275eee42df",
+  "v39_w2.py": "d4ca10c4a88030bfd6f1a0f0bbf159d345f3c2a35f15dd1992bb3510a61e50ad"
+ }
+}

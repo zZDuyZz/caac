@@ -1,0 +1,184 @@
+{
+ "candidates": {
+  "F1": {
+   "A": true,
+   "C": true,
+   "Cw1": true,
+   "W1": {
+    "fails": [],
+    "gain": 0.029525000000000003,
+    "max_false_go": 0.009,
+    "power": 0.102575
+   },
+   "W1_vs_H1": {
+    "fails": [],
+    "gain": 0.0385,
+    "max_false_go": 0.009,
+    "power": 0.102575
+   },
+   "W2": {
+    "250": {
+     "configs_failing": 0,
+     "false_go": 0.00024281667341157425,
+     "max_config_false_go": 0.025,
+     "power": 0.33543933054393305,
+     "wrong_nogo": 0.0005334728033472803
+    },
+    "500": {
+     "configs_failing": 0,
+     "false_go": 0.0003217320922703359,
+     "max_config_false_go": 0.035,
+     "power": 0.47412133891213387,
+     "wrong_nogo": 0.0007217573221757322
+    },
+    "1000": {
+     "configs_failing": 0,
+     "false_go": 0.00023067583974099555,
+     "max_config_false_go": 0.035,
+     "power": 0.5945292887029289,
+     "wrong_nogo": 0.0009728033472803348
+    }
+   },
+   "W3": {
+    "flips": 0,
+    "go": 297,
+    "go_infeasible_policy": 0,
+    "v0_go": 263,
+    "v0_go_lost": 0
+   },
+   "eligible": true,
+   "gW1_vs_H1": 0.0385,
+   "gW1_vs_V0": 0.029525000000000003,
+   "gW2_vs_H1": 0.035882147838214785,
+   "gains_vs_H1": {
+    "250": 0.029759414225941416,
+    "500": 0.03761506276150628,
+    "1000": 0.04027196652719667
+   },
+   "gate": true,
+   "score": 0.03719107391910739
+  },
+  "F2": {
+   "A": true,
+   "C": true,
+   "Cw1": true,
+   "W1": {
+    "fails": [],
+    "gain": 0.032625,
+    "max_false_go": 0.017,
+    "power": 0.105675
+   },
+   "W1_vs_H1": {
+    "fails": [],
+    "gain": 0.041600000000000005,
+    "max_false_go": 0.017,
+    "power": 0.105675
+   },
+   "W2": {
+    "250": {
+     "configs_failing": 0,
+     "false_go": 0.00034196681505463373,
+     "max_config_false_go": 0.025,
+     "power": 0.3409623430962343,
+     "wrong_nogo": 0.0005334728033472803
+    },
+    "500": {
+     "configs_failing": 0,
+     "false_go": 0.0003500607041683529,
+     "max_config_false_go": 0.035,
+     "power": 0.47451882845188287,
+     "wrong_nogo": 0.0007217573221757322
+    },
+    "1000": {
+     "configs_failing": 0,
+     "false_go": 0.0002367462565762849,
+     "max_config_false_go": 0.035,
+     "power": 0.5938807531380753,
+     "wrong_nogo": 0.0009728033472803348
+    }
+   },
+   "W3": {
+    "flips": 0,
+    "go": 297,
+    "go_infeasible_policy": 0,
+    "v0_go": 263,
+    "v0_go_lost": 0
+   },
+   "eligible": true,
+   "gW1_vs_H1": 0.041600000000000005,
+   "gW1_vs_V0": 0.032625,
+   "gW2_vs_H1": 0.03763947001394702,
+   "gains_vs_H1": {
+    "250": 0.03528242677824267,
+    "500": 0.038012552301255276,
+    "1000": 0.03962343096234311
+   },
+   "gate": true,
+   "score": 0.03961973500697351
+  },
+  "F3": {
+   "A": true,
+   "C": true,
+   "Cw1": true,
+   "W1": {
+    "fails": [],
+    "gain": 0.0295,
+    "max_false_go": 0.015,
+    "power": 0.10255
+   },
+   "W1_vs_H1": {
+    "fails": [],
+    "gain": 0.038475,
+    "max_false_go": 0.015,
+    "power": 0.10255
+   },
+   "W2": {
+    "250": {
+     "configs_failing": 0,
+     "false_go": 0.00033994334277620395,
+     "max_config_false_go": 0.025,
+     "power": 0.3332531380753138,
+     "wrong_nogo": 0.0005334728033472803
+    },
+    "500": {
+     "configs_failing": 0,
+     "false_go": 0.0003480372318899231,
+     "max_config_false_go": 0.035,
+     "power": 0.4661192468619247,
+     "wrong_nogo": 0.0007217573221757322
+    },
+    "1000": {
+     "configs_failing": 0,
+     "false_go": 0.00023876972885471468,
+     "max_config_false_go": 0.035,
+     "power": 0.583326359832636,
+     "wrong_nogo": 0.0009728033472803348
+    }
+   },
+   "W3": {
+    "flips": 0,
+    "go": 295,
+    "go_infeasible_policy": 0,
+    "v0_go": 263,
+    "v0_go_lost": 0
+   },
+   "eligible": true,
+   "gW1_vs_H1": 0.038475,
+   "gW1_vs_V0": 0.0295,
+   "gW2_vs_H1": 0.02875174337517437,
+   "gains_vs_H1": {
+    "250": 0.027573221757322186,
+    "500": 0.029612970711297093,
+    "1000": 0.02906903765690383
+   },
+   "gate": true,
+   "score": 0.033613371687587185
+  }
+ },
+ "chosen": "F2",
+ "eligible": [
+  "F3",
+  "F2",
+  "F1"
+ ]
+}

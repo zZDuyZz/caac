@@ -1,0 +1,2597 @@
+{
+ "cells": [
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 34,
+    "nogo": 0,
+    "power": 34
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 28,
+    "nogo": 0,
+    "power": 28
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 5,
+    "nogo": 0,
+    "power": 5
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 40,
+    "nogo": 0,
+    "power": 40
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 52,
+    "nogo": 0,
+    "power": 52
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 48,
+    "nogo": 0,
+    "power": 48
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 16,
+    "nogo": 0,
+    "power": 16
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 120,
+    "nogo": 0,
+    "power": 120
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 119,
+    "nogo": 0,
+    "power": 119
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 119,
+    "nogo": 0,
+    "power": 119
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 52,
+    "nogo": 0,
+    "power": 52
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 75,
+    "nogo": 0,
+    "power": 75
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 223,
+    "nogo": 0,
+    "power": 223
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 223,
+    "nogo": 0,
+    "power": 223
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 223,
+    "nogo": 0,
+    "power": 223
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 114,
+    "nogo": 0,
+    "power": 114
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 141,
+    "nogo": 0,
+    "power": 141
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 496,
+    "nogo": 0,
+    "power": 496
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 496,
+    "nogo": 0,
+    "power": 496
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 496,
+    "nogo": 0,
+    "power": 496
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 287,
+    "nogo": 0,
+    "power": 287
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 305,
+    "nogo": 1,
+    "power": 305
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S2_rel_tight",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 4,
+    "nogo": 0,
+    "power": 4
+   },
+   "F2": {
+    "false_go": 1,
+    "go": 5,
+    "nogo": 0,
+    "power": 4
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S2_rel_tight",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 12,
+    "nogo": 1,
+    "power": 12
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 1,
+    "power": 13
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 1,
+    "power": 8
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 1,
+    "power": 1
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 5,
+    "nogo": 1,
+    "power": 5
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S2_rel_tight",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 28,
+    "nogo": 0,
+    "power": 28
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 26,
+    "nogo": 0,
+    "power": 26
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 15,
+    "nogo": 0,
+    "power": 15
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 5,
+    "nogo": 0,
+    "power": 5
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 15,
+    "nogo": 1,
+    "power": 15
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S2_rel_tight",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 43,
+    "nogo": 0,
+    "power": 43
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 42,
+    "nogo": 0,
+    "power": 42
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 41,
+    "nogo": 0,
+    "power": 41
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 11,
+    "nogo": 0,
+    "power": 11
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S2_rel_tight",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 13,
+    "go": 13,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 12,
+    "go": 12,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 2,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 14,
+    "go": 14,
+    "nogo": 2,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 13,
+    "go": 13,
+    "nogo": 2,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 2,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 4,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 9,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 9,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 9,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 9,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 16,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 23,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 23,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 23,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 23,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 45,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 4,
+    "go": 4,
+    "nogo": 43,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 4,
+    "go": 4,
+    "nogo": 43,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 4,
+    "go": 4,
+    "nogo": 43,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 43,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 90,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 18,
+    "nogo": 0,
+    "power": 18
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 1,
+    "power": 1
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 10,
+    "nogo": 3,
+    "power": 10
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 20,
+    "nogo": 3,
+    "power": 20
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 19,
+    "nogo": 3,
+    "power": 19
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 3,
+    "power": 6
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 4,
+    "power": 9
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 16,
+    "nogo": 6,
+    "power": 16
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 6,
+    "power": 17
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 6,
+    "power": 17
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 6,
+    "power": 9
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 17,
+    "power": 13
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 7,
+    "power": 21
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 7,
+    "power": 21
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 7,
+    "power": 21
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 7,
+    "power": 8
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 12,
+    "nogo": 14,
+    "power": 12
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 7,
+    "power": 8
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 7,
+    "power": 8
+   },
+   "F3": {
+    "false_go": 1,
+    "go": 9,
+    "nogo": 7,
+    "power": 8
+   },
+   "H1": {
+    "false_go": 1,
+    "go": 5,
+    "nogo": 7,
+    "power": 4
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 10,
+    "nogo": 16,
+    "power": 10
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 2,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 2,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 2,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 2,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 10,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 33,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 33,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 33,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 33,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 78,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 253,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 253,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 253,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 253,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 343,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 738,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 738,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 738,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 738,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 805,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 12,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 12,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 12,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 12,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 12,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 27,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 27,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 27,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 27,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 27,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 66,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 66,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 4,
+    "go": 4,
+    "nogo": 66,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 66,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 67,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 179,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 179,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 179,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 179,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 179,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 401,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 401,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 399,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 400,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 401,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 4,
+    "nogo": 0,
+    "power": 4
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 0,
+    "power": 21
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 31,
+    "nogo": 0,
+    "power": 31
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 24,
+    "nogo": 0,
+    "power": 24
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 95,
+    "nogo": 0,
+    "power": 95
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 91,
+    "nogo": 0,
+    "power": 91
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 80,
+    "nogo": 0,
+    "power": 80
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 39,
+    "nogo": 0,
+    "power": 39
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 47,
+    "nogo": 0,
+    "power": 47
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 215,
+    "nogo": 0,
+    "power": 215
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 216,
+    "nogo": 0,
+    "power": 216
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 214,
+    "nogo": 0,
+    "power": 214
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 110,
+    "nogo": 0,
+    "power": 110
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 131,
+    "nogo": 0,
+    "power": 131
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 506,
+    "nogo": 0,
+    "power": 506
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 506,
+    "nogo": 0,
+    "power": 506
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 506,
+    "nogo": 0,
+    "power": 506
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 291,
+    "nogo": 0,
+    "power": 291
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 301,
+    "nogo": 0,
+    "power": 301
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 16,
+    "nogo": 0,
+    "power": 16
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 0,
+    "power": 17
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 5,
+    "nogo": 0,
+    "power": 5
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 10,
+    "nogo": 0,
+    "power": 10
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 24,
+    "nogo": 0,
+    "power": 24
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 24,
+    "nogo": 0,
+    "power": 24
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 22,
+    "nogo": 0,
+    "power": 22
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 11,
+    "nogo": 0,
+    "power": 11
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 48,
+    "nogo": 1,
+    "power": 48
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 48,
+    "nogo": 1,
+    "power": 48
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 48,
+    "nogo": 1,
+    "power": 48
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 32,
+    "nogo": 1,
+    "power": 32
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 34,
+    "nogo": 0,
+    "power": 34
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 1,
+    "power": 67
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 1,
+    "power": 67
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 1,
+    "power": 67
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 51,
+    "nogo": 1,
+    "power": 51
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 32,
+    "nogo": 2,
+    "power": 32
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 148,
+    "nogo": 0,
+    "power": 148
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 148,
+    "nogo": 0,
+    "power": 148
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 148,
+    "nogo": 0,
+    "power": 148
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 100,
+    "nogo": 0,
+    "power": 100
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 50,
+    "nogo": 0,
+    "power": 50
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 4,
+    "nogo": 0,
+    "power": 4
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 14,
+    "nogo": 0,
+    "power": 14
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 15,
+    "nogo": 0,
+    "power": 15
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 14,
+    "nogo": 0,
+    "power": 14
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 4,
+    "nogo": 0,
+    "power": 4
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 0,
+    "power": 21
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 22,
+    "nogo": 0,
+    "power": 22
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 22,
+    "nogo": 0,
+    "power": 22
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 14,
+    "nogo": 0,
+    "power": 14
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 16,
+    "nogo": 0,
+    "power": 16
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 24,
+    "nogo": 0,
+    "power": 24
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 2,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 2,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 2,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 2,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 4,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 40,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 40,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 40,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 40,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 51,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 4,
+    "nogo": 0,
+    "power": 4
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 10,
+    "nogo": 0,
+    "power": 10
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 10,
+    "nogo": 0,
+    "power": 10
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 19,
+    "nogo": 0,
+    "power": 19
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 19,
+    "nogo": 0,
+    "power": 19
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 26,
+    "nogo": 0,
+    "power": 26
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 26,
+    "nogo": 0,
+    "power": 26
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 26,
+    "nogo": 0,
+    "power": 26
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 14,
+    "nogo": 0,
+    "power": 14
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 43,
+    "nogo": 0,
+    "power": 43
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 42,
+    "nogo": 0,
+    "power": 42
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 42,
+    "nogo": 0,
+    "power": 42
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 0,
+    "power": 17
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 30,
+    "nogo": 0,
+    "power": 30
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 8,
+    "go": 8,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 8,
+    "go": 8,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 8,
+    "go": 8,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 8,
+    "go": 8,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 4,
+    "go": 4,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 0,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 2,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 2,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 4,
+    "go": 4,
+    "nogo": 2,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 2,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 2,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 3,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 3,
+    "power": 0
+   },
+   "F3": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 3,
+    "power": 0
+   },
+   "H1": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 3,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 3,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "F2": {
+    "false_go": 7,
+    "go": 12,
+    "nogo": 0,
+    "power": 5
+   },
+   "F3": {
+    "false_go": 5,
+    "go": 6,
+    "nogo": 0,
+    "power": 1
+   },
+   "H1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "F2": {
+    "false_go": 14,
+    "go": 52,
+    "nogo": 0,
+    "power": 38
+   },
+   "F3": {
+    "false_go": 14,
+    "go": 37,
+    "nogo": 0,
+    "power": 23
+   },
+   "H1": {
+    "false_go": 1,
+    "go": 3,
+    "nogo": 0,
+    "power": 2
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 3,
+    "nogo": 0,
+    "power": 2
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 2,
+    "go": 158,
+    "nogo": 0,
+    "power": 156
+   },
+   "F2": {
+    "false_go": 2,
+    "go": 163,
+    "nogo": 0,
+    "power": 161
+   },
+   "F3": {
+    "false_go": 2,
+    "go": 135,
+    "nogo": 0,
+    "power": 133
+   },
+   "H1": {
+    "false_go": 1,
+    "go": 58,
+    "nogo": 0,
+    "power": 57
+   },
+   "V0": {
+    "false_go": 3,
+    "go": 110,
+    "nogo": 0,
+    "power": 107
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 2,
+    "go": 570,
+    "nogo": 0,
+    "power": 568
+   },
+   "F2": {
+    "false_go": 2,
+    "go": 542,
+    "nogo": 0,
+    "power": 540
+   },
+   "F3": {
+    "false_go": 2,
+    "go": 540,
+    "nogo": 0,
+    "power": 538
+   },
+   "H1": {
+    "false_go": 1,
+    "go": 404,
+    "nogo": 0,
+    "power": 403
+   },
+   "V0": {
+    "false_go": 2,
+    "go": 486,
+    "nogo": 0,
+    "power": 484
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid",
+   "seed_tag": "bl3"
+  },
+  {
+   "F1": {
+    "false_go": 0,
+    "go": 948,
+    "nogo": 0,
+    "power": 948
+   },
+   "F2": {
+    "false_go": 0,
+    "go": 947,
+    "nogo": 0,
+    "power": 947
+   },
+   "F3": {
+    "false_go": 0,
+    "go": 947,
+    "nogo": 0,
+    "power": 947
+   },
+   "H1": {
+    "false_go": 3,
+    "go": 838,
+    "nogo": 0,
+    "power": 835
+   },
+   "V0": {
+    "false_go": 4,
+    "go": 875,
+    "nogo": 0,
+    "power": 871
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid",
+   "seed_tag": "bl3"
+  }
+ ],
+ "reps": 1000,
+ "seconds": 279,
+ "seed_tag": "bl3"
+}

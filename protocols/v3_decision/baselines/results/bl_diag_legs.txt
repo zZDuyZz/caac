@@ -1,0 +1,1 @@
+579 {'saving': 6880, 'risk+saving': 3136, 'risk': 10716, '': 1}   (configs with a feasible policy; draws where CLT+Bonferroni says GO and CAAC does not, n=500, by CAAC leg that fails)

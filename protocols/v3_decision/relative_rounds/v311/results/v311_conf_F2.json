@@ -1,0 +1,272 @@
+{
+ "ADOPT": true,
+ "W1": {
+  "H1": {
+   "fails": [],
+   "gain": -0.007625,
+   "max_false_go": 0.005,
+   "power": 0.06305
+  },
+  "V0": {
+   "fails": [],
+   "gain": 0.0,
+   "max_false_go": 0.007,
+   "power": 0.070675
+  },
+  "chosen": {
+   "fails": [],
+   "gain": 0.032125,
+   "max_false_go": 0.014,
+   "power": 0.1028
+  },
+  "chosen_vs_H1": {
+   "fails": [],
+   "gain": 0.03975,
+   "max_false_go": 0.014,
+   "power": 0.1028
+  }
+ },
+ "all": {
+  "W2": {
+   "250": {
+    "H1": {
+     "configs_failing": 0,
+     "false_go": 0.00015140719629497685,
+     "max_config_false_go": 0.02,
+     "power": 0.32738341968911916,
+     "wrong_nogo": 0.0004835924006908463
+    },
+    "V0": {
+     "configs_failing": 0,
+     "false_go": 0.00021375133594584965,
+     "max_config_false_go": 0.03,
+     "power": 0.24768566493955094,
+     "wrong_nogo": 0.0008981001727115717
+    },
+    "chosen": {
+     "configs_failing": 0,
+     "false_go": 0.0004292839330245814,
+     "max_config_false_go": 0.035,
+     "power": 0.3596373056994819,
+     "wrong_nogo": 0.0004835924006908463
+    },
+    "gain_ci_vs_H1": [
+     0.028290155440414508,
+     0.03613989637305699
+    ],
+    "gain_ci_vs_V0": [
+     0.09604490500863558,
+     0.12760794473229706
+    ],
+    "gain_vs_H1": 0.03225388601036272,
+    "gain_vs_V0": 0.11195164075993094
+   },
+   "500": {
+    "H1": {
+     "configs_failing": 0,
+     "false_go": 0.00015140719629497685,
+     "max_config_false_go": 0.02,
+     "power": 0.45436960276338517,
+     "wrong_nogo": 0.0005785837651122625
+    },
+    "V0": {
+     "configs_failing": 0,
+     "false_go": 0.00021553259707873175,
+     "max_config_false_go": 0.04,
+     "power": 0.39234024179620036,
+     "wrong_nogo": 0.0012003454231433507
+    },
+    "chosen": {
+     "configs_failing": 0,
+     "false_go": 0.0003206270039187745,
+     "max_config_false_go": 0.025,
+     "power": 0.485,
+     "wrong_nogo": 0.0005785837651122625
+    },
+    "gain_ci_vs_H1": [
+     0.02530224525043178,
+     0.03567357512953368
+    ],
+    "gain_ci_vs_V0": [
+     0.08020725388601037,
+     0.10593264248704663
+    ],
+    "gain_vs_H1": 0.030630397236614815,
+    "gain_vs_V0": 0.09265975820379962
+   },
+   "1000": {
+    "H1": {
+     "configs_failing": 0,
+     "false_go": 0.0001567509796936231,
+     "max_config_false_go": 0.02,
+     "power": 0.5706735751295337,
+     "wrong_nogo": 0.0010189982728842832
+    },
+    "V0": {
+     "configs_failing": 0,
+     "false_go": 0.00023334520840755254,
+     "max_config_false_go": 0.035,
+     "power": 0.5161226252158895,
+     "wrong_nogo": 0.0015975820379965457
+    },
+    "chosen": {
+     "configs_failing": 0,
+     "false_go": 0.00022443890274314216,
+     "max_config_false_go": 0.025,
+     "power": 0.6044559585492228,
+     "wrong_nogo": 0.0010189982728842832
+    },
+    "gain_ci_vs_H1": [
+     0.02924006908462867,
+     0.03856649395509499
+    ],
+    "gain_ci_vs_V0": [
+     0.0755440414507772,
+     0.10233160621761658
+    ],
+    "gain_vs_H1": 0.0337823834196892,
+    "gain_vs_V0": 0.08833333333333337
+   }
+  },
+  "W3": {
+   "flips": 0,
+   "go": 369,
+   "go_infeasible_policy": 0,
+   "v0_go": 333,
+   "v0_go_lost": 0
+  },
+  "W3_H1": {
+   "flips": 0,
+   "go": 355,
+   "go_infeasible_policy": 0,
+   "v0_go": 333,
+   "v0_go_lost": 3
+  },
+  "n_configs": 2807
+ },
+ "chosen": "F2",
+ "criteria": {
+  "A_validity": true,
+  "B_power": true,
+  "C_W1_not_worse": true,
+  "D_compat": true
+ },
+ "heldout": {
+  "W2": {
+   "250": {
+    "H1": {
+     "configs_failing": 0,
+     "false_go": 0.00025297619047619046,
+     "max_config_false_go": 0.01,
+     "power": 0.42485148514851484,
+     "wrong_nogo": 0.000594059405940594
+    },
+    "V0": {
+     "configs_failing": 0,
+     "false_go": 0.0003125,
+     "max_config_false_go": 0.02,
+     "power": 0.36217821782178217,
+     "wrong_nogo": 0.001188118811881188
+    },
+    "chosen": {
+     "configs_failing": 0,
+     "false_go": 0.0006398809523809524,
+     "max_config_false_go": 0.025,
+     "power": 0.4389108910891089,
+     "wrong_nogo": 0.000594059405940594
+    },
+    "gain_ci_vs_H1": [
+     0.0066336633663366335,
+     0.020742574257425744
+    ],
+    "gain_ci_vs_V0": [
+     0.048514851485148516,
+     0.10747524752475247
+    ],
+    "gain_vs_H1": 0.014059405940594072,
+    "gain_vs_V0": 0.07673267326732675
+   },
+   "500": {
+    "H1": {
+     "configs_failing": 0,
+     "false_go": 0.00028273809523809523,
+     "max_config_false_go": 0.015,
+     "power": 0.538019801980198,
+     "wrong_nogo": 0.0007920792079207921
+    },
+    "V0": {
+     "configs_failing": 0,
+     "false_go": 0.0005059523809523809,
+     "max_config_false_go": 0.04,
+     "power": 0.47217821782178215,
+     "wrong_nogo": 0.001386138613861386
+    },
+    "chosen": {
+     "configs_failing": 0,
+     "false_go": 0.000550595238095238,
+     "max_config_false_go": 0.025,
+     "power": 0.5395049504950495,
+     "wrong_nogo": 0.0007920792079207921
+    },
+    "gain_ci_vs_H1": [
+     -0.017574257425742576,
+     0.015495049504950495
+    ],
+    "gain_ci_vs_V0": [
+     0.046386138613861386,
+     0.08955445544554455
+    ],
+    "gain_vs_H1": 0.0014851485148514865,
+    "gain_vs_V0": 0.06732673267326739
+   },
+   "1000": {
+    "H1": {
+     "configs_failing": 0,
+     "false_go": 0.00028273809523809523,
+     "max_config_false_go": 0.01,
+     "power": 0.6408415841584159,
+     "wrong_nogo": 0.0010891089108910892
+    },
+    "V0": {
+     "configs_failing": 0,
+     "false_go": 0.00032738095238095237,
+     "max_config_false_go": 0.015,
+     "power": 0.5864851485148515,
+     "wrong_nogo": 0.0020792079207920793
+    },
+    "chosen": {
+     "configs_failing": 0,
+     "false_go": 0.0003422619047619048,
+     "max_config_false_go": 0.02,
+     "power": 0.6521782178217822,
+     "wrong_nogo": 0.0010396039603960397
+    },
+    "gain_ci_vs_H1": [
+     -0.005148514851485149,
+     0.023663366336633664
+    ],
+    "gain_ci_vs_V0": [
+     0.044108910891089106,
+     0.08816831683168316
+    ],
+    "gain_vs_H1": 0.011336633663366347,
+    "gain_vs_V0": 0.06569306930693075
+   }
+  },
+  "W3": {
+   "flips": 0,
+   "go": 72,
+   "go_infeasible_policy": 0,
+   "v0_go": 70,
+   "v0_go_lost": 0
+  },
+  "W3_H1": {
+   "flips": 0,
+   "go": 72,
+   "go_infeasible_policy": 0,
+   "v0_go": 70,
+   "v0_go_lost": 0
+  },
+  "n_configs": 336
+ }
+}

@@ -57,7 +57,7 @@ def clopper_pearson(k: int, n: int, conf: float) -> tuple[float, float]:
 def _run_audit(inp, cfg: Config):
     if cfg.design == "v3":
         return audit3(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt,
-                      claim=cfg.claim, eps=cfg.eps)
+                      claim=cfg.claim, eps=cfg.eps, rel_mode=cfg.rel_mode)
     return audit(inp, alpha=cfg.alpha, delta=cfg.delta, s=cfg.s, salt=cfg.salt, cost_test=cfg.cost_test)
 
 
@@ -68,7 +68,9 @@ def _guarantee(cfg: Config) -> str:
                 f"{cfg.eps} AND it saves >= {cfg.s:.0%} of the big-model-only cost, both tested on all questions at "
                 f"level delta/|Pi| (Bonferroni over the candidate set); NO-GO means every candidate policy fails "
                 f"one of the two claims. Assumes questions exchangeable with the deployment, costs bounded "
-                f"(structural range), candidates fixed in advance.")
+                f"(structural range), candidates fixed in advance, and the declared use ({cfg.rel_mode}: "
+                + ("the result is read once, at this n" if cfg.rel_mode == "fixed_n" else
+                   "betting only, valid at every look while questions arrive") + ") fixed before the data were read.")
     if cfg.design == "v3":
         return (f"Each verdict is wrong with probability <= {cfg.delta}: GO means the chosen policy has "
                 f"risk (error rate among served answers) <= {cfg.alpha} AND saves >= {cfg.s:.0%} of the "
@@ -139,9 +141,10 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
         if inp0.big_error is not None and inp0.qids:
             rep["R1_verdict"]["big_only_error"] = _f(sum(bool(x) for x in inp0.big_error) / len(inp0.qids))
         if cfg.claim == "relative":
-            rep["R1_verdict"].update({"claim": "relative", "eps": cfg.eps, "rel_test": res.go.get("rel_test")})
+            rep["R1_verdict"].update({"claim": "relative", "eps": cfg.eps, "rel_test": res.go.get("rel_test"),
+                                      "rel_mode": res.go.get("rel_mode")})
         cs = certified_saving(inp0, claim=cfg.claim or "absolute", alpha=cfg.alpha, eps=cfg.eps, delta=cfg.delta,
-                              salt=cfg.salt)
+                              salt=cfg.salt, rel_mode=cfg.rel_mode)
         rep["R1_verdict"]["certified_saving"] = {
             "value": cs["certified_saving"], "policy": cs["policy"],
             "saving_hat_of_policy": _f(cs["saving_hat_of_policy"]), "n_risk_pass": cs["n_risk_pass"],
@@ -362,7 +365,7 @@ def _evidence_gap(inp, cfg: Config) -> dict:
 
 def _evidence_gap_relative(inp, cfg: Config, lo: float) -> dict:
     """Relative claim: plan on the best-looking candidate (observed R_pi - R_big < eps and mean d > 0)."""
-    from caac.pool_v1.audit import REL_TEST
+    from caac.pool_v1.audit import policy_lo
     n, m = len(inp.qids), len(inp.policies)
     best, seen_any = None, False
     for p in inp.policies:
@@ -371,11 +374,12 @@ def _evidence_gap_relative(inp, cfg: Config, lo: float) -> dict:
         if sum(D) / n >= cfg.eps or sum(d) <= 0:
             continue
         seen_any = True
-        g = gap_relative(D, n, d, lo, cfg.eps, cfg.delta / m, 0.8, test=REL_TEST)
+        g = gap_relative(D, n, d, policy_lo(inp, p, cfg.s), cfg.eps, cfg.delta / m, 0.8, mode=cfg.rel_mode,
+                         hi_d=(1.0 - cfg.s) * inp.big_max)
         if g["reachable"] and (best is None or g["questions_needed"] < best["questions_needed"]):
             best = dict(g, policy=p.name)
     out = {"basis": "best-looking candidate (R_pi - R_big < eps and mean d > 0), power 0.8, tests at level "
-                    "delta/|Pi|", "questions_available": n, "claim": "relative", "eps": cfg.eps}
+                    "delta/|Pi|", "questions_available": n, "claim": "relative", "eps": cfg.eps, "rel_mode": cfg.rel_mode}
     if best is None:
         out.update(reachable=False, questions_needed=None,
                    reason=("no candidate has an observed error within eps of big-only and a positive mean of d: "
@@ -458,7 +462,8 @@ def to_markdown(rep: dict) -> str:
     else:
         L += [f"**Verdict: {v['verdict']}**" + (" (GO and NO-GO both fired; reported as INCONCLUSIVE)"
                                                if v.get("conflict") else ""), "", v["guarantee"], "",
-              ] + ([f"- claim: relative, error within {v['eps']} of big-only ({v.get('rel_test')} test); "
+              ] + ([f"- claim: relative, error within {v['eps']} of big-only (tests for declared use: "
+                    f"{v.get('rel_mode')}; fixed_n = read once at this n, anytime = valid at every look); "
                     f"big-only error {v.get('big_only_error')}"] if v.get("claim") == "relative" else []) + (
                    [_certified_saving_line(v["certified_saving"], v.get("delta"))] if "certified_saving" in v else []) + (
                    [f"- questions: {v['n_questions']} (all questions test every policy; design v3)",

@@ -1,0 +1,18 @@
+{
+ "design_sha256": "fa4c42281ebdb12db21179e2530b017946e2f76ece2185d58a5680e1a9b73720",
+ "lock_sha256_file": "12850228353de81567d4f90534be4aff8654a19cf06a73fc9290169a51af6653",
+ "map_sha256": "f3032a97d1fe09674c25213cc084de145b6c98c3cb2bcd70eced6e23f6e007c2",
+ "n_configs": 2807,
+ "n_subs": [
+  250,
+  500,
+  1000
+ ],
+ "reps": 200,
+ "scripts": {
+  "bl_methods.py": "a114280414d48cb8618644e3cf61c4ce70b67eedd671dcfc6bd5a4717476ce9f",
+  "bl_ref.py": "6cbe9c5fd63b69b70a3cb19f6c7366803e66af1b3605ed8fc3da3d1cc9d5a56a",
+  "bl_w1.py": "6c8cb2a2b6a326b4986d52ef2c8430b1a5eaf9936996db3b627eff4fb6e16b42",
+  "bl_w2.py": "719c86e6733b1925df0d392be62b8473494d638ba11dc775516d39a31c6b77e7"
+ }
+}

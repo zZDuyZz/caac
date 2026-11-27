@@ -20,15 +20,24 @@ from .plan import power as risk_power
 _SEED = 20261126
 
 
-def betting_pass_rate(d, m: int, lo: float, delta: float, B: int = 300, seed: int = _SEED) -> float:
-    """P(the betting test passes at level delta on m i.i.d. resamples of d). Same bets as audit._betting_p."""
+def betting_pass_rate(d, m: int, lo: float, delta: float, B: int = 300, seed: int = _SEED,
+                      cap: float = 0.5, fixed_n_hi: float | None = None) -> float:
+    """P(the betting test passes at level delta on m i.i.d. resamples of d). Same bets as audit._betting_p
+    (cap 0.5), audit._betting_p_cap (other cap), or, when fixed_n_hi is given, audit._betting_fixed_n_p with
+    range [lo, fixed_n_hi] and n = m (v3-11)."""
     rng = np.random.default_rng(seed)
     X = rng.choice(np.asarray(d, float), size=(m, B), replace=True)
-    lmax = 0.5 / (-lo)
+    lmax = cap / (-lo)
     s1 = np.zeros(B); s2 = np.zeros(B); logk = np.zeros(B); best = np.zeros(B)
     thr = math.log(1.0 / delta)
+    if fixed_n_hi is not None:
+        prior = (fixed_n_hi - lo) ** 2 / 4.0
+        c = 2.0 * math.log(1.0 / delta)
     for t in range(m):
-        if t:
+        if fixed_n_hi is not None:
+            v = (prior + s2 - t * (s1 / t) ** 2) / (t + 1) if t else np.full(B, prior)
+            lam = np.minimum(lmax, np.sqrt(c / (m * v)))
+        elif t:
             mu = s1 / t
             var = s2 / t - mu * mu
             lam = np.where(mu <= 0, 0.0, np.minimum(lmax, mu / (var + mu * mu + 1e-12)))
@@ -57,11 +66,11 @@ def _search(fn, target, m0, m_max):
     return hi
 
 
-def m_saving(d, lo, delta, target=0.8, m_max=200_000, B=300):
+def m_saving(d, lo, delta, target=0.8, m_max=200_000, B=300, cap=0.5, fixed_n_hi=None):
     d = np.asarray(d, float)
     if len(d) < 2 or d.mean() <= 0:
         return None
-    return _search(lambda m: betting_pass_rate(d, m, lo, delta, B), target, 16, m_max)
+    return _search(lambda m: betting_pass_rate(d, m, lo, delta, B, cap=cap, fixed_n_hi=fixed_n_hi), target, 16, m_max)
 
 
 def m_risk(rate, alpha, delta, target=0.8, m_max=200_000):
@@ -95,13 +104,16 @@ def gap(errors, served, n_tested, d, lo, alpha, delta_each, target=0.8):
     return out
 
 
-def gap_relative(D, n_tested, d, lo_d, eps, delta_each, target=0.8, test="bet"):
+def gap_relative(D, n_tested, d, lo_d, eps, delta_each, target=0.8, test="bet", mode=None, hi_d=None):
     """Relative claim, both legs, same tests as the audit (planning only).
       risk leg  bet: bootstrap of x = eps - D (range [eps - 1, eps + 1]);
                 harm: exact binomial power of the harm count at the observed harm rate;
                 mix: the better of the two at level delta_each / 2.
       cost leg  bootstrap of d (structural range), as for the absolute claim.
-    Unreachable if mean(D) >= eps (bet), harm rate >= eps (harm), or mean(d) <= 0."""
+    Unreachable if mean(D) >= eps (bet), harm rate >= eps (harm), or mean(d) <= 0.
+    mode (v3-10 / v3-11; overrides test): 'fixed_n' plans both legs with the fixed-n bets (cap 0.9, n = the planned
+    size; the cost leg needs hi_d); 'anytime' plans the quality leg with the plug-in bet (cap 0.5) and the cost leg
+    with the plug-in bet, cap 0.9, as the anytime audit runs them."""
     D = np.asarray(D, float)
     n = len(D)
     mean_D = float(D.mean()) if n else None
@@ -113,14 +125,26 @@ def gap_relative(D, n_tested, d, lo_d, eps, delta_each, target=0.8, test="bet"):
     def m_harm(level):
         return m_risk(h, eps, level, target) if (h is not None and eps > 0) else None
 
-    if test == "bet":
+    if mode is not None:
+        if mode not in ("fixed_n", "anytime"):
+            raise ValueError("mode must be 'fixed_n' or 'anytime'")
+        ok = mean_D is not None and mean_D < eps
+        if mode == "fixed_n":
+            mr = m_saving(eps - D, eps - 1.0, delta_each, target, cap=0.9, fixed_n_hi=eps + 1.0) if ok else None
+            ms = m_saving(d, lo_d, delta_each, target, cap=0.9, fixed_n_hi=hi_d)
+        else:
+            mr = m_saving(eps - D, eps - 1.0, delta_each, target) if ok else None
+            ms = m_saving(d, lo_d, delta_each, target, cap=0.9)
+        test = mode
+    elif test == "bet":
         mr = m_bet(delta_each)
     elif test == "harm":
         mr = m_harm(delta_each)
     else:
         c = [m for m in (m_bet(delta_each / 2), m_harm(delta_each / 2)) if m is not None]
         mr = min(c) if c else None
-    ms = m_saving(d, lo_d, delta_each, target)
+    if mode is None:
+        ms = m_saving(d, lo_d, delta_each, target)
     out = {"delta_hat": mean_D, "harm_rate": h, "eps": eps, "rel_test": test,
            "mean_d": float(np.mean(d)) if len(d) else None, "m_risk_questions": mr, "m_saving_questions": ms}
     if mr is None or ms is None:

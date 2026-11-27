@@ -1,0 +1,6 @@
+X0 V0 == caac and H1 == v3-10 H1, mismatches: 0 / 60
+X5 mismatches 0 / 150 draws x 5 methods
+X5b max |vectorised - plain| p-value: 2.7755575615628914e-16
+X7 worst size / alpha at the null boundary: 0.838
+ALL CHECKS PASS
+seconds 295

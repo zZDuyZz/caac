@@ -177,6 +177,14 @@ def replay(rows: list[Row], meta: Meta | None, cfg: Config) -> ReplayResult:
         big_cost.append(uc + _prefill(b, m, c.price_in_big))
         big_tok.append(b.out_tokens or 0)
 
+    pcap = {}
+    if c.c_max is None:                                # tokens: per-policy structural bound of the small part (v3-9)
+        caps0 = (meta.caps if meta else {}) or {}
+        if cfg.small in caps0:
+            in_max_s0 = max((S[q][0].in_tokens or 0) for q in qids)
+            for p in pols:
+                cs = caps0[cfg.small] if p.cut is None else min(caps0[cfg.small], p.cut)
+                pcap[p.name] = p.k * cs * c.price_out_small + in_max_s0 * c.price_in_small
     pdata, stok, btok, ssmall = [], {}, {}, {}
     for p in pols:
         served, error, cost, st, bt, sm, sp = [], [], [], [], [], [], []
@@ -234,7 +242,7 @@ def replay(rows: list[Row], meta: Meta | None, cfg: Config) -> ReplayResult:
                 sm.append(False)
             st.append(used_tok)
             sp.append(used_cost)
-        pdata.append(PolicyData(p.name, served, error, cost, small_part=sp))
+        pdata.append(PolicyData(p.name, served, error, cost, small_part=sp, small_cap=pcap.get(p.name)))
         stok[p.name], btok[p.name], ssmall[p.name] = st, bt, sm
 
     big_max = None

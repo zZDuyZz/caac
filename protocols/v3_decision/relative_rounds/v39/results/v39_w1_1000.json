@@ -1,0 +1,3786 @@
+{
+ "cells": [
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 23,
+    "nogo": 0,
+    "power": 23
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 24,
+    "nogo": 0,
+    "power": 24
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 23,
+    "nogo": 0,
+    "power": 23
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 24,
+    "nogo": 0,
+    "power": 24
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 12,
+    "nogo": 0,
+    "power": 12
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 11,
+    "nogo": 0,
+    "power": 11
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 11,
+    "nogo": 0,
+    "power": 11
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 12,
+    "nogo": 0,
+    "power": 12
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 87,
+    "nogo": 0,
+    "power": 87
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 87,
+    "nogo": 0,
+    "power": 87
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 87,
+    "nogo": 0,
+    "power": 87
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 87,
+    "nogo": 0,
+    "power": 87
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 158,
+    "nogo": 0,
+    "power": 158
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 158,
+    "nogo": 0,
+    "power": 158
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 158,
+    "nogo": 0,
+    "power": 158
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 158,
+    "nogo": 0,
+    "power": 158
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 123,
+    "nogo": 0,
+    "power": 123
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 123,
+    "nogo": 0,
+    "power": 123
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 123,
+    "nogo": 0,
+    "power": 123
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 123,
+    "nogo": 0,
+    "power": 123
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 290,
+    "nogo": 0,
+    "power": 290
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 290,
+    "nogo": 0,
+    "power": 290
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 290,
+    "nogo": 0,
+    "power": 290
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 290,
+    "nogo": 0,
+    "power": 290
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 294,
+    "nogo": 0,
+    "power": 294
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 294,
+    "nogo": 0,
+    "power": 294
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 294,
+    "nogo": 0,
+    "power": 294
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 294,
+    "nogo": 0,
+    "power": 294
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S1_rel_feasible"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S2_rel_tight"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 1,
+    "power": 1
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 1,
+    "power": 1
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 1,
+    "power": 1
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 1,
+    "power": 1
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S2_rel_tight"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 1,
+    "power": 7
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 1,
+    "power": 7
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 1,
+    "power": 7
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 1,
+    "power": 8
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S2_rel_tight"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 13,
+    "nogo": 0,
+    "power": 13
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S2_rel_tight"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 3,
+    "power": 25
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 3,
+    "power": 25
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 3,
+    "power": 25
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 3,
+    "power": 25
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S2_rel_tight"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false"
+  },
+  {
+   "Conly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 5,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 5,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 5,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 5,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false"
+  },
+  {
+   "Conly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 28,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 28,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 28,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 28,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false"
+  },
+  {
+   "Conly": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 54,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 54,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 54,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 7,
+    "go": 7,
+    "nogo": 54,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 5,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 5,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 5,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 5,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false"
+  },
+  {
+   "Conly": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 74,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 74,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 74,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 74,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 19,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 19,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 19,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 19,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S3_rel_bound_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 9,
+    "nogo": 3,
+    "power": 8
+   },
+   "Monly": {
+    "false_go": 1,
+    "go": 9,
+    "nogo": 3,
+    "power": 8
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 9,
+    "nogo": 3,
+    "power": 8
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 9,
+    "nogo": 3,
+    "power": 8
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 11,
+    "power": 17
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 11,
+    "power": 17
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 11,
+    "power": 17
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 11,
+    "power": 17
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 18,
+    "nogo": 19,
+    "power": 17
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 19,
+    "power": 17
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 19,
+    "power": 17
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 19,
+    "power": 17
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 4,
+    "nogo": 0,
+    "power": 3
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 4,
+    "nogo": 0,
+    "power": 3
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 23,
+    "power": 21
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 23,
+    "power": 21
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 23,
+    "power": 21
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 23,
+    "power": 21
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 2,
+    "power": 2
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 2,
+    "power": 2
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 2,
+    "power": 2
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 2,
+    "power": 2
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S4_rel_bound_true"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 64,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 64,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 64,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 64,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 11,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 370,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 370,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 370,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 370,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 232,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 232,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 232,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 232,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 808,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 808,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 808,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 808,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 778,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 778,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 778,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 778,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S5_rel_false_risk"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 8,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 21,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 50,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 50,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 50,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 193,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 193,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 193,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 193,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 193,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 193,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 193,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 193,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 416,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S6_rel_false_saving"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 4,
+    "nogo": 0,
+    "power": 4
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 5,
+    "nogo": 0,
+    "power": 5
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 5,
+    "nogo": 0,
+    "power": 5
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 60,
+    "nogo": 0,
+    "power": 60
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 41,
+    "nogo": 0,
+    "power": 41
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 61,
+    "nogo": 0,
+    "power": 61
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 49,
+    "nogo": 0,
+    "power": 49
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 23,
+    "nogo": 0,
+    "power": 23
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 31,
+    "nogo": 0,
+    "power": 31
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 30,
+    "nogo": 0,
+    "power": 30
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 33,
+    "nogo": 0,
+    "power": 33
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 128,
+    "nogo": 0,
+    "power": 128
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 128,
+    "nogo": 0,
+    "power": 128
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 128,
+    "nogo": 0,
+    "power": 128
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 128,
+    "nogo": 0,
+    "power": 128
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 84,
+    "nogo": 0,
+    "power": 84
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 84,
+    "nogo": 0,
+    "power": 84
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 84,
+    "nogo": 0,
+    "power": 84
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 84,
+    "nogo": 0,
+    "power": 84
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 322,
+    "nogo": 0,
+    "power": 322
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 322,
+    "nogo": 0,
+    "power": 322
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 322,
+    "nogo": 0,
+    "power": 322
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 322,
+    "nogo": 0,
+    "power": 322
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 309,
+    "nogo": 0,
+    "power": 309
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 309,
+    "nogo": 0,
+    "power": 309
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 309,
+    "nogo": 0,
+    "power": 309
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 309,
+    "nogo": 0,
+    "power": 309
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S7_rel_heavy"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 0,
+    "power": 9
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 18,
+    "nogo": 0,
+    "power": 18
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 18,
+    "nogo": 0,
+    "power": 18
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 18,
+    "nogo": 0,
+    "power": 18
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 18,
+    "nogo": 0,
+    "power": 18
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 1,
+    "power": 25
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 1,
+    "power": 25
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 1,
+    "power": 25
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 25,
+    "nogo": 1,
+    "power": 25
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 46,
+    "nogo": 0,
+    "power": 46
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 46,
+    "nogo": 0,
+    "power": 46
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 46,
+    "nogo": 0,
+    "power": 46
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 46,
+    "nogo": 0,
+    "power": 46
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 35,
+    "nogo": 1,
+    "power": 35
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 35,
+    "nogo": 1,
+    "power": 35
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 35,
+    "nogo": 1,
+    "power": 35
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 35,
+    "nogo": 1,
+    "power": 35
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 0,
+    "power": 67
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 0,
+    "power": 67
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 0,
+    "power": 67
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 67,
+    "nogo": 0,
+    "power": 67
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 72,
+    "nogo": 1,
+    "power": 72
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 72,
+    "nogo": 1,
+    "power": 72
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 72,
+    "nogo": 1,
+    "power": 72
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 72,
+    "nogo": 1,
+    "power": 72
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 156,
+    "nogo": 0,
+    "power": 156
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 156,
+    "nogo": 0,
+    "power": 156
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 156,
+    "nogo": 0,
+    "power": 156
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 156,
+    "nogo": 0,
+    "power": 156
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S8_rel_discordant"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 8,
+    "nogo": 0,
+    "power": 8
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 0,
+    "power": 9
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 0,
+    "power": 9
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 0,
+    "power": 9
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 9,
+    "nogo": 0,
+    "power": 9
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 0,
+    "power": 21
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 0,
+    "power": 21
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 0,
+    "power": 21
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 21,
+    "nogo": 0,
+    "power": 21
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S9_rel_chains_true"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 6,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 6,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 6,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 6,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 50,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 23,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 23,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 23,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 23,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S10_rel_chains_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 6,
+    "nogo": 0,
+    "power": 6
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 7,
+    "nogo": 0,
+    "power": 7
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 1,
+    "nogo": 0,
+    "power": 1
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 0,
+    "power": 17
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 0,
+    "power": 17
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 0,
+    "power": 17
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 17,
+    "nogo": 0,
+    "power": 17
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 2,
+    "nogo": 0,
+    "power": 2
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 27,
+    "nogo": 0,
+    "power": 27
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 3,
+    "nogo": 0,
+    "power": 3
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 4,
+    "nogo": 0,
+    "power": 3
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 4,
+    "nogo": 0,
+    "power": 3
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S11_rel_nonmono"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 3,
+    "go": 3,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S12_near_miss_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 1,
+    "nogo": 1,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 1,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false"
+  },
+  {
+   "Conly": {
+    "false_go": 10,
+    "go": 10,
+    "nogo": 2,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 5,
+    "go": 5,
+    "nogo": 2,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 2,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 2,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 2,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 6,
+    "go": 6,
+    "nogo": 2,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 8,
+    "go": 8,
+    "nogo": 2,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 8,
+    "go": 8,
+    "nogo": 2,
+    "power": 0
+   },
+   "claim_true": false,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S13_heavy_saving_false"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 0,
+    "nogo": 0,
+    "power": 0
+   },
+   "V1": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V2": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V3": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "V4": {
+    "false_go": 2,
+    "go": 2,
+    "nogo": 0,
+    "power": 0
+   },
+   "claim_true": true,
+   "n": 150,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 5,
+    "nogo": 0,
+    "power": 4
+   },
+   "Monly": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 5,
+    "nogo": 0,
+    "power": 4
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 6,
+    "nogo": 0,
+    "power": 5
+   },
+   "claim_true": true,
+   "n": 300,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 3,
+    "go": 115,
+    "nogo": 0,
+    "power": 112
+   },
+   "Monly": {
+    "false_go": 3,
+    "go": 122,
+    "nogo": 0,
+    "power": 119
+   },
+   "Ponly": {
+    "false_go": 3,
+    "go": 119,
+    "nogo": 0,
+    "power": 116
+   },
+   "V0": {
+    "false_go": 3,
+    "go": 119,
+    "nogo": 0,
+    "power": 116
+   },
+   "V1": {
+    "false_go": 1,
+    "go": 41,
+    "nogo": 0,
+    "power": 40
+   },
+   "V2": {
+    "false_go": 1,
+    "go": 41,
+    "nogo": 0,
+    "power": 40
+   },
+   "V3": {
+    "false_go": 1,
+    "go": 41,
+    "nogo": 0,
+    "power": 40
+   },
+   "V4": {
+    "false_go": 1,
+    "go": 42,
+    "nogo": 0,
+    "power": 41
+   },
+   "claim_true": true,
+   "n": 600,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 1,
+    "go": 491,
+    "nogo": 0,
+    "power": 490
+   },
+   "Monly": {
+    "false_go": 1,
+    "go": 492,
+    "nogo": 0,
+    "power": 491
+   },
+   "Ponly": {
+    "false_go": 1,
+    "go": 492,
+    "nogo": 0,
+    "power": 491
+   },
+   "V0": {
+    "false_go": 1,
+    "go": 492,
+    "nogo": 0,
+    "power": 491
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 254,
+    "nogo": 0,
+    "power": 254
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 254,
+    "nogo": 0,
+    "power": 254
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 253,
+    "nogo": 0,
+    "power": 253
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 254,
+    "nogo": 0,
+    "power": 254
+   },
+   "claim_true": true,
+   "n": 1200,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid"
+  },
+  {
+   "Conly": {
+    "false_go": 0,
+    "go": 883,
+    "nogo": 0,
+    "power": 883
+   },
+   "Monly": {
+    "false_go": 0,
+    "go": 883,
+    "nogo": 0,
+    "power": 883
+   },
+   "Ponly": {
+    "false_go": 0,
+    "go": 883,
+    "nogo": 0,
+    "power": 883
+   },
+   "V0": {
+    "false_go": 0,
+    "go": 883,
+    "nogo": 0,
+    "power": 883
+   },
+   "V1": {
+    "false_go": 0,
+    "go": 785,
+    "nogo": 0,
+    "power": 785
+   },
+   "V2": {
+    "false_go": 0,
+    "go": 785,
+    "nogo": 0,
+    "power": 785
+   },
+   "V3": {
+    "false_go": 0,
+    "go": 785,
+    "nogo": 0,
+    "power": 785
+   },
+   "V4": {
+    "false_go": 0,
+    "go": 785,
+    "nogo": 0,
+    "power": 785
+   },
+   "claim_true": true,
+   "n": 2400,
+   "reps": 1000,
+   "scenario": "S14_one_feasible_in_grid"
+  }
+ ],
+ "reps": 1000,
+ "seconds": 519
+}

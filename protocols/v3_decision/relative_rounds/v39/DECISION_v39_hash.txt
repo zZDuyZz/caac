@@ -1,0 +1,5 @@
+d6e23f98c8241382c85a7516941e6995042bbc63af4729c23a8fc4ead374c3b6  DECISION_v39_before_run.md
+Fri Nov 27 05:10:41 UTC 2026
+d8ecdbc13f73f6dcaa50dd1dcca6691b07e8209dc2cec0a2062b495cb700589c  DECISION_v39_before_run.md
+(rev. 1 supersedes d6e23f98..., corrected before any run)
+Fri Nov 27 05:11:06 UTC 2026

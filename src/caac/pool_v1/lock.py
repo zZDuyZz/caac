@@ -75,6 +75,8 @@ def check_config_against_lock(cfg: Config, path, caps: dict | None = None,
         from caac.pool_v1.audit import REL_TEST
         if a["rel_test"] != REL_TEST:
             bad.append(f"rel_test: code {REL_TEST!r} != lock {a['rel_test']!r}")
+    if cfg.claim == "relative" and "rel_modes" in a and cfg.rel_mode not in a["rel_modes"]:
+        bad.append(f"rel_mode {cfg.rel_mode!r} not in lock rel_modes {a['rel_modes']}")
     if cfg.claim not in claims:
         bad.append(f"claim {cfg.claim!r} not in lock claims {claims}")
     if cfg.claim == "relative":

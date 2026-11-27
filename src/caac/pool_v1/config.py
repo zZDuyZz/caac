@@ -75,6 +75,7 @@ class Config:
     design: str = "v2"                  # "v2" = split A/B (lock v2); "v3" = no split, Bonferroni, structural range
     claim: str = "absolute"             # v3 only: "absolute" (R <= alpha) | "relative" (R - R_big <= eps)
     eps: float = 0.02                   # margin of the relative claim
+    rel_mode: str = "fixed_n"           # v3-11 profiler: declared use, "fixed_n" (read once) | "anytime" (looked at while rows arrive)
 
     def to_dict(self) -> dict:
         """Design v2 configs serialize exactly as before v3 existed (same report bytes);
@@ -93,6 +94,7 @@ class Config:
             d["design"] = self.design
             if self.claim != "absolute":
                 d["claim"], d["eps"] = self.claim, self.eps
+                d["rel_mode"] = self.rel_mode
             d["cost"]["c_max_big"] = c.c_max_big
         else:
             for a in d["cost"]["also"]:
@@ -177,15 +179,20 @@ def config_from_dict(d: dict) -> Config:
     eps = float(d.get("eps", 0.02))
     if not (0.0 <= eps < 1.0):
         raise ValueError("config: eps must be in [0, 1)")
+    rel_mode = d.get("rel_mode", "fixed_n")
+    if rel_mode not in ("fixed_n", "anytime"):
+        raise ValueError("config: rel_mode must be 'fixed_n' or 'anytime'")
+    if "rel_mode" in d and claim != "relative":
+        raise ValueError("config: rel_mode applies to the relative claim only")
     unknown = set(d) - {"small", "big", "alpha", "delta", "s", "salt", "audit_split", "cost",
-                        "policies", "cost_test", "serving_mode", "notes", "design", "claim", "eps"}
+                        "policies", "cost_test", "serving_mode", "notes", "design", "claim", "eps", "rel_mode"}
     if unknown:
         raise ValueError(f"config: unknown key(s) {sorted(unknown)}")
     return Config(small=d["small"], big=d["big"], alpha=alpha, delta=delta, s=s,
                   salt=str(d.get("salt", "caac-audit-v1")), audit_split=d.get("audit_split"),
                   cost=cost, policies=grid, cost_test=ct,
                   serving_mode=str(d.get("serving_mode", "batch")), design=design,
-                  claim=claim, eps=eps)
+                  claim=claim, eps=eps, rel_mode=rel_mode)
 
 
 def load_config(path: str | Path) -> Config:

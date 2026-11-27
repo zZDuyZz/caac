@@ -16,7 +16,12 @@
   ],
   "claim_main": "relative",
   "eps": 0.02,
-  "rel_test": "bet"
+  "rel_test": "profiler",
+  "rel_modes": [
+   "fixed_n",
+   "anytime"
+  ],
+  "rel_mode_default": "fixed_n"
  },
  "policies": {
   "k": [
@@ -384,6 +389,42 @@
    "seen_v3_results": true,
    "seen_relative_results": true,
    "evidence": "protocols/v3_decision/uc/ (rule and criteria hashed before any run)"
+  },
+  {
+   "id": "v3-9",
+   "what": "candidate round for the relative tests (exact conditional quality test R1, per-policy cost range P, bet cap 0.9 C, mixture bets M); the variant chosen by its rule (R1+P+C) was NOT adopted",
+   "why": "#170 baseline comparison: the v3-8 relative audit was valid everywhere but less powerful than CLT + Bonferroni",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_relative_results": true,
+   "evidence": "protocols/v3_decision/relative_rounds/v39/ (design rev.1 sha256 d8ecdbc1..., hashed before any run); chosen variant lowered synthetic power in 28/40 claim-true cells"
+  },
+  {
+   "id": "v3-10",
+   "what": "candidate round 2 for the relative tests, each with the per-policy structural range lo_pi = -(small_cap_pi + s big_max) (tokens measure; replay records small_cap and the audit stops if a row exceeds it) for the GO cost leg: quality by betting (B), by an exact conditional test on the discordant questions with a Berger-Boos term gamma 1e-4 (X), or min(1, 2 min(p_bet, p_exact)) (H); bet cap 0.9 or 0.99. Chosen and confirmed: H1 (fixed-n valid). Used from v3-11 on: H1's NO-GO quality leg in the fixed_n mode, and B1 (betting only, cap 0.9) as the anytime mode (deviation v3-11-D2)",
+   "why": "raise power without losing the finite-sample guarantee; selected on development data, confirmed on fresh draws (all four criteria)",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_relative_results": true,
+   "evidence": "protocols/v3_decision/relative_rounds/v310/ (design sha256 e95a309e..., deviation D1 fe863afd... added the W1 threshold to the selection rule before confirmation)"
+  },
+  {
+   "id": "v3-11",
+   "what": "profiler: the relative tests follow the declared use (config rel_mode, fixed before the data are read). fixed_n (default; read once at n): fixed-n bets on both GO legs, lambda_t = min(0.9/|lo|, sqrt(2 ln(1/level)/(n v_{t-1}))), level = delta/|Pi| (F2); NO-GO quality min(1, 2 min(p_bet, p_exact)) (v3-10), NO-GO cost v3-8. anytime: B1 of v3-10 (GO quality v3-8 bet, GO cost plug-in bet with the per-policy range and cap 0.9, NO-GO legs v3-8 bets), valid at every look. Certified saving S* and the evidence gap use the tests of the declared mode",
+   "why": "diagnostics located the remaining power gap in the quality leg; fixed-n bets recover part of it; selected on development data, confirmed on fresh draws (all four criteria)",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_relative_results": true,
+   "evidence": "protocols/v3_decision/relative_rounds/v311/ (design sha256 1230a455..., hashed before any run)"
+  },
+  {
+   "id": "v3-11-D2",
+   "what": "the anytime mode was first set to H1; H1's exact component is valid only when the result is read once at a fixed n, so H1 is not valid under repeated looks. Corrected to B1 (betting only) before any anytime result was used. The anytime mode also processes the rows in the order given (the arrival order) instead of the salted hash order, so that every look is a stopping time of the same wealth process",
+   "why": "validity: the anytime mode must hold at every look (Ville's inequality needs every p-value to come from a nonnegative supermartingale)",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_relative_results": true,
+   "evidence": "B1 on the v3-10 confirmation draws (fresh seeds bl2/BL2, not used to choose B1): W2 power .314/.436/.551 vs v3-8 .248/.393/.517, largest per-configuration false GO .04, none failing, W1 gain 0.000, no v3-8 GO lost; peeking experiment planned"
   }
  ],
  "revision": 1,

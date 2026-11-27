@@ -156,6 +156,7 @@ class PolicyData:
     error: list[bool]        # True only if served and wrong
     cost: list[float]
     small_part: list[float] | None = None   # v3: cost of the small model's draws (cost - small_part is 0 or the big-only cost)
+    small_cap: float | None = None          # v3-9: structural bound of this policy's own small part (data-independent), None = use inp.small_max
 
 
 @dataclass
@@ -337,10 +338,17 @@ def _check3(inp: AuditInput) -> None:
             diff = c - a
             if abs(diff) > tol * max(1.0, abs(c)) and abs(diff - inp.big_cost[i]) > tol * max(1.0, abs(c)):
                 raise ValueError(f"policy {p.name}: cost is not small part (+ big-only cost) at question {i}")
+        if p.small_cap is not None:                      # v3-10: per-policy structural bound must hold on every row
+            if not (0 < p.small_cap <= inp.small_max * (1 + tol)):
+                raise ValueError(f"policy {p.name}: small_cap {p.small_cap} outside (0, small_max={inp.small_max}]")
+            for i, a in enumerate(p.small_part):
+                if a > p.small_cap * (1 + tol):
+                    raise ValueError(f"policy {p.name}: small part {a} above its structural bound {p.small_cap} "
+                                     f"at question {i}")
 
 
 REL_TESTS = ("bet", "harm", "mix")
-REL_TEST = "bet"          # GO risk leg of the relative claim; FIXED by the simulation rule (DECISION rev. 2)
+REL_TEST = "profiler"     # v3-10/v3-11: relative tests chosen by the declared use (rel_legs); "bet"/"harm"/"mix" = lock v3-8 (legacy)
 
 
 def rel_risk_p(D: list[int], eps: float, order: list[int], test: str) -> float:
@@ -361,6 +369,168 @@ def rel_risk_p(D: list[int], eps: float, order: list[int], test: str) -> float:
     if test == "harm":
         return ph
     return min(1.0, 2.0 * min(pb, ph))
+
+
+# ------------------------------------------------ amendments v3-10 / v3-11: relative-claim tests by mode
+REL_MODES = ("fixed_n", "anytime")   # declared use (the profiler's input): read once at n, or looked at while rows arrive
+REL_MODE = "fixed_n"                 # default: offline replay, the use of every run in the paper
+BET_CAP = 0.9                        # v3-10: cap of the GO cost-leg bets (and of the fixed-n bets), as a fraction of 1/|lo|
+GAMMA_XC = 1e-4                      # v3-9: Berger-Boos term of the exact conditional quality test
+
+
+def _betting_p_cap(x: list[float], lo: float, hi: float, order: list[int] | None, cap: float) -> float:
+    """_betting_p with the bet cap as a parameter (cap = 0.5 is _betting_p). 1 + l x >= 1 - cap > 0."""
+    if cap == 0.5:
+        return _betting_p(x, lo, hi, order)
+    n = len(x)
+    if n < 2 or lo >= 0 or hi <= 0:
+        return 1.0
+    idx = order if order is not None else list(range(n))
+    lmax = cap / (-lo)
+    logk, best = 0.0, 0.0
+    s1 = s2 = 0.0
+    m = 0
+    for i in idx:
+        mu = s1 / m if m else 0.0
+        var = (s2 / m - mu * mu) if m else 0.0
+        lam = 0.0 if mu <= 0 else min(lmax, mu / (var + mu * mu + 1e-12))
+        logk += math.log1p(lam * x[i])
+        best = max(best, logk)
+        s1 += x[i]; s2 += x[i] * x[i]; m += 1
+    return min(1.0, math.exp(-best))
+
+
+def _betting_fixed_n_p(x: list[float], lo: float, hi: float, level: float, order: list[int] | None,
+                       cap: float = BET_CAP) -> float:
+    """Fixed-n betting test (v3-11), H0: E[x] <= 0, x in [lo, hi]. Bets tuned to the known n and the level:
+    l_t = min(cap/|lo|, sqrt(2 ln(1/level) / (n v_{t-1}))), v_{t-1} = ((hi - lo)^2/4 + sum_{i<t}(x_i - mean)^2) / t.
+    l_t is predictable and >= 0, 1 + l x >= 1 - cap > 0: K is a nonnegative supermartingale under H0 and
+    Ville gives P(p <= a) <= a for every a (the tuning only changes power)."""
+    n = len(x)
+    if n < 2 or lo >= 0 or hi <= 0:
+        return 1.0
+    idx = order if order is not None else list(range(n))
+    lmax = cap / (-lo)
+    prior = (hi - lo) ** 2 / 4.0
+    c = 2.0 * math.log(1.0 / level)
+    logk = best = s1 = s2 = 0.0
+    for m, i in enumerate(idx):
+        if m:
+            mu = s1 / m
+            v = (prior + s2 - m * mu * mu) / (m + 1)
+        else:
+            v = prior
+        lam = min(lmax, math.sqrt(c / (n * v)))
+        logk += math.log1p(lam * x[i])
+        best = max(best, logk)
+        s1 += x[i]; s2 += x[i] * x[i]
+    return min(1.0, math.exp(-best))
+
+
+def _binom_sf(k: int, n: int, p: float) -> float:
+    """P(X >= k), X ~ Bin(n, p)."""
+    if k <= 0:
+        return 1.0
+    if k > n:
+        return 0.0
+    return min(1.0, max(0.0, 1.0 - binom_cdf(k - 1, n, p)))
+
+
+def _cp_upper(m: int, n: int, gamma: float) -> float:
+    """Smallest theta with P(Bin(n, theta) <= m) <= gamma (one-sided exact upper bound, bisection)."""
+    if m >= n:
+        return 1.0
+    lo, hi = m / n, 1.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if binom_cdf(m, n, mid) <= gamma:
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def _cp_lower(m: int, n: int, gamma: float) -> float:
+    """Largest theta with P(Bin(n, theta) >= m) <= gamma; 0 if m = 0."""
+    if m <= 0:
+        return 0.0
+    lo, hi = 0.0, m / n
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if _binom_sf(m, n, mid) <= gamma:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+def p_rel_exact_go(D: list[int], eps: float, gamma: float = GAMMA_XC) -> float:
+    """Exact conditional test of H0: E[D] >= eps (v3-9 R1). Given the m discordant questions, the harm count H is
+    Bin(m, pi) with pi = P(D=1 | D!=0); E[D] = theta (2 pi - 1), theta = P(D != 0). With theta_U the exact upper
+    bound of theta at 1 - gamma: if theta_U < eps, p = gamma; else H0 implies pi >= 0.5 + eps/(2 theta_U) on the
+    event theta <= theta_U, and p = P(Bin(m, pi_min) <= H) + gamma (Berger-Boos)."""
+    n = len(D)
+    h = sum(1 for v in D if v > 0)
+    m = h + sum(1 for v in D if v < 0)
+    th = _cp_upper(m, n, gamma)
+    if th < eps:
+        return min(1.0, gamma)
+    return min(1.0, binom_cdf(h, m, 0.5 + eps / (2.0 * th)) + gamma)
+
+
+def p_rel_exact_above(D: list[int], eps: float, gamma: float = GAMMA_XC) -> float:
+    """Exact conditional test of H0: E[D] <= eps (NO-GO direction)."""
+    n = len(D)
+    h = sum(1 for v in D if v > 0)
+    m = h + sum(1 for v in D if v < 0)
+    tl = _cp_lower(m, n, gamma)
+    pi_max = 1.0 if tl <= eps else min(1.0, 0.5 + eps / (2.0 * tl))
+    return min(1.0, _binom_sf(h, m, pi_max) + gamma)
+
+
+def rel_quality_go_p(D: list[int], eps: float, order: list[int], level: float, mode: str) -> float:
+    """GO quality p-value of the relative claim in the declared mode (see rel_legs)."""
+    if mode not in REL_MODES:
+        raise ValueError(f"relative mode must be one of {REL_MODES}")
+    if mode == "fixed_n":
+        return _betting_fixed_n_p([eps - v for v in D], eps - 1.0, eps + 1.0, level, order)
+    return _betting_p([eps - v for v in D], eps - 1.0, eps + 1.0, order)        # anytime: betting only (Ville)
+
+
+def rel_legs(D: list[int], d: list[float], eps: float, order: list[int], level: float, lo_pol: float,
+             lo: float, hi: float, mode: str) -> tuple[float, float, float, float]:
+    """The four p-values of one policy for the relative claim (v3-10 / v3-11).
+      fixed_n  GO quality: fixed-n bet on eps - D; GO cost: fixed-n bet on d in [lo_pol, hi] (v3-11, F2);
+               NO-GO quality: min(1, 2 min(bet, exact)) on D - eps (v3-10); NO-GO cost: v3-8 bet.
+               Valid when the result is read once at this n (the exact test is a fixed-n test).
+      anytime  GO quality: v3-8 bet on eps - D; GO cost: plug-in bet on d in [lo_pol, hi], cap 0.9 (v3-10 B1);
+               NO-GO legs: v3-8 bets. Betting only, so every p-value is valid at every look (Ville).
+    GO cost p-value is 1 when mean(D) > eps (gate, as in v3-8)."""
+    n = len(D)
+    gate = sum(D) / n <= eps
+    pr_go = rel_quality_go_p(D, eps, order, level, mode)
+    if mode == "fixed_n":
+        ps_go = _betting_fixed_n_p(d, lo_pol, hi, level, order) if gate else 1.0
+    else:
+        ps_go = _betting_p_cap(d, lo_pol, hi, order, BET_CAP) if gate else 1.0
+    pbn = _betting_p([v - eps for v in D], -1.0 - eps, 1.0 - eps, order)
+    pr_ng = min(1.0, 2.0 * min(pbn, p_rel_exact_above(D, eps))) if mode == "fixed_n" else pbn
+    ps_ng = _betting_p([-v for v in d], -hi, -lo, order)
+    return pr_go, ps_go, pr_ng, ps_ng
+
+
+def test_order(qids: list[str], salt: str, anytime: bool) -> list[int]:
+    """Order in which the tests see the questions. Read once (absolute claim, fixed_n): the salted hash order,
+    data-independent. anytime: the order of the rows as given, which must be the order in which they arrived, so
+    that the wealth processes are supermartingales in time and every look is covered by Ville's inequality."""
+    return list(range(len(qids))) if anytime else _order(qids, salt)
+
+
+def policy_lo(inp: "AuditInput", p: "PolicyData", s: float) -> float:
+    """Lower end of d for the GO cost leg of one policy: per-policy structural range when the policy carries
+    small_cap (tokens measure), else the global structural range."""
+    cap = p.small_cap if p.small_cap is not None else inp.small_max
+    return -(cap + max(s, 0.0) * inp.big_max)
 
 
 RELATIVE_NOTE = ("relative claim: R_pi - R_big <= eps (paired with the big model's draw 0, the answer an "
@@ -385,7 +555,7 @@ def _check_relative(inp: AuditInput) -> None:
 
 def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: float = 0.20,
            salt: str = DEFAULT_SALT, claim: str = "absolute", eps: float = 0.02,
-           rel_test: str | None = None) -> AuditResult:
+           rel_test: str | None = None, rel_mode: str = REL_MODE) -> AuditResult:
     """Design v3. Guarantee: each verdict is wrong with probability <= delta.
       GO       some policy passes BOTH legs on all questions, each at delta/|Pi|: exact binomial
                rejecting "R > alpha" and betting rejecting "E[d] < 0". By a union bound over the
@@ -396,18 +566,25 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
       else INCONCLUSIVE (also when both fire: flagged conflict).
     claim = "relative": the risk leg becomes R_pi - R_big <= eps, tested by betting on
       x_i = eps - D_i with D_i = e_pi,i - e_big,i in {-1, 0, 1} (range [eps - 1, eps + 1]), at the same
-      levels; NO-GO rejects "R_pi - R_big <= eps" by betting on D_i - eps. Same guarantee."""
+      levels; NO-GO rejects "R_pi - R_big <= eps" by betting on D_i - eps. Same guarantee.
+    Since amendments v3-10 / v3-11 the relative tests depend on the DECLARED use (rel_mode, fixed before the
+    data are read): see rel_legs. rel_test in ("bet", "harm", "mix") reproduces lock v3-8 exactly (for checks)."""
     if claim not in ("absolute", "relative"):
         raise ValueError("claim must be 'absolute' or 'relative'")
     _check3(inp)
     rel = claim == "relative"
+    legacy = rel_test in REL_TESTS
     if rel:
         if not (0.0 <= eps < 1.0):
             raise ValueError("eps must be in [0, 1)")
+        if rel_test is not None and not legacy and rel_test != REL_TEST:
+            raise ValueError(f"rel_test must be {REL_TEST!r} or a legacy test {REL_TESTS}")
+        if not legacy and rel_mode not in REL_MODES:
+            raise ValueError(f"rel_mode must be one of {REL_MODES}")
         _check_relative(inp)
     n, m = len(inp.qids), len(inp.policies)
     lo, hi = structural_range(inp.small_max, inp.big_max, s)
-    order = _order(inp.qids, salt)
+    order = test_order(inp.qids, salt, rel and not legacy and rel_mode == "anytime")
     res = AuditResult("INCONCLUSIVE", alpha, delta, s, n, 0, n)
     lvl = delta / m
     rows, passing, all_rej = [], [], True
@@ -419,14 +596,17 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
         if rel:
             D = [int(bool(p.error[i])) - int(bool(inp.big_error[i])) for i in range(n)]
             dh = sum(D) / n
-            pr_go = rel_risk_p(D, eps, order, rel_test or REL_TEST)
-            ps_go = _betting_p(d, lo, hi, order) if dh <= eps else 1.0
-            pr_ng = _betting_p([v - eps for v in D], -1.0 - eps, 1.0 - eps, order)
+            if legacy:
+                pr_go = rel_risk_p(D, eps, order, rel_test)
+                ps_go = _betting_p(d, lo, hi, order) if dh <= eps else 1.0
+                pr_ng = _betting_p([v - eps for v in D], -1.0 - eps, 1.0 - eps, order)
+            else:
+                pr_go, ps_go, pr_ng, ps_ng_rel = rel_legs(D, d, eps, order, lvl, policy_lo(inp, p, s), lo, hi, rel_mode)
         else:
             pr_go = p_risk_below(e, sv, alpha)
             ps_go = _betting_p(d, lo, hi, order) if (sv and e / sv <= alpha) else 1.0
             pr_ng = p_risk_above(e, sv, alpha)
-        ps_ng = _betting_p([-v for v in d], -hi, -lo, order)
+        ps_ng = ps_ng_rel if (rel and not legacy) else _betting_p([-v for v in d], -hi, -lo, order)
         ok = pr_go <= lvl and ps_go <= lvl
         rej = pr_ng <= delta / 2 or ps_ng <= delta / 2
         all_rej &= rej
@@ -459,7 +639,10 @@ def audit3(inp: AuditInput, *, alpha: float = 0.10, delta: float = 0.10, s: floa
     res.notes.append("design v3: no split; Bonferroni over the candidate set; structural cost range")
     if rel:
         res.notes.append(RELATIVE_NOTE + f" (eps = {eps})")
-        res.go["claim"], res.go["eps"], res.go["rel_test"] = "relative", eps, rel_test or REL_TEST
+        res.go["claim"], res.go["eps"] = "relative", eps
+        res.go["rel_test"] = rel_test if legacy else REL_TEST
+        if not legacy:
+            res.go["rel_mode"] = rel_mode
         res.go["big_only_error"] = round(eb / n, 6)
         if go:
             res.go["delta_hat"] = rows[j]["delta_hat"]
