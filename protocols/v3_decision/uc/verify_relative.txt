@@ -1,0 +1,60 @@
+== relative: reports 6867; C2 differing 0; C4 differing 0; C5 failing 0; C1 map lines equal ignoring report hashes: True (6031 lines)
+{
+ "primary": {
+  "go:groups_flagged": 0,
+  "go:verdict_changes_with_measure": 0,
+  "inc:below_floor": 20,
+  "inc:reachable": 9,
+  "inc:reachable:blocking=risk": 7,
+  "inc:reachable:blocking=saving": 2,
+  "inc:unreachable": 19,
+  "inc:unreachable:blocking=power": 3,
+  "inc:unreachable:blocking=risk": 4,
+  "inc:unreachable:blocking=saving": 4,
+  "inc:unreachable:blocking=trade_off": 8,
+  "nogo_any_quality_rejection": 27,
+  "nogo_any_saving_rejection": 37,
+  "nogo_rejected_by_both(policies)": 45,
+  "nogo_rejected_by_quality(policies)": 51,
+  "nogo_rejected_by_saving(policies)": 289,
+  "smaller_saving_certified:INCONCLUSIVE": 2,
+  "verdict:GO": 7,
+  "verdict:INCONCLUSIVE": 28,
+  "verdict:NO-GO": 41,
+  "reachable_more_questions_median": 3602,
+  "reachable_more_questions_quartiles": [
+   1706.5,
+   3602.0,
+   44016.0
+  ]
+ },
+ "secondary": {
+  "go:groups_flagged": 0,
+  "go:verdict_changes_with_measure": 0,
+  "inc:below_floor": 639,
+  "inc:reachable": 637,
+  "inc:reachable:blocking=risk": 418,
+  "inc:reachable:blocking=saving": 219,
+  "inc:unreachable": 954,
+  "inc:unreachable:blocking=power": 73,
+  "inc:unreachable:blocking=risk": 335,
+  "inc:unreachable:blocking=saving": 271,
+  "inc:unreachable:blocking=trade_off": 275,
+  "nogo_any_quality_rejection": 2561,
+  "nogo_any_saving_rejection": 2827,
+  "nogo_rejected_by_both(policies)": 3254,
+  "nogo_rejected_by_quality(policies)": 7476,
+  "nogo_rejected_by_saving(policies)": 13348,
+  "smaller_saving_certified:INCONCLUSIVE": 144,
+  "smaller_saving_certified:NO-GO": 9,
+  "verdict:GO": 577,
+  "verdict:INCONCLUSIVE": 1591,
+  "verdict:NO-GO": 3787,
+  "reachable_more_questions_median": 2900,
+  "reachable_more_questions_quartiles": [
+   719.0,
+   2900.0,
+   10827.5
+  ]
+ }
+}

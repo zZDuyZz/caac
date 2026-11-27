@@ -15,6 +15,7 @@ import math
 from caac.pool_v1.audit import audit, audit3, binom_cdf, certified_frontier, in_half_a, served_needed, structural_range
 from caac.pool_v1.certsave import certified_saving
 from caac.pool_v1.gap import gap as evidence_gap, gap_relative
+from caac.pool_v1.action import action_from_report
 from caac.pool_v1.config import Config
 from caac.pool_v1.replay import replay
 from caac.pool_v1.schema import Meta, Row
@@ -113,6 +114,8 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
     if not val.ok:
         rep["R1_verdict"] = {"verdict": "NOT RUN", "reason": "the pool has errors (see R5)"}
         rep["R5_data_quality"] = r5
+        if cfg.design == "v3":
+            rep["R1_verdict"]["action"] = action_from_report(rep)
         return rep
 
     rr = replay(rows, meta, cfg)
@@ -318,6 +321,8 @@ def make_report(rows: list[Row], meta: Meta | None, cfg: Config, *, row_errors=(
     if r5_note:
         r5["replay_notes"].append(r5_note)
     rep["R5_data_quality"] = r5
+    if v3:
+        rep["R1_verdict"]["action"] = action_from_report(rep)    # amendment v3-8: never changes the verdict
     return rep
 
 
@@ -448,6 +453,8 @@ def to_markdown(rep: dict) -> str:
     L = ["# CAAC report", ""]
     if v["verdict"] == "NOT RUN":
         L += [f"**Verdict: NOT RUN** - {v['reason']}", ""]
+        if "action" in v:
+            L += ["## What to do", ""] + [f"- {t}" for t in v["action"]["text"]] + [""]
     else:
         L += [f"**Verdict: {v['verdict']}**" + (" (GO and NO-GO both fired; reported as INCONCLUSIVE)"
                                                if v.get("conflict") else ""), "", v["guarantee"], "",
@@ -461,6 +468,8 @@ def to_markdown(rep: dict) -> str:
                    [f"- questions: {v['n_questions']} (half A {v['n_half_a']} to choose, half B {v['n_half_b']} to test)",
                     f"- candidate policies: {v['n_policies']}; chosen on half A: {v['chosen_on_half_a']}",
                     f"- cost test: {v['cost_test']}; split salt: `{v['salt']}`", ""])
+        if "action" in v:
+            L += ["## What to do", ""] + [f"- {t}" for t in v["action"]["text"]] + [""]
         r2 = rep["R2_estimates"]
         if r2.get("policy"):
             lo, hi = r2["risk_interval"]

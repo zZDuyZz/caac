@@ -279,7 +279,8 @@
   "v1_and_v2": "v1 = the run registered first (reported in full, as is); v2 = amended after v1 was seen, reported beside it with the amendment list; claims of the paper rest on v2 for public sources and on the single opening of our test split",
   "v1_v2_v3": "v1 = registered first, v2 = amended after v1, v3 = amended after v2 (see amendments v3-1..v3-4); all three reported side by side; claims of the paper rest on v3 for public sources and on the single opening of our test split",
   "claims": "relative = the paper's answer to 'is small-first worth deploying instead of big-only'; absolute = SLA option; each verdict controls its own error at delta (no joint guarantee)",
-  "certified_saving": "every v3 report gives S* (certified saving) beside the verdict; same guarantee as the verdict; reported for all configurations"
+  "certified_saving": "every v3 report gives S* (certified saving) beside the verdict; same guarantee as the verdict; reported for all configurations",
+  "action": "every v3 report gives an action (deploy / keep_big / collect_or_stop / check_data / fix_data) derived only from report fields; it never changes the verdict"
  },
  "frozen_on": null,
  "supersedes": "audit_lock_v2.json (tag audit-lock-v2-final, commit 35f3706, hash 5a542f87...) for the verdict procedure; v1 and v2 results stay reported beside v3",
@@ -374,6 +375,15 @@
    "seen_v3_results": true,
    "seen_relative_results": true,
    "evidence": "protocols/v3_decision/ua/ (design + criteria hashed before any run; simulation: validity <= 0.024; real data: GO iff S* >= .20 in 12,062/12,062 rows)"
+  },
+  {
+   "id": "v3-8",
+   "what": "action guidance added to every v3 report (R1_verdict.action + 'What to do' in markdown): a pure function of fields already in the report (verdict, conflict, S*, per-policy rows, R3, R4 evidence gap and floor); INCONCLUSIVE split into reachable (questions still needed, blocking leg) and unreachable (blocking: risk / saving / trade_off / power), plus below_floor; NO-GO split by rejecting leg. No new test; no verdict changes",
+   "why": "readers must be able to act on every verdict, INCONCLUSIVE included (user request 26/11: U-c)",
+   "seen_v2_results": true,
+   "seen_v3_results": true,
+   "seen_relative_results": true,
+   "evidence": "protocols/v3_decision/uc/ (rule and criteria hashed before any run)"
   }
  ],
  "revision": 1,
